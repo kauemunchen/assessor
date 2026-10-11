@@ -1,0 +1,21 @@
+services:
+  assessor:
+    build: .
+    container_name: assessor-km
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./src/personas:/app/src/personas
+      - ./src/conhecimento:/app/src/conhecimento
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.assessor.rule=Host(`assessor.SEUDOMINIO.com.br`)
+      - traefik.http.routers.assessor.entrypoints=websecure
+      - traefik.http.routers.assessor.tls.certresolver=letsencrypt
+      - traefik.http.services.assessor.loadbalancer.server.port=3000
+    networks:
+      - traefik
+networks:
+  traefik:
+    external: true
