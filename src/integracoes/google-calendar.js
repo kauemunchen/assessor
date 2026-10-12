@@ -29,6 +29,11 @@ export async function listarEventos(contaId, { inicio, fim, max = 50 } = {}) {
     timeMax: fim || new Date(Date.now() + 30 * 864e5).toISOString(), maxResults: max, singleEvents: true, orderBy: 'startTime' });
   return r.data.items || [];
 }
+export async function buscarEventos(contaId, texto, dias = 365) {
+  const r = await servico(contaId).events.list({ calendarId: 'primary', q: texto, timeMin: new Date().toISOString(),
+    timeMax: new Date(Date.now() + dias * 864e5).toISOString(), maxResults: 50, singleEvents: true, orderBy: 'startTime' });
+  return r.data.items || [];
+}
 export async function criarEvento(contaId, { titulo, inicio, fim, descricao = '', local = '', convidados = [], lembreteMin = 30, meet = false }) {
   inicio = norm(inicio); fim = norm(fim) || new Date(new Date(inicio).getTime() + 36e5).toISOString().slice(0, 19);
   const body = { summary: titulo, description: descricao, location: local,

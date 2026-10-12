@@ -20,6 +20,7 @@ export async function responder({ prompt, conta, modulo, msg }) {
 FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas, sem linhas ---. Negrito só com *uma palavra*. Listas com "-" e no máximo 5 itens. Resposta "curta" = até 6 linhas; "média" = até 12; "completa" = até 25. Vá direto ao ponto, sem introdução nem fechamento.`,
     tools: decls.length ? [{ functionDeclarations: decls }] : undefined });
   const contents = [{ role: 'user', parts: [{ text: msg.texto }] }];
+  let ultimoErro = null, assinaturaAnterior = '';
   for (let i = 0; i < 5; i++) {
     const r = await m.generateContent({ contents });
     const cand = r.response.candidates?.[0];
@@ -27,6 +28,9 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
     const calls = parts.filter(p => p.functionCall).map(p => p.functionCall);
     if (!calls.length) return r.response.text();
     contents.push({ role: 'model', parts });
+    const assinatura = JSON.stringify(calls);
+    if (assinatura === assinaturaAnterior && ultimoErro) return `Não consegui: ${ultimoErro}`;
+    assinaturaAnterior = assinatura;
     const respostas = [];
     for (const c of calls) {
       if (precisaConfirmar(modulo, c.name)) {
@@ -35,10 +39,10 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
       }
       let result;
       try { result = { result: await executarFerramenta(modulo, c.name, c.args, conta, { chatId: msg.chatId }) }; }
-      catch (e) { result = { erro: e.message }; }
+      catch (e) { result = { erro: e.message }; ultimoErro = e.message; console.error(`[tool] ${modulo}.${c.name}`, e.message); }
       respostas.push({ functionResponse: { name: c.name, response: result } });
     }
     contents.push({ role: 'user', parts: respostas });
   }
-  return 'Não consegui concluir. Tente de novo com mais detalhes.';
+  return ultimoErro ? `Não consegui: ${ultimoErro}` : 'Não consegui concluir. Tente de novo com mais detalhes.';
 }
