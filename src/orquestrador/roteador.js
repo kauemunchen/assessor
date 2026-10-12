@@ -60,7 +60,11 @@ export async function tratarMensagem(msg, canal) {
     const continuacao = /^(aprov|sim\b|ok\b|pode|confirm|agend|ajust|troca|muda|mudar|publica|refaz|outra|outro|mais |menos |n[ãa]o\b|cancela|deixa|essa|esse|isso|a segunda|a primeira|prefiro)/i.test(msg.texto.trim()) || msg.texto.trim().length < 25;
     if (recente && continuacao && ativos.includes(ult.modulo)) modulo = ult.modulo;
   }
-  if (!modulo) modulo = await classificar(msg.texto, ativos);
+  // Nome desconhecido no início ("OLGA, …") → ignora o vocativo e classifica pelo conteúdo
+  let textoClass = msg.texto;
+  const voc = msg.texto.match(/^([A-Za-zÀ-ÿ]{2,20})[,:]\s+/);
+  if (!modulo && voc) textoClass = msg.texto.slice(voc[0].length);
+  if (!modulo) modulo = await classificar(textoClass, ativos);
   console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`);
   const prompt = montarPrompt({ modulo, conta, ativos });
   // Pedidos pesados (carrossel, arte, imagem): avisa na hora e deixa demorar
