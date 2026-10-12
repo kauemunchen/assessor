@@ -3,7 +3,8 @@ import { db } from '../db/index.js';
 import { urlAutorizacao, listarEventos, listarCalendarios, obterOuCriarCalendario } from '../integracoes/google-calendar.js';
 const MODS = { secretaria: 'Secretária', producao: 'Produção', documentos: 'Documentos', financeiro: 'Financeiro', social: 'MIA (Social Media)' };
 const alias = { secretária: 'secretaria', produção: 'producao', financeira: 'financeiro', 'social media': 'social', instagram: 'social', mia: 'social', docs: 'documentos' };
-const norm = (s) => alias[s] || s;
+const semAcento = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const norm = (s) => alias[s] || alias[semAcento(s)] || semAcento(s);
 
 const fmtHora = (e) => e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : 'dia todo';
 const fmtDia = (e) => new Date(e.start?.dateTime || e.start?.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
@@ -61,14 +62,16 @@ export async function governanca(msg, conta) {
   }
   if (/^conectar? instagram$/.test(t)) return 'Me mande numa linha: `conectar instagram <IG_USER_ID> <ACCESS_TOKEN>` (os mesmos do bot antigo). Depois eu apago a mensagem do histórico.';
   if (/^(quais|que) módulos|^módulos$|^equipe$/.test(t)) {
-    const on = db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(conta.id).map(r => MODS[r.modulo]);
-    return `Equipe ativa: Diretor${on.length ? ', ' + on.join(', ') : ''}.\nDesligados: ${Object.entries(MODS).filter(([k]) => !on.includes(MODS[k])).map(([, v]) => v).join(', ') || 'nenhum'}.`;
+    const nomeDe = (mod) => { const r = db.prepare('SELECT nome FROM persona_config WHERE conta_id=? AND modulo=?').get(conta.id, mod); return r?.nome ? `${r.nome} (${mod === 'diretor' ? 'Diretor' : MODS[mod]})` : (mod === 'diretor' ? 'Diretor' : MODS[mod]); };
+    const ligados = db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(conta.id).map(r => r.modulo);
+    const off = Object.keys(MODS).filter(k => !ligados.includes(k));
+    return `Equipe ativa: ${['diretor', ...ligados].map(nomeDe).join(', ')}.\nDesligados: ${off.map(k => MODS[k]).join(', ') || 'nenhum'}.`;
   }
   if (/conectar? (o )?google|conectar? (a )?agenda/.test(t)) {
     const base = process.env.PUBLIC_URL || '';
     return `Abra este link para autorizar o Google Agenda:\n${base}/oauth/google/iniciar/${conta.id}\n\n(ou direto: ${urlAutorizacao(conta.id)})`;
   }
-  if ((m = t.match(/^(?:diretor,?\s*)?(?:a|o)?\s*(\w+) (?:agora )?se chama (.+)$/))) {
+  if ((m = t.match(/^(?:diretor,?\s*)?(?:a|o)?\s*([\wÀ-ÿ]+) (?:agora )?se chama (.+)$/))) {
     const mod = norm(m[1]); if (!MODS[mod] && mod !== 'diretor') return null;
     db.prepare('INSERT INTO persona_config (conta_id, modulo, nome) VALUES (?,?,?) ON CONFLICT(conta_id, modulo) DO UPDATE SET nome=excluded.nome').run(conta.id, mod, caso(m[2].trim()));
     return `Combinado. ${MODS[mod] || 'Diretor'} agora se chama ${caso(m[2].trim())}.`;
