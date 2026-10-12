@@ -5,15 +5,25 @@ import { db } from '../db/index.js';
 import { historicoRecente } from './memoria.js';
 export { transcrever } from '../integracoes/gemini.js';
 
+// Pistas fortes (decidem sozinhas) e pistas comuns
+const FORTES = {
+  secretaria: /\b(e-?mails?|inbox|caixa de entrada|gmail|mensagens? (de|do|da) (e-?mail|caixa)|remetente|assunto)\b/i,
+  social: /\b(carrossel|legenda|hashtags?|stories|story|reels?|instagram|post(s|agem|agens)?)\b/i,
+  financeiro: /\b(fluxo de caixa|caixa (da|do|de) (empresa|loja|douglas|km|pj|pf)|dre|boleto|extrato|paguei|recebi|nota fiscal|nfs-?e)\b/i,
+  producao: /\b(ops?|ordem de produ[çc][ãa]o|efici[êe]ncia|agilfac|embarque)\b/i,
+  documentos: /\b(contrato|alvar[áa]|certid[ãa]o|ap[óo]lice|cadastro)\b/i,
+};
 const PISTAS = {
-  secretaria: /\b(agenda|agendar|marca|marcar|reuni[ãa]o|compromisso|lembra|lembrete|e-?mail|meet|hor[áa]rio|amanh[ãa]|semana|retorno|responder)\b/i,
+  secretaria: /\b(agenda|agendar|marca|marcar|reuni[ãa]o|compromisso|lembra|lembrete|meet|hor[áa]rio|amanh[ãa]|semana|retorno|responder)\b/i,
   producao: /\b(op|ops|produ[çc][ãa]o|efici[êe]ncia|c[ée]lula|embarque|lan[çc]amento|costureira|agilfac)\b/i,
   documentos: /\b(contrato|documento|arquivo|cadastro|alvar[áa]|certid[ãa]o|ap[óo]lice|guarda|pasta)\b/i,
-  financeiro: /\b(paguei|pagar|recebi|receber|boleto|dre|caixa|extrato|conta|saldo|cobran[çc]a|nota fiscal|nfs|carteira|gasto|despesa|receita)\b/i,
+  financeiro: /\b(paguei|pagar|recebi|receber|boleto|dre|extrato|saldo|cobran[çc]a|nota fiscal|nfs|carteira|gasto|despesa|receita|vencimento)\b/i,
   social: /\b(post|carrossel|legenda|hashtag|story|stories|reels?|instagram|publica|conte[úu]do|arte|marca d.?[áa]gua|identidade)\b/i,
 };
 export async function classificar(texto, ativos) {
   if (ativos.length === 1) return 'diretor';
+  const fortes = ativos.filter(m => FORTES[m]?.test(texto));
+  if (fortes.length === 1) return fortes[0];
   const hits = ativos.filter(m => PISTAS[m]?.test(texto));
   if (hits.length === 1) return hits[0];
   if (hits.length === 0 && /\b(o que voc[êe] faria|conselho|estrat[ée]gia|prioridade|an[áa]lise|ideia|processo)\b/i.test(texto)) return 'diretor';
@@ -27,6 +37,8 @@ const agoraBR = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sa
 export async function responder({ prompt, conta, modulo, msg }) {
   const decls = ferramentasDe(modulo, conta);
   const m = modelo({ systemInstruction: `${prompt}\n\nAGORA: ${agoraBR()} (America/Sao_Paulo). Datas relativas ("amanhã", "quinta") são calculadas a partir daqui e passadas às ferramentas no formato YYYY-MM-DDTHH:MM.
+
+Os prefixos [módulo] no histórico são marcação interna: NUNCA os escreva nas suas respostas.
 
 VERDADE: só prometa o que suas ferramentas fazem. Se não houver ferramenta para algo, diga "ainda não consigo fazer X" em uma linha. Nunca invente painéis, links, integrações ou etapas externas.
 
@@ -48,7 +60,7 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
     const cand = r.response.candidates?.[0];
     const parts = cand?.content?.parts || [];
     const calls = parts.filter(p => p.functionCall).map(p => p.functionCall);
-    if (!calls.length) return r.response.text();
+    if (!calls.length) return r.response.text().replace(/^(\s*\[[a-zç]+\]\s*)+/i, '');
     contents.push({ role: 'model', parts });
     const assinatura = JSON.stringify(calls);
     if (assinatura === assinaturaAnterior && ultimoErro) return `Não consegui: ${ultimoErro}`;
