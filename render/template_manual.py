@@ -153,7 +153,7 @@ def logo_colorido(cor_hex):
     lg = Image.open(LOGO_PATH).convert("RGBA"); a = lg.getchannel("A"); r, g, b = h2r(cor_hex)
     return Image.merge("RGBA", (Image.new("L", lg.size, r), Image.new("L", lg.size, g), Image.new("L", lg.size, b), a))
 
-def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatura=True):
+def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatura=False):
     """Aplica o logo KM com cor decidida pela luminosidade do canto: branco em fundo escuro, #37414E em fundo claro.
     Em fundo médio/ruidoso adiciona sombra suave para legibilidade. Retorna (jpeg_bytes, info)."""
     img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
