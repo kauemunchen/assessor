@@ -9,12 +9,14 @@ async function comRetry(fn, tentativas = 4) {
     try { return await fn(); }
     catch (e) { ultimo = e; if (!transitorio(e)) throw e; await new Promise(r => setTimeout(r, 1500 * 2 ** i)); }
   }
+  const msg = String(ultimo?.message || '');
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(msg)) throw new Error('Cota da API Gemini esgotada (429). Verifique limites/faturamento do projeto no Google AI Studio.');
   throw new Error('IA indisponível no momento (pico de demanda no Google). Tente de novo em 1 minuto.');
 }
 // Cadeia de modelos: MODELOS="a,b,c" ou MODELO_PADRAO + MODELO_FALLBACK + reservas conhecidas
 const CADEIA = [...new Set([
   ...(process.env.MODELOS ? process.env.MODELOS.split(',') : [MODELO, process.env.MODELO_FALLBACK]),
-  'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash',
+  'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite',
 ].map(m => (m || '').trim()).filter(Boolean))];
 export const modelo = (opts = {}) => {
   const m = genai.getGenerativeModel({ model: CADEIA[0], ...opts });
@@ -23,7 +25,7 @@ export const modelo = (opts = {}) => {
     for (const nome of CADEIA) {
       const inst = genai.getGenerativeModel({ model: nome, ...opts });
       try { return await comRetry(() => inst.generateContent(...a), nome === CADEIA[0] ? 2 : 1); }
-      catch (e) { ultimo = e; if (!transitorio(e) && !/indisponível/i.test(String(e?.message))) throw e; console.warn(`[gemini] ${nome} indisponível, tentando próximo`); }
+      catch (e) { ultimo = e; if (!transitorio(e) && !/indisponível/i.test(String(e?.message))) throw e; console.warn(`[gemini] ${nome} falhou: ${String(e?.message).slice(0, 160)}`); }
     }
     throw ultimo;
   };
