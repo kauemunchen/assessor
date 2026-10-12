@@ -11,24 +11,32 @@ export async function classificar(texto, ativos) {
   return ativos.includes(m) ? m : 'diretor';
 }
 
+const agoraBR = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
+
 export async function responder({ prompt, conta, modulo, msg }) {
   const decls = ferramentasDe(modulo, conta);
-  const m = modelo({ systemInstruction: prompt, tools: decls.length ? [{ functionDeclarations: decls }] : undefined });
-  const chat = m.startChat();
-  let r = await chat.sendMessage(msg.texto);
+  const m = modelo({ systemInstruction: `${prompt}\n\nAGORA: ${agoraBR()} (America/Sao_Paulo). Datas relativas ("amanhã", "quinta") são calculadas a partir daqui e passadas às ferramentas no formato YYYY-MM-DDTHH:MM.`,
+    tools: decls.length ? [{ functionDeclarations: decls }] : undefined });
+  const contents = [{ role: 'user', parts: [{ text: msg.texto }] }];
   for (let i = 0; i < 5; i++) {
-    const calls = r.response.functionCalls?.() || [];
-    if (!calls.length) break;
-    const results = [];
+    const r = await m.generateContent({ contents });
+    const cand = r.response.candidates?.[0];
+    const parts = cand?.content?.parts || [];
+    const calls = parts.filter(p => p.functionCall).map(p => p.functionCall);
+    if (!calls.length) return r.response.text();
+    contents.push({ role: 'model', parts });
+    const respostas = [];
     for (const c of calls) {
       if (precisaConfirmar(modulo, c.name)) {
         db.prepare('INSERT INTO pendencias (conta_id, chat_id, modulo, ferramenta, args) VALUES (?,?,?,?,?)').run(conta.id, msg.chatId, modulo, c.name, JSON.stringify(c.args));
-        return { texto: `Vou executar **${c.name}** com ${JSON.stringify(c.args)}. Confirma? (sim/não)` };
+        return `Vou executar ${c.name} com ${JSON.stringify(c.args)}. Confirma? (sim/não)`;
       }
-      try { results.push({ functionResponse: { name: c.name, response: { result: await executarFerramenta(modulo, c.name, c.args, conta, { chatId: msg.chatId }) } } }); }
-      catch (e) { results.push({ functionResponse: { name: c.name, response: { erro: e.message } } }); }
+      let result;
+      try { result = { result: await executarFerramenta(modulo, c.name, c.args, conta, { chatId: msg.chatId }) }; }
+      catch (e) { result = { erro: e.message }; }
+      respostas.push({ functionResponse: { name: c.name, response: result } });
     }
-    r = await chat.sendMessage(results);
+    contents.push({ role: 'user', parts: respostas });
   }
-  return r.response.text();
+  return 'Não consegui concluir. Tente de novo com mais detalhes.';
 }
