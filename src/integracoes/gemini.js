@@ -2,7 +2,21 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const MODELO = process.env.MODELO_PADRAO || 'gemini-3.8-flash';
-export const modelo = (opts = {}) => genai.getGenerativeModel({ model: MODELO, ...opts });
+const transitorio = (e) => /503|429|high demand|overloaded|RESOURCE_EXHAUSTED|UNAVAILABLE/i.test(String(e?.message || e));
+async function comRetry(fn, tentativas = 4) {
+  let ultimo;
+  for (let i = 0; i < tentativas; i++) {
+    try { return await fn(); }
+    catch (e) { ultimo = e; if (!transitorio(e)) throw e; await new Promise(r => setTimeout(r, 1500 * 2 ** i)); }
+  }
+  throw new Error('IA indisponível no momento (pico de demanda no Google). Tente de novo em 1 minuto.');
+}
+export const modelo = (opts = {}) => {
+  const m = genai.getGenerativeModel({ model: MODELO, ...opts });
+  const gc = m.generateContent.bind(m);
+  m.generateContent = (...a) => comRetry(() => gc(...a));
+  return m;
+};
 
 export async function transcrever(bytes, mime = 'audio/ogg') {
   const r = await modelo().generateContent([
