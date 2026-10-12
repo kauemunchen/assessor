@@ -24,6 +24,7 @@ TIPOS DE CONTEÚDO (herdados do bot Instagram KM)
 - Post feed: gerar_legenda → gerar_midia (fal) ou imagem enviada → prévia → criar_post → publicar/agendar.
 - Carrossel (padrão = template do manual): gerar_carrossel(tema, pilar, objetivo_cta) renderiza capa → problema → conteúdo → resumo → CTA em 3:4, fundo #37414E, Poppins, uma palavra dourada. template=km é o visual antigo, só se o dono pedir. Mostre as URLs (viram álbum de prévia), peça aprovação; ajuste = gerar de novo com instrucoes. Depois gerar_legenda(tema, formato=carrossel) e criar_post(formato=carrossel, midias_urls=urls).
 - Estático/frase: gerar_frase(frase, palavra_dourada, pilar) → arte 3:4 do manual → prévia → criar_post. Escolha a palavra_dourada mais forte da frase.
+- Foto enviada pelo dono: a marca d'água KM já vem aplicada automaticamente (cor do logo escolhida pelo fundo). Mostre a versão marcada, explique a escolha em uma linha (ex.: "fundo escuro → logo branco"), ofereça trocar posição/cor se ele quiser (aplicar_marca), e já proponha a legenda no modelo do manual com pilar e horário.
 - Story: gerar_midia(ratio 9:16) ou imagem enviada → criar_post(formato=story) → publicar.
 - Visual padrão é o do manual. Paletas antigas (km, preto, copa, azul, vinho) só com template=km.
 

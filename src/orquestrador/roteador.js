@@ -25,8 +25,8 @@ export async function tratarMensagem(msg, canal) {
     if (ativosAgora.includes('social')) {
       try {
         const { guardarImagemEnviada } = await import('../ferramentas/social.js');
-        const url = await guardarImagemEnviada(conta.id, await canal.baixarMidia(msg.midia.ref));
-        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[imagem enviada pelo dono, já hospedada: ${url}. Use como midia_url do post se fizer sentido.]`;
+        const r = await guardarImagemEnviada(conta.id, await canal.baixarMidia(msg.midia.ref));
+        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Foto enviada pelo dono. Original: ${r.original}. Versão com marca d'água KM já aplicada (logo ${r.info.logo || '?'}${r.info.sombra ? ' com sombra' : ''}, canto ${r.info.posicao || 'inferior-direito'}): ${r.marcada || 'falhou: ' + (r.info.erro || '')}. Use a versão marcada como midia_url. Mostre-a na resposta (vira prévia), diga qual cor de logo foi escolhida e por quê, e proponha legenda no modelo do manual (pergunte o pilar se não estiver claro).]`;
       } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[imagem recebida, mas não consegui hospedar: ${e.message}]`; }
     } else msg.texto = (msg.texto ? msg.texto + '\n' : '') + '[imagem recebida; leitura de imagem entra na v2]';
   }

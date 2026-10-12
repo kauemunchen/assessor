@@ -17,6 +17,7 @@ export function ferramentas(_conta) {
     { name: 'gerar_midia', description: 'Gera imagem via fal.ai a partir de briefing visual (na identidade da marca). Retorna URL.', parameters: { type: 'OBJECT', properties: { briefing: { type: 'STRING' }, ratio: { type: 'STRING', description: '1:1|4:5|9:16' } }, required: ['briefing'] } },
     { name: 'gerar_frase', description: 'Estático do manual: frase forte (até 2 linhas) com UMA palavra em dourado, etiqueta do pilar, fundo #37414E, 3:4. template=km usa o visual antigo (paletas km/preto/copa/azul/vinho). Retorna URL.', parameters: { type: 'OBJECT', properties: { frase: { type: 'STRING' }, palavra_dourada: { type: 'STRING', description: 'a palavra da frase que vai em dourado' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' }, autoria: { type: 'STRING' } }, required: ['frase'] } },
     { name: 'gerar_carrossel', description: 'Carrossel do manual KM (6–8 slides, 3:4): capa (etiqueta + título ≤8 palavras com UMA palavra dourada + subtítulo) → problema → 3–5 conteúdo → resumo → CTA. IA escreve, serviço renderiza em Poppins/fundo #37414E. Retorna URLs + textos. Depois criar_post(formato=carrossel, midias_urls). template=km usa o visual antigo.', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa' }, qtd_conteudo: { type: 'NUMBER', description: 'slides de conteúdo, 3 a 5 (padrão 3)' }, instrucoes: { type: 'STRING' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' } }, required: ['tema', 'pilar'] } },
+    { name: 'aplicar_marca', description: 'Aplica o logo KM como marca d\'água numa imagem (URL) escolhendo automaticamente a cor pelo fundo (branco em fundo escuro, azul-cinza em fundo claro, com sombra se precisar). Use em toda foto enviada pelo dono antes de propor o post.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, posicao: { type: 'STRING', description: 'inferior-direito (padrão) | inferior-esquerdo | superior-direito | superior-esquerdo' }, assinatura: { type: 'BOOLEAN', description: 'escrever @kauemunchen sob o logo (padrão true)' } }, required: ['url'] } },
     { name: 'listar_paletas', description: 'Paletas de cor disponíveis para artes KM', parameters: { type: 'OBJECT', properties: {} } },
     { name: 'criar_post', description: 'Salva post no calendário editorial com legenda/hashtags/mídia aprovados. status: rascunho ou agendado (com data).', parameters: { type: 'OBJECT', properties: { formato: { type: 'STRING' }, tema: { type: 'STRING' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' }, description: 'slides do carrossel, em ordem' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM para agendar; vazio = rascunho' }, pilar: { type: 'STRING' } }, required: ['formato', 'legenda'] } },
     { name: 'listar_calendario', description: 'Lista a programação de posts (rascunho, agendado, publicado) num período; use para "o que temos programado"', parameters: { type: 'OBJECT', properties: { inicio: { type: 'STRING' }, fim: { type: 'STRING' }, status: { type: 'STRING' } } } },
@@ -61,6 +62,12 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "gancho":
       return { url: await ig.gerarImagemFal(prompt, a.ratio || '4:5'), briefing: a.briefing };
     }
     case 'listar_paletas': return render.paletas();
+    case 'aplicar_marca': {
+      const src = await fetch(a.url).then(r => { if (!r.ok) throw new Error('não consegui baixar a imagem'); return r.arrayBuffer(); });
+      const { bytes, info } = await render.marcaDagua(Buffer.from(src), { posicao: a.posicao || 'inferior-direito', assinatura: a.assinatura !== false });
+      const url = await cdn.upload(bytes, { pasta: `assessor/${conta.id}/marcadas` });
+      return { url, ...info };
+    }
     case 'gerar_frase': {
       const bytes = await render.frase(a.frase, { template: a.template || 'manual', paleta: a.paleta || 'km', autoria: a.autoria || '@kauemunchen', palavra_dourada: a.palavra_dourada, etiqueta: a.pilar });
       const url = await cdn.upload(bytes, { pasta: `assessor/${conta.id}/frases` });
@@ -134,7 +141,9 @@ export async function publicarPost(contaId, postId) {
 
 // Upload de imagem enviada pelo dono no chat → URL pública (vira mídia do próximo post)
 export async function guardarImagemEnviada(contaId, bytes) {
-  const url = await cdn.upload(bytes, { pasta: `assessor/${contaId}` });
-  db.prepare('INSERT INTO biblioteca (conta_id, url, tipo) VALUES (?,?,?)').run(contaId, url, 'imagem');
-  return url;
+  const original = await cdn.upload(bytes, { pasta: `assessor/${contaId}` });
+  db.prepare('INSERT INTO biblioteca (conta_id, url, tipo) VALUES (?,?,?)').run(contaId, original, 'imagem');
+  let marcada = null, info = {};
+  try { const r = await render.marcaDagua(Buffer.from(bytes)); marcada = await cdn.upload(r.bytes, { pasta: `assessor/${contaId}/marcadas` }); info = r.info; } catch (e) { info = { erro: e.message }; }
+  return { original, marcada, info };
 }

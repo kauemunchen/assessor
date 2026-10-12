@@ -136,3 +136,54 @@ def letreiro(gancho, largura=1080):
     y = 40
     for l in linhas: dr.text((80, y), l, fill=h2r(BRANCO), font=f); y += 68
     b = io.BytesIO(); img.save(b, "PNG"); return b.getvalue()
+
+# ---------- Marca d'água inteligente (foto do dono) ----------
+def _luminancia_media(img, box):
+    reg = img.crop(box).convert("L").resize((32, 32))
+    px = list(reg.get_flattened_data()) if hasattr(reg, "get_flattened_data") else list(reg.getdata())
+    return sum(px) / max(1, len(px))
+
+def _desvio(img, box):
+    reg = img.crop(box).convert("L").resize((32, 32))
+    px = list(reg.get_flattened_data()) if hasattr(reg, "get_flattened_data") else list(reg.getdata())
+    m = sum(px) / len(px); return (sum((p - m) ** 2 for p in px) / len(px)) ** 0.5
+
+def logo_colorido(cor_hex):
+    if not os.path.exists(LOGO_PATH): return None
+    lg = Image.open(LOGO_PATH).convert("RGBA"); a = lg.getchannel("A"); r, g, b = h2r(cor_hex)
+    return Image.merge("RGBA", (Image.new("L", lg.size, r), Image.new("L", lg.size, g), Image.new("L", lg.size, b), a))
+
+def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatura=True):
+    """Aplica o logo KM com cor decidida pela luminosidade do canto: branco em fundo escuro, #37414E em fundo claro.
+    Em fundo médio/ruidoso adiciona sombra suave para legibilidade. Retorna (jpeg_bytes, info)."""
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+    Wf, Hf = img.size
+    lw = int(Wf * proporcao); margem = int(Wf * 0.045)
+    lg0 = logo_branco()
+    if lg0 is None:
+        out = io.BytesIO(); img.convert("RGB").save(out, "JPEG", quality=95); return out.getvalue(), {"logo": "ausente"}
+    lh = int(lg0.height * lw / lg0.width)
+    x = Wf - lw - margem if "direito" in posicao else margem
+    y = Hf - lh - margem if "inferior" in posicao else margem
+    box = (max(0, x - 10), max(0, y - 10), min(Wf, x + lw + 10), min(Hf, y + lh + 10))
+    lum = _luminancia_media(img, box); dev = _desvio(img, box)
+    if lum < 110: cor, nome = BRANCO, "branco"
+    elif lum > 170: cor, nome = PRIM, "azul-cinza #37414E"
+    else: cor, nome = (BRANCO, "branco") if lum < 140 else (PRIM, "azul-cinza #37414E")
+    logo = logo_colorido(cor).resize((lw, lh), Image.LANCZOS)
+    # sombra suave quando fundo é médio ou ruidoso
+    if 90 < lum < 190 or dev > 40:
+        from PIL import ImageFilter
+        sombra_cor = (0, 0, 0, 150) if cor == BRANCO else (255, 255, 255, 150)
+        sombra = Image.new("RGBA", (lw + 24, lh + 24), (0, 0, 0, 0))
+        a = logo.getchannel("A"); s = Image.new("RGBA", logo.size, sombra_cor); s.putalpha(a)
+        sombra.paste(s, (12, 12), s); sombra = sombra.filter(ImageFilter.GaussianBlur(6))
+        img.alpha_composite(sombra, (x - 12, y - 12))
+    img.alpha_composite(logo, (x, y))
+    if assinatura:
+        dr = ImageDraw.Draw(img); f = fonte("Medium", max(18, int(Wf * 0.02)))
+        txt = "@kauemunchen"; tw = dr.textbbox((0, 0), txt, font=f)[2]
+        tx = x + lw - tw if "direito" in posicao else x
+        dr.text((tx, y + lh + 6), txt, fill=h2r(cor), font=f)
+    out = io.BytesIO(); img.convert("RGB").save(out, "JPEG", quality=95)
+    return out.getvalue(), {"logo": nome, "luminancia": round(lum), "sombra": bool(90 < lum < 190 or dev > 40), "posicao": posicao}

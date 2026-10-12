@@ -279,6 +279,12 @@ def carrossel_ep():
 def logo_ep():
     return send_file(io.BytesIO(add_logo(request.get_data(), True)), mimetype="image/jpeg")
 
+@app.post("/marca-dagua")
+def marca_ep():
+    pos = request.args.get("posicao", "inferior-direito"); prop = float(request.args.get("proporcao", "0.14")); ass = request.args.get("assinatura", "1") == "1"
+    out, info = manual.marca_dagua(request.get_data(), pos, prop, ass)
+    resp = send_file(io.BytesIO(out), mimetype="image/jpeg"); resp.headers["X-Marca-Info"] = json.dumps(info, ensure_ascii=False); return resp
+
 @app.post("/letreiro")
 def letreiro_ep():
     j = request.get_json(force=True)

@@ -9,6 +9,12 @@ async function post(path, body, json = true) {
 export const paletas = () => fetch(BASE + '/paletas').then(r => r.json());
 export const frase = (texto, { paleta = 'km', autoria = '@kauemunchen', template = 'manual', palavra_dourada, etiqueta } = {}) => post('/frase', { frase: texto, paleta, autoria, template, palavra_dourada, etiqueta });
 export const letreiro = (gancho) => post('/letreiro', { gancho });
+export async function marcaDagua(bytes, { posicao = 'inferior-direito', proporcao = 0.14, assinatura = true } = {}) {
+  const r = await fetch(`${BASE}/marca-dagua?posicao=${posicao}&proporcao=${proporcao}&assinatura=${assinatura ? 1 : 0}`, { method: 'POST', body: bytes });
+  if (!r.ok) throw new Error(`render /marca-dagua: ${r.status} ${await r.text()}`);
+  let info = {}; try { info = JSON.parse(r.headers.get('x-marca-info') || '{}'); } catch {}
+  return { bytes: Buffer.from(await r.arrayBuffer()), info };
+}
 export const comLogo = (bytes) => post('/logo', bytes, false);
 export async function carrossel(dados, { paleta = 'km', template = 'manual' } = {}) {
   const zip = await post('/carrossel', { dados, paleta, template });
