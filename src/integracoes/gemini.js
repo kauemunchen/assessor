@@ -1,7 +1,7 @@
 // Gemini: transcrição de áudio, geração de texto/JSON, classificação. Portado de crm_bot/gemini_service.py
 import { GoogleGenerativeAI } from '@google/generative-ai';
 const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODELO = process.env.MODELO_PADRAO || 'gemini-2.5-flash';
+const MODELO = process.env.MODELO_PADRAO || 'gemini-3.8-flash';
 export const modelo = (opts = {}) => genai.getGenerativeModel({ model: MODELO, ...opts });
 
 export async function transcrever(bytes, mime = 'audio/ogg') {
