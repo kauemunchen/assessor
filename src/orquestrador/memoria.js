@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
 export function lerMemoria(contaId, modulo) {
-  return db.prepare('SELECT fato FROM memoria WHERE conta_id=? AND (modulo=? OR modulo="todos") ORDER BY criado_em DESC LIMIT 50').all(contaId, modulo).map(r => r.fato);
+  return db.prepare('SELECT fato FROM memoria WHERE conta_id=? AND (modulo=? OR modulo='todos') ORDER BY criado_em DESC LIMIT 50').all(contaId, modulo).map(r => r.fato);
 }
 export function gravarFato(contaId, modulo, fato) {
   db.prepare('INSERT INTO memoria (conta_id, modulo, fato) VALUES (?,?,?)').run(contaId, modulo, fato);
