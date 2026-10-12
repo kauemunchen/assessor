@@ -19,6 +19,11 @@ export class TelegramCanal {
     });
   }
   async enviar(_conta, chatId, resposta) {
+    if (resposta && typeof resposta === 'object' && resposta.foto) {
+      const r = await fetch(`https://api.telegram.org/bot${this.token}/sendPhoto`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: resposta.foto, caption: semMarkdown(resposta.texto || '').slice(0, 1000) }) }).then(r => r.json());
+      if (!r.ok) console.error('[telegram] sendPhoto falhou:', r.description);
+      return;
+    }
     const texto = typeof resposta === 'string' ? resposta : resposta.texto;
     const base = { chat_id: chatId, reply_markup: resposta?.botoes };
     const html = paraHTML(texto);

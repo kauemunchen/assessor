@@ -5,6 +5,7 @@ import { configPersona, modulosAtivos } from '../db/contas.js';
 import { montarPrompt } from '../orquestrador/montador-prompt.js';
 import { modelo } from '../integracoes/gemini.js';
 import * as gcal from '../integracoes/google-calendar.js';
+import { publicarPost } from '../ferramentas/social.js';
 
 const TZ = process.env.TZ || 'America/Sao_Paulo';
 const agoraLocal = () => new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
@@ -43,9 +44,18 @@ async function resumoDoDia(canal, conta, chatId) {
   await canal.enviar(conta.id, chatId, r.response.text());
 }
 
+async function publicarAgendados(canal) {
+  const agora = agoraLocal().toISOString().slice(0, 16);
+  for (const p of db.prepare("SELECT p.*, u.chat_id FROM posts p JOIN usuarios u ON u.conta_id=p.conta_id AND u.papel='dono' WHERE p.status='agendado' AND p.data<=?").all(agora)) {
+    try { const r = await publicarPost(p.conta_id, p.id); await canal.enviar(p.conta_id, p.chat_id, `📣 Post #${p.id} publicado no Instagram (${r.ig_media_id}).`); }
+    catch (e) { db.prepare("UPDATE posts SET status='erro' WHERE id=?").run(p.id); await canal.enviar(p.conta_id, p.chat_id, `⚠️ Post #${p.id} não publicou: ${e.message}`).catch(() => {}); }
+  }
+}
+
 export function iniciarRotinas(canal) {
   cron.schedule('* * * * *', async () => {
     await dispararLembretes(canal);
+    await publicarAgendados(canal).catch(e => console.error('publicarAgendados', e.message));
     const agora = hhmm(agoraLocal());
     for (const u of db.prepare(`SELECT u.chat_id, c.* FROM usuarios u JOIN contas c ON c.id=u.conta_id WHERE u.papel='dono'`).all()) {
       const cfg = configPersona(u.id, 'diretor');

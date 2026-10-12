@@ -49,6 +49,12 @@ export async function governanca(msg, conta) {
     const c = await obterOuCriarCalendario(conta.id, caso(m[1].trim()));
     return `✅ Marcador *${c.nome}* pronto na sua agenda Google.`;
   }
+  if ((m = t.match(/^conectar? instagram\s+(\d{5,})\s+(\S+)$/))) {
+    db.prepare('INSERT INTO instagram_auth (conta_id, ig_user_id, token) VALUES (?,?,?) ON CONFLICT(conta_id) DO UPDATE SET ig_user_id=excluded.ig_user_id, token=excluded.token').run(conta.id, m[1], caso(m[2]));
+    db.prepare('INSERT INTO modulos (conta_id, modulo, ligado) VALUES (?,?,1) ON CONFLICT(conta_id, modulo) DO UPDATE SET ligado=1').run(conta.id, 'social');
+    return '✅ Instagram conectado e módulo Social ligado. Agora me conte a identidade da marca (perfil, nicho, público, tom, pilares) ou peça "cria um post sobre …".';
+  }
+  if (/^conectar? instagram$/.test(t)) return 'Me mande numa linha: `conectar instagram <IG_USER_ID> <ACCESS_TOKEN>` (os mesmos do bot antigo). Depois eu apago a mensagem do histórico.';
   if (/^(quais|que) módulos|^módulos$|^equipe$/.test(t)) {
     const on = db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(conta.id).map(r => MODS[r.modulo]);
     return `Equipe ativa: Diretor${on.length ? ', ' + on.join(', ') : ''}.\nDesligados: ${Object.entries(MODS).filter(([k]) => !on.includes(MODS[k])).map(([, v]) => v).join(', ') || 'nenhum'}.`;

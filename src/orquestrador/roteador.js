@@ -20,9 +20,17 @@ export async function tratarMensagem(msg, canal) {
     if (!msg.texto) return 'Não consegui entender o áudio. Pode repetir ou escrever?';
     await canal.enviar(msg.conta, msg.chatId, `📝 "${msg.texto}"`);
   }
-  if (msg.tipo === 'imagem' || msg.tipo === 'arquivo') {
-    msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[${msg.tipo} recebido: ${msg.midia?.mime || ''}; leitura de ${msg.tipo} entra na v2]`;
+  if (msg.tipo === 'imagem') {
+    const ativosAgora = modulosAtivos(conta.id);
+    if (ativosAgora.includes('social')) {
+      try {
+        const { guardarImagemEnviada } = await import('../ferramentas/social.js');
+        const url = await guardarImagemEnviada(conta.id, await canal.baixarMidia(msg.midia.ref));
+        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[imagem enviada pelo dono, já hospedada: ${url}. Use como midia_url do post se fizer sentido.]`;
+      } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[imagem recebida, mas não consegui hospedar: ${e.message}]`; }
+    } else msg.texto = (msg.texto ? msg.texto + '\n' : '') + '[imagem recebida; leitura de imagem entra na v2]';
   }
+  if (msg.tipo === 'arquivo') msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[arquivo recebido: ${msg.midia?.mime || ''}; entra na v2]`;
   if (!msg.texto?.trim()) return 'Recebi uma mensagem vazia.';
 
   // confirmação de ação pendente
@@ -40,7 +48,12 @@ export async function tratarMensagem(msg, canal) {
   const modulo = await classificar(msg.texto, ativos);
   console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`);
   const prompt = montarPrompt({ modulo, conta, ativos });
-  const resposta = await responder({ prompt, conta, modulo, msg });
+  let resposta = await responder({ prompt, conta, modulo, msg });
   await memoria.registrarInteracao(conta.id, modulo, msg, resposta);
+  // Social: se a resposta contém URL de imagem (fal/cloudinary), manda como foto com a legenda
+  if (modulo === 'social' && typeof resposta === 'string') {
+    const m = resposta.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)(?:\?\S*)?|https?:\/\/(?:[\w.-]*fal\.media|res\.cloudinary\.com)\/\S+/i);
+    if (m) resposta = { foto: m[0], texto: resposta.replace(m[0], '').trim() };
+  }
   return resposta;
 }
