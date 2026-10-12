@@ -12,14 +12,23 @@ const ext = (mime = '', nome = '') => (nome.match(/\.(\w{2,5})$/)?.[1] || { 'app
 const semAcento = (s = '') => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const tipoValido = (t) => TIPOS.find(x => semAcento(x).slice(0, 4) === semAcento(t).trim().slice(0, 4)) || 'Outros';
 
-const PROMPT_OCR = (empresas) => `Você classifica documentos de um empresário brasileiro. Empresas dele: ${empresas || 'desconhecidas'} (se o documento for pessoal, empresa = "PF").
+const listaEmpresas = (conta) => { try { const l = JSON.parse(conta.empresas || '[]'); return l.length ? l : [conta.empresa].filter(Boolean); } catch { return [conta.empresa].filter(Boolean); } };
+/** Encaixa o nome extraído em uma das empresas fixadas (grafia exata) ou PF/Geral. */
+export function normalizarEmpresa(nome, conta) {
+  const lista = listaEmpresas(conta); const n = semAcento(nome || '');
+  if (!n || /^(geral|desconhecid)/.test(n)) return 'Geral';
+  if (/^(pf|pessoal|pessoa fisica)$/.test(n) || /^kaue/.test(n)) return 'PF';
+  const hit = lista.find(e => semAcento(e) === n) || lista.find(e => n.includes(semAcento(e)) || semAcento(e).includes(n)) || lista.find(e => semAcento(e).split(' ')[0].length > 2 && n.startsWith(semAcento(e).split(' ')[0]));
+  return hit || (lista.length ? 'Geral' : (nome || 'Geral'));
+}
+const PROMPT_OCR = (empresas) => `Você classifica documentos de um empresário brasileiro. Empresas dele: ${empresas || 'desconhecidas'} — use EXATAMENTE um desses nomes em "empresa" quando o documento for de uma delas (razão social, nome fantasia ou CNPJ relacionado); se for pessoal (nome dele como pessoa física), empresa = "PF".
 Leia o arquivo e devolva JSON com:
 {"tipo": um de [${TIPOS.join(', ')}], "empresa": nome da empresa do dono a que pertence ou "PF" ou "Geral", "titulo": título curto e descritivo (ex.: "Contrato de prestação de serviços — Oficina Silva"), "contraparte": outra parte/emissor, "data_doc": "YYYY-MM-DD" ou null, "resumo": até 2 frases, "valor": número ou null, "vigencia": {"inicio": "YYYY-MM-DD"|null, "fim": "YYYY-MM-DD"|null, "renovacao_auto": bool, "aviso_previo_dias": número|null} ou null, "validade": "YYYY-MM-DD"|null (para certidão, alvará, CNH, apólice, licença), "sensivel": bool (RG, CPF, CNH, dados bancários, saúde), "legivel": bool, "campos": {outros dados úteis: CNPJ, CPF, número do documento, placa, endereço...}}
 Se não conseguir ler, "legivel": false e o resto null.`;
 
 /** Ponto de entrada quando o dono manda um arquivo/foto que é documento. Arquiva no Drive e registra; devolve contexto para a persona. */
 export async function receberArquivo(conta, { bytes, mime, nome }) {
-  const empresas = [conta.empresa, conta.carteiras].filter(Boolean).join(', ');
+  const empresas = listaEmpresas(conta).join(', ');
   let dados = {};
   if (bytes.byteLength <= LIMITE_OCR && /^(image\/|application\/pdf)/.test(mime || '')) {
     try { dados = await lerArquivoJSON(bytes, mime, PROMPT_OCR(empresas)); } catch (e) { dados = { erro_ocr: e.message }; }
@@ -31,7 +40,7 @@ export async function receberLinkDrive(conta, texto) {
   const id = drive.extrairId(texto); if (!id) throw new Error('Não reconheci o link do Drive.');
   const m = await drive.metadados(conta.id, id);
   if (m.mime === 'application/vnd.google-apps.folder') throw new Error('É uma pasta; mande o link de um arquivo (ou diga "documentos pasta <link>" para usá-la como raiz).');
-  let dados = {}; const empresas = [conta.empresa, conta.carteiras].filter(Boolean).join(', ');
+  let dados = {}; const empresas = listaEmpresas(conta).join(', ');
   if (m.tamanho && m.tamanho <= LIMITE_OCR && /^(image\/|application\/pdf)/.test(m.mime)) {
     try { dados = await lerArquivoJSON(await drive.baixar(conta.id, id), m.mime, PROMPT_OCR(empresas)); } catch (e) { dados = { erro_ocr: e.message }; }
   } else dados = { legivel: false, motivo: 'arquivo grande ou formato sem OCR; classificado pelo nome' };
@@ -39,7 +48,7 @@ export async function receberLinkDrive(conta, texto) {
 }
 
 async function arquivar(conta, { bytes, driveId, mime, tamanho, nomeOriginal = '', dados = {} }) {
-  const tipo = tipoValido(dados.tipo); const empresa = dados.empresa || conta.empresa || 'Geral';
+  const tipo = tipoValido(dados.tipo); const empresa = normalizarEmpresa(dados.empresa, conta);
   const dataDoc = dados.data_doc || hoje(); const ano = dataDoc.slice(0, 4);
   const titulo = dados.titulo || nomeOriginal.replace(/\.\w+$/, '') || `Documento ${dataDoc}`;
   const nome = `${dataDoc}_${slug(tipo.replace(/s$/, ''))}_${slug(titulo) || 'documento'}.${ext(mime, nomeOriginal)}`;
@@ -105,7 +114,7 @@ export async function executar(nome, a, conta, ctx) {
     }
     case 'atualizar_documento': {
       const d = db.prepare('SELECT * FROM documentos WHERE id=? AND conta_id=?').get(a.documento_id, conta.id); if (!d) throw new Error('Documento não encontrado.');
-      const empresa = a.empresa || d.empresa, tipo = a.tipo ? tipoValido(a.tipo) : d.tipo, dataDoc = a.data_doc || d.data_doc, titulo = a.titulo || d.titulo;
+      const empresa = a.empresa ? normalizarEmpresa(a.empresa, conta) : d.empresa, tipo = a.tipo ? tipoValido(a.tipo) : d.tipo, dataDoc = a.data_doc || d.data_doc, titulo = a.titulo || d.titulo;
       let link = d.drive_link, pasta = d.pasta;
       if (empresa !== d.empresa || tipo !== d.tipo || dataDoc.slice(0, 4) !== d.data_doc.slice(0, 4) || titulo !== d.titulo) {
         const pastaId = await drive.pastaDestino(conta.id, { empresa, tipo, ano: dataDoc.slice(0, 4) });

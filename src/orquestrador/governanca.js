@@ -67,6 +67,12 @@ export async function governanca(msg, conta) {
     const off = Object.keys(MODS).filter(k => !ligados.includes(k));
     return `Equipe ativa: ${['diretor', ...ligados].map(nomeDe).join(', ')}.\nDesligados: ${off.map(k => MODS[k]).join(', ') || 'nenhum'}.`;
   }
+  if ((m = msg.texto.trim().match(/^(?:minhas )?empresas\s*[:=]\s*(.+)$/i))) {
+    const lista = m[1].split(/[,;\n]/).map(x => x.trim()).filter(Boolean);
+    db.prepare('UPDATE contas SET empresas=? WHERE id=?').run(JSON.stringify(lista), conta.id);
+    return `🏢 Empresas fixadas: ${lista.join(', ')}. Documentos pessoais vão para "PF". As pastas no Drive usam exatamente esses nomes.`;
+  }
+  if (/^(minhas )?empresas$/.test(t)) { const l = JSON.parse(conta.empresas || '[]'); return l.length ? `🏢 ${l.join(', ')} (+ PF para pessoal)\nPara alterar: empresas: Nome A, Nome B, …` : 'Nenhuma empresa fixada. Mande: empresas: Mais Têxtil, Douglas Confecções, KM, …'; }
   if ((m = msg.texto.trim().match(/^documentos?\s+pasta\s+(\S+)$/i))) {
     try { const { definirPastaRaiz } = await import('../integracoes/google-drive.js'); const r = await definirPastaRaiz(conta.id, m[1]); return `📂 Pasta raiz dos documentos: "${r.nome}". Vou criar dentro dela Empresa/Tipo/Ano.`; }
     catch (e) { return `Não consegui usar essa pasta: ${e.message}`; }
