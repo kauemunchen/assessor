@@ -1,6 +1,6 @@
 // Comandos de governança tratados antes da IA: ligar/desligar módulos, conectar Google, ajustar persona.
 import { db } from '../db/index.js';
-import { urlAutorizacao, listarEventos } from '../integracoes/google-calendar.js';
+import { urlAutorizacao, listarEventos, listarCalendarios, obterOuCriarCalendario } from '../integracoes/google-calendar.js';
 const MODS = { secretaria: 'Secretária', producao: 'Produção', documentos: 'Documentos', financeiro: 'Financeiro', social: 'Social' };
 const alias = { secretária: 'secretaria', produção: 'producao', financeira: 'financeiro', 'social media': 'social', instagram: 'social', docs: 'documentos' };
 const norm = (s) => alias[s] || s;
@@ -12,7 +12,7 @@ async function agenda(conta, dias, titulo) {
   const fim = new Date(ini); fim.setDate(fim.getDate() + (dias === 'semana' ? 7 : 1));
   const evs = await listarEventos(conta.id, { inicio: ini.toISOString(), fim: fim.toISOString() });
   if (!evs.length) return `${titulo}: nada marcado.`;
-  const linhas = evs.map(e => `- ${dias === 'semana' ? fmtDia(e) + ' ' : ''}${fmtHora(e)} ${e.summary || '(sem título)'}${e.location ? ' · ' + e.location : ''}`);
+  const linhas = evs.map(e => `- ${dias === 'semana' ? fmtDia(e) + ' ' : ''}${fmtHora(e)} ${e.summary || '(sem título)'}${e.categoria && e.categoria !== conta.nome_dono ? ' [' + e.categoria + ']' : ''}${e.location ? ' · ' + e.location : ''}`);
   return `*${titulo}* (${evs.length})\n${linhas.join('\n')}`;
 }
 
@@ -41,6 +41,14 @@ export async function governanca(msg, conta) {
   if (/^agenda( de)? hoje$|^(o que|oq) (eu )?tenho hoje\??$|^hoje\??$/.test(t)) return agenda(conta, 'hoje', 'Hoje');
   if (/^agenda( de)? amanh[ãa]$|^(o que|oq) (eu )?tenho amanh[ãa]\??$/.test(t)) return agenda(conta, 'amanha', 'Amanhã');
   if (/^agenda( da)? semana$|^(o que|oq) (eu )?tenho (essa |nesta |na )?semana\??$|^semana$/.test(t)) return agenda(conta, 'semana', 'Próximos 7 dias');
+  if (/^(categorias|marcadores|calend[áa]rios)$/.test(t)) {
+    const c = await listarCalendarios(conta.id);
+    return `Marcadores da agenda:\n${c.map(x => `- ${x.nome}${x.primario ? ' (principal)' : ''}`).join('\n')}\n\nPara criar: "criar marcador Família". Para usar: "marca dentista quinta 15h, marcador Saúde".`;
+  }
+  if ((m = t.match(/^(?:cria|criar|novo|nova) (?:marcador|categoria|calend[áa]rio)[:\s]+(.+)$/))) {
+    const c = await obterOuCriarCalendario(conta.id, caso(m[1].trim()));
+    return `✅ Marcador *${c.nome}* pronto na sua agenda Google.`;
+  }
   if (/^(quais|que) módulos|^módulos$|^equipe$/.test(t)) {
     const on = db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(conta.id).map(r => MODS[r.modulo]);
     return `Equipe ativa: Diretor${on.length ? ', ' + on.join(', ') : ''}.\nDesligados: ${Object.entries(MODS).filter(([k]) => !on.includes(MODS[k])).map(([, v]) => v).join(', ') || 'nenhum'}.`;

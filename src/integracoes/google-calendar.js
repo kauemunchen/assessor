@@ -24,25 +24,62 @@ function servico(contaId) {
 }
 const norm = (dt) => { if (!dt) return dt; dt = dt.replace(' ', 'T'); return dt.length === 16 ? dt + ':00' : dt; };
 
-export async function listarEventos(contaId, { inicio, fim, max = 50 } = {}) {
+const CORES = { 'financeiro pf': '10', 'financeiro pj': '2', 'profissional': '9', 'família': '5', 'familia': '5', 'saúde': '11', 'saude': '11', 'pessoal': '6' };
+export async function listarCalendarios(contaId) {
+  const r = await servico(contaId).calendarList.list({ minAccessRole: 'writer' });
+  return (r.data.items || []).map(c => ({ id: c.id, nome: c.summary, primario: !!c.primary, cor: c.backgroundColor }));
+}
+export async function obterOuCriarCalendario(contaId, nome) {
+  const lista = await listarCalendarios(contaId);
+  const achado = lista.find(c => c.nome.trim().toLowerCase() === nome.trim().toLowerCase());
+  if (achado) return achado;
+  const svc = servico(contaId);
+  const r = await svc.calendars.insert({ requestBody: { summary: nome, timeZone: TZ } });
+  const cor = CORES[nome.trim().toLowerCase()];
+  if (cor) await svc.calendarList.patch({ calendarId: r.data.id, colorRgbFormat: false, requestBody: { colorId: cor } }).catch(() => {});
+  return { id: r.data.id, nome: r.data.summary, primario: false };
+}
+async function idsCalendarios(contaId, categoria) {
+  if (categoria) return [(await obterOuCriarCalendario(contaId, categoria)).id];
+  return (await listarCalendarios(contaId)).map(c => c.id);
+}
+export async function listarEventos(contaId, { inicio, fim, max = 50, categoria } = {}) {
+  const svc = servico(contaId); const cals = await listarCalendarios(contaId);
+  const ids = categoria ? [(await obterOuCriarCalendario(contaId, categoria)).id] : cals.map(c => c.id);
+  const todos = [];
+  for (const id of ids) {
+    const r = await svc.events.list({ calendarId: id, timeMin: inicio || new Date().toISOString(),
+      timeMax: fim || new Date(Date.now() + 30 * 864e5).toISOString(), maxResults: max, singleEvents: true, orderBy: 'startTime' }).catch(() => ({ data: {} }));
+    for (const e of r.data.items || []) todos.push({ ...e, categoria: cals.find(c => c.id === id)?.nome });
+  }
+  return todos.sort((a, b) => (a.start?.dateTime || a.start?.date).localeCompare(b.start?.dateTime || b.start?.date)).slice(0, max);
+}
+async function _listarEventosAntigo(contaId, { inicio, fim, max = 50 } = {}) {
   const r = await servico(contaId).events.list({ calendarId: 'primary', timeMin: inicio || new Date().toISOString(),
     timeMax: fim || new Date(Date.now() + 30 * 864e5).toISOString(), maxResults: max, singleEvents: true, orderBy: 'startTime' });
   return r.data.items || [];
 }
-export async function buscarEventos(contaId, texto, dias = 365) {
-  const r = await servico(contaId).events.list({ calendarId: 'primary', q: texto, timeMin: new Date().toISOString(),
-    timeMax: new Date(Date.now() + dias * 864e5).toISOString(), maxResults: 50, singleEvents: true, orderBy: 'startTime' });
-  return r.data.items || [];
+export async function buscarEventos(contaId, texto, dias = 365, categoria) {
+  const svc = servico(contaId); const cals = await listarCalendarios(contaId);
+  const ids = await idsCalendarios(contaId, categoria);
+  const todos = [];
+  for (const id of ids) {
+    const r = await svc.events.list({ calendarId: id, q: texto, timeMin: new Date().toISOString(),
+      timeMax: new Date(Date.now() + dias * 864e5).toISOString(), maxResults: 50, singleEvents: true, orderBy: 'startTime' }).catch(() => ({ data: {} }));
+    for (const e of r.data.items || []) todos.push({ ...e, categoria: cals.find(c => c.id === id)?.nome });
+  }
+  return todos.sort((a, b) => (a.start?.dateTime || a.start?.date).localeCompare(b.start?.dateTime || b.start?.date));
 }
-export async function criarEvento(contaId, { titulo, inicio, fim, descricao = '', local = '', convidados = [], lembreteMin = 30, meet = false }) {
+export async function criarEvento(contaId, { titulo, inicio, fim, descricao = '', local = '', convidados = [], lembreteMin = 30, meet = false, categoria }) {
+  const calendarId = categoria ? (await obterOuCriarCalendario(contaId, categoria)).id : 'primary';
   inicio = norm(inicio); fim = norm(fim) || new Date(new Date(inicio).getTime() + 36e5).toISOString().slice(0, 19);
   const body = { summary: titulo, description: descricao, location: local,
     start: { dateTime: inicio, timeZone: TZ }, end: { dateTime: fim, timeZone: TZ },
     attendees: convidados.filter(Boolean).map(email => ({ email })),
     reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: lembreteMin }] } };
   if (meet) body.conferenceData = { createRequest: { requestId: `km-${Date.now()}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } };
-  const r = await servico(contaId).events.insert({ calendarId: 'primary', requestBody: body, conferenceDataVersion: meet ? 1 : 0, sendUpdates: convidados.length ? 'all' : 'none' });
-  return { id: r.data.id, link: r.data.htmlLink, meet: r.data.hangoutLink || null };
+  const r = await servico(contaId).events.insert({ calendarId, requestBody: body, conferenceDataVersion: meet ? 1 : 0, sendUpdates: convidados.length ? 'all' : 'none' });
+  return { id: r.data.id, link: r.data.htmlLink, meet: r.data.hangoutLink || null, categoria: categoria || 'Principal' };
 }
 export async function atualizarEvento(contaId, eventId, campos) {
   const svc = servico(contaId); const { data: ev } = await svc.events.get({ calendarId: 'primary', eventId });
