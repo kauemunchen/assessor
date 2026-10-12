@@ -1,6 +1,6 @@
 import { montarPrompt } from './montador-prompt.js';
 import { transcrever, classificar, responder } from './ia.js';
-import { obterConta, modulosAtivos } from '../db/contas.js';
+import { obterConta, modulosAtivos, configPersona } from '../db/contas.js';
 import { executarFerramenta } from '../ferramentas/index.js';
 import * as memoria from './memoria.js';
 import { db } from '../db/index.js';
@@ -45,7 +45,15 @@ export async function tratarMensagem(msg, canal) {
   const gov = await governanca(msg, conta); if (gov) return gov;
 
   const ativos = modulosAtivos(conta.id);
-  const modulo = await classificar(msg.texto, ativos);
+  // Chamou um assessor pelo nome? ("MIA, ...", "Tina: ...", "Secretária, ...") → vai direto para ele
+  let modulo = null;
+  const cabeca = msg.texto.trim().slice(0, 40).toLowerCase();
+  const nomesPadrao = { diretor: ['diretor'], secretaria: ['secretária', 'secretaria'], producao: ['produção', 'producao'], documentos: ['documentos'], financeiro: ['financeiro'], social: ['mia', 'social'] };
+  for (const mod of ativos) {
+    const nomes = [...(nomesPadrao[mod] || []), (configPersona(conta.id, mod).nome || '').toLowerCase()].filter(Boolean);
+    if (nomes.some(n => new RegExp(`^${n}\\b[,:!]?\\s`).test(cabeca + ' '))) { modulo = mod; break; }
+  }
+  if (!modulo) modulo = await classificar(msg.texto, ativos);
   console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`);
   const prompt = montarPrompt({ modulo, conta, ativos });
   let resposta = await responder({ prompt, conta, modulo, msg });
