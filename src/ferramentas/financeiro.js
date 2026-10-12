@@ -1,4 +1,5 @@
 // Ferramentas do módulo financeiro. REGRAS DURAS validadas aqui.
+export const requerConfirmacao = new Set(["criar_cobranca"]);
 export function ferramentas(_conta) { return []; }
 export async function executar(nome, args, conta) {
   if (nome === 'registrar_lancamento' && !args.carteira) throw new Error('Lançamento sem carteira. Pergunte ao dono qual carteira.');
