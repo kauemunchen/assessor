@@ -3,11 +3,11 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const MODELO = process.env.MODELO_PADRAO || 'gemini-3.8-flash';
 const transitorio = (e) => /503|429|high demand|overloaded|RESOURCE_EXHAUSTED|UNAVAILABLE/i.test(String(e?.message || e));
-async function comRetry(fn, tentativas = 4) {
+async function comRetry(fn, tentativas = 2) {
   let ultimo;
   for (let i = 0; i < tentativas; i++) {
     try { return await fn(); }
-    catch (e) { ultimo = e; if (!transitorio(e)) throw e; await new Promise(r => setTimeout(r, 1500 * 2 ** i)); }
+    catch (e) { ultimo = e; if (!transitorio(e)) throw e; if (i < tentativas - 1) await new Promise(r => setTimeout(r, 600)); }
   }
   const msg = String(ultimo?.message || '');
   if (/429|RESOURCE_EXHAUSTED|quota/i.test(msg)) throw new Error('Cota da API Gemini esgotada (429). Verifique limites/faturamento do projeto no Google AI Studio.');
@@ -18,13 +18,15 @@ const CADEIA = [...new Set([
   ...(process.env.MODELOS ? process.env.MODELOS.split(',') : [MODELO, process.env.MODELO_FALLBACK]),
   'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite',
 ].map(m => (m || '').trim()).filter(Boolean))];
-export const modelo = (opts = {}) => {
-  const m = genai.getGenerativeModel({ model: CADEIA[0], ...opts });
+const RAPIDO = process.env.MODELO_RAPIDO || 'gemini-3.1-flash-lite';
+export const modelo = (opts = {}, { rapido = false } = {}) => {
+  const cadeia = rapido ? [RAPIDO, ...CADEIA.filter(x => x !== RAPIDO)] : CADEIA;
+  const m = genai.getGenerativeModel({ model: cadeia[0], ...opts });
   m.generateContent = async (...a) => {
     let ultimo;
-    for (const nome of CADEIA) {
+    for (const nome of cadeia) {
       const inst = genai.getGenerativeModel({ model: nome, ...opts });
-      try { return await comRetry(() => inst.generateContent(...a), nome === CADEIA[0] ? 2 : 1); }
+      try { return await comRetry(() => inst.generateContent(...a), nome === cadeia[0] ? 2 : 1); }
       catch (e) { ultimo = e; if (!transitorio(e) && !/indisponível/i.test(String(e?.message))) throw e; console.warn(`[gemini] ${nome} falhou: ${String(e?.message).slice(0, 160)}`); }
     }
     throw ultimo;
@@ -33,7 +35,7 @@ export const modelo = (opts = {}) => {
 };
 
 export async function transcrever(bytes, mime = 'audio/ogg') {
-  const r = await modelo().generateContent([
+  const r = await modelo({}, { rapido: true }).generateContent([
     { inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: mime } },
     'Transcreva o áudio em português brasileiro. Retorne apenas a transcrição.',
   ]);

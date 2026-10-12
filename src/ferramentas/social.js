@@ -96,8 +96,8 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo":
       }
       if (!dados?.slides?.length) throw new Error('IA não devolveu slides válidos; tente de novo.');
       const slides = await render.carrossel(dados, { template, paleta: a.paleta || 'km' });
-      const urls = [];
-      for (let i = 0; i < slides.length; i++) urls.push(await cdn.upload(slides[i], { pasta: `assessor/${conta.id}/carrossel`, nome: `car_${Date.now()}_${i}` }));
+      const base = Date.now();
+      const urls = await Promise.all(slides.map((b, i) => cdn.upload(b, { pasta: `assessor/${conta.id}/carrossel`, nome: `car_${base}_${i}` })));
       return { urls, textos: dados, template };
     }
     case 'criar_post': {
@@ -162,9 +162,10 @@ export async function publicarPost(contaId, postId) {
 
 // Upload de imagem enviada pelo dono no chat → URL pública (vira mídia do próximo post)
 export async function guardarImagemEnviada(contaId, bytes) {
-  const original = await cdn.upload(bytes, { pasta: `assessor/${contaId}` });
+  const [original, m] = await Promise.all([
+    cdn.upload(bytes, { pasta: `assessor/${contaId}` }),
+    render.marcaDagua(Buffer.from(bytes)).then(async r => ({ marcada: await cdn.upload(r.bytes, { pasta: `assessor/${contaId}/marcadas` }), info: r.info })).catch(e => ({ marcada: null, info: { erro: e.message } })),
+  ]);
   db.prepare('INSERT INTO biblioteca (conta_id, url, tipo) VALUES (?,?,?)').run(contaId, original, 'imagem');
-  let marcada = null, info = {};
-  try { const r = await render.marcaDagua(Buffer.from(bytes)); marcada = await cdn.upload(r.bytes, { pasta: `assessor/${contaId}/marcadas` }); info = r.info; } catch (e) { info = { erro: e.message }; }
-  return { original, marcada, info };
+  return { original, ...m };
 }

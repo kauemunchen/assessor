@@ -37,6 +37,7 @@ export class TelegramCanal {
     if (!r.ok) r = await this._post({ ...base, text: semMarkdown(texto) });
     if (!r.ok) console.error('[telegram] sendMessage falhou:', r.description);
   }
+  async digitando(chatId) { fetch(`https://api.telegram.org/bot${this.token}/sendChatAction`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, action: 'typing' }) }).catch(() => {}); }
   async _post(body) {
     return fetch(`https://api.telegram.org/bot${this.token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
   }

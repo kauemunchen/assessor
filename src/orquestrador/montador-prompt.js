@@ -20,7 +20,12 @@ export function montarPrompt({ modulo, conta, ativos }) {
     memoria: lerMemoria(conta.id, modulo).map(m => `- ${m}`).join('\n') || '- (nada ainda)',
   };
   let texto = base(modulo).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
-  const ref = conhecimento(MAPA_CONHECIMENTO[modulo]);
-  if (ref) texto += `\n\nREFERÊNCIA DE EXPERTISE\n${ref}`;
+  let ref = conhecimento(MAPA_CONHECIMENTO[modulo]);
+  if (ref) {
+    // se o arquivo tiver um bloco "## Regras operacionais", usa só dali para baixo (resumo executável); senão corta em 7000 chars
+    const i = ref.indexOf('## Regras operacionais'); if (i > 0) ref = ref.slice(i);
+    if (ref.length > 7000) ref = ref.slice(0, 7000) + '\n[…]';
+    texto += `\n\nREFERÊNCIA DE EXPERTISE\n${ref}`;
+  }
   return texto;
 }

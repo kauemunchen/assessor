@@ -5,9 +5,19 @@ import { db } from '../db/index.js';
 import { historicoRecente } from './memoria.js';
 export { transcrever } from '../integracoes/gemini.js';
 
+const PISTAS = {
+  secretaria: /\b(agenda|agendar|marca|marcar|reuni[ãa]o|compromisso|lembra|lembrete|e-?mail|meet|hor[áa]rio|amanh[ãa]|semana|retorno|responder)\b/i,
+  producao: /\b(op|ops|produ[çc][ãa]o|efici[êe]ncia|c[ée]lula|embarque|lan[çc]amento|costureira|agilfac)\b/i,
+  documentos: /\b(contrato|documento|arquivo|cadastro|alvar[áa]|certid[ãa]o|ap[óo]lice|guarda|pasta)\b/i,
+  financeiro: /\b(paguei|pagar|recebi|receber|boleto|dre|caixa|extrato|conta|saldo|cobran[çc]a|nota fiscal|nfs|carteira|gasto|despesa|receita)\b/i,
+  social: /\b(post|carrossel|legenda|hashtag|story|stories|reels?|instagram|publica|conte[úu]do|arte|marca d.?[áa]gua|identidade)\b/i,
+};
 export async function classificar(texto, ativos) {
   if (ativos.length === 1) return 'diretor';
-  const r = await modelo().generateContent(`Classifique a mensagem em UM destes módulos: ${ativos.join(', ')}. Regras: agenda/reunião/lembrete/e-mail → secretaria; OP/produção/eficiência → producao; arquivo/contrato/cadastro → documentos; dinheiro/conta/pagamento/DRE → financeiro; post/instagram/conteúdo/carrossel/legenda/identidade da marca/story → social; pedido de opinião, conselho, estratégia, prioridade, "o que você faria", análise geral → diretor; o resto → diretor. Responda só o nome.\nMensagem: ${texto}`);
+  const hits = ativos.filter(m => PISTAS[m]?.test(texto));
+  if (hits.length === 1) return hits[0];
+  if (hits.length === 0 && /\b(o que voc[êe] faria|conselho|estrat[ée]gia|prioridade|an[áa]lise|ideia|processo)\b/i.test(texto)) return 'diretor';
+  const r = await modelo({}, { rapido: true }).generateContent(`Classifique a mensagem em UM destes módulos: ${ativos.join(', ')}. Regras: agenda/reunião/lembrete/e-mail → secretaria; OP/produção/eficiência → producao; arquivo/contrato/cadastro → documentos; dinheiro/conta/pagamento/DRE → financeiro; post/instagram/conteúdo/carrossel/legenda/identidade da marca/story → social; pedido de opinião, conselho, estratégia, prioridade, "o que você faria", análise geral → diretor; o resto → diretor. Responda só o nome.\nMensagem: ${texto}`);
   const m = r.response.text().trim().toLowerCase();
   return ativos.includes(m) ? m : 'diretor';
 }
