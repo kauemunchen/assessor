@@ -11,10 +11,19 @@ async function comRetry(fn, tentativas = 4) {
   }
   throw new Error('IA indisponível no momento (pico de demanda no Google). Tente de novo em 1 minuto.');
 }
+const FALLBACK = process.env.MODELO_FALLBACK || '';
 export const modelo = (opts = {}) => {
   const m = genai.getGenerativeModel({ model: MODELO, ...opts });
   const gc = m.generateContent.bind(m);
-  m.generateContent = (...a) => comRetry(() => gc(...a));
+  m.generateContent = async (...a) => {
+    try { return await comRetry(() => gc(...a), 2); }
+    catch (e) {
+      if (!FALLBACK || !/indisponível|503|429/i.test(String(e?.message))) throw e;
+      console.warn(`[gemini] ${MODELO} indisponível, usando ${FALLBACK}`);
+      const f = genai.getGenerativeModel({ model: FALLBACK, ...opts });
+      return comRetry(() => f.generateContent(...a), 3);
+    }
+  };
   return m;
 };
 
