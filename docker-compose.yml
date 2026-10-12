@@ -4,6 +4,8 @@ services:
     container_name: assessor-km
     restart: unless-stopped
     env_file: .env
+    ports:
+      - "127.0.0.1:3010:3000"
     volumes:
       - ./data:/app/data
       - ./src/personas:/app/src/personas
@@ -13,9 +15,4 @@ services:
       - traefik.http.routers.assessor.rule=Host(`assessor.kauemunchen.com.br`)
       - traefik.http.routers.assessor.entrypoints=websecure
       - traefik.http.routers.assessor.tls.certresolver=letsencrypt
-      - traefik.http.services.assessor.loadbalancer.server.port=3000
-    networks:
-      - traefik
-networks:
-  traefik:
-    external: true
+      - traefik.http.services.assessor.loadbalancer.server.url=http://127.0.0.1:3010
