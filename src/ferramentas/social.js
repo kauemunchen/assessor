@@ -15,8 +15,8 @@ export function ferramentas(_conta) {
     { name: 'ver_identidade', description: 'Mostra a identidade de marca salva', parameters: { type: 'OBJECT', properties: {} } },
     { name: 'gerar_legenda', description: 'Gera legenda no modelo do manual KM (gancho, contexto, 3 pontos, CTA único, 5 hashtags = 3 fixas + 2 do pilar). Informe o pilar (GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO) e o objetivo do CTA (salvar|compartilhar|comentar|seguir|conversa|direct).', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, formato: { type: 'STRING', description: 'post|carrossel|reels|story' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa|direct' }, serie: { type: 'STRING', description: 'Antes do processo | Método 3R | Ferramenta da semana | (vazio)' }, ajuste: { type: 'STRING', description: 'instrução de ajuste sobre uma versão anterior' } }, required: ['tema', 'pilar'] } },
     { name: 'gerar_midia', description: 'Gera imagem via fal.ai a partir de briefing visual (na identidade da marca). Retorna URL.', parameters: { type: 'OBJECT', properties: { briefing: { type: 'STRING' }, ratio: { type: 'STRING', description: '1:1|4:5|9:16' } }, required: ['briefing'] } },
-    { name: 'gerar_frase', description: 'Renderiza uma frase/citação em arte KM (1080x1350) com logo. Paletas: km, preto, copa, azul, vinho. Retorna URL.', parameters: { type: 'OBJECT', properties: { frase: { type: 'STRING' }, paleta: { type: 'STRING' }, autoria: { type: 'STRING' } }, required: ['frase'] } },
-    { name: 'gerar_carrossel', description: 'Gera carrossel KM: IA cria capa + N slides + CTA e renderiza as artes (template KM, com logo). Retorna URLs dos slides e os textos. Depois use criar_post com formato=carrossel e midias_urls.', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, qtd: { type: 'NUMBER', description: 'slides internos, padrão 4' }, paleta: { type: 'STRING' }, instrucoes: { type: 'STRING' } }, required: ['tema'] } },
+    { name: 'gerar_frase', description: 'Estático do manual: frase forte (até 2 linhas) com UMA palavra em dourado, etiqueta do pilar, fundo #37414E, 3:4. template=km usa o visual antigo (paletas km/preto/copa/azul/vinho). Retorna URL.', parameters: { type: 'OBJECT', properties: { frase: { type: 'STRING' }, palavra_dourada: { type: 'STRING', description: 'a palavra da frase que vai em dourado' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' }, autoria: { type: 'STRING' } }, required: ['frase'] } },
+    { name: 'gerar_carrossel', description: 'Carrossel do manual KM (6–8 slides, 3:4): capa (etiqueta + título ≤8 palavras com UMA palavra dourada + subtítulo) → problema → 3–5 conteúdo → resumo → CTA. IA escreve, serviço renderiza em Poppins/fundo #37414E. Retorna URLs + textos. Depois criar_post(formato=carrossel, midias_urls). template=km usa o visual antigo.', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa' }, qtd_conteudo: { type: 'NUMBER', description: 'slides de conteúdo, 3 a 5 (padrão 3)' }, instrucoes: { type: 'STRING' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' } }, required: ['tema', 'pilar'] } },
     { name: 'listar_paletas', description: 'Paletas de cor disponíveis para artes KM', parameters: { type: 'OBJECT', properties: {} } },
     { name: 'criar_post', description: 'Salva post no calendário editorial com legenda/hashtags/mídia aprovados. status: rascunho ou agendado (com data).', parameters: { type: 'OBJECT', properties: { formato: { type: 'STRING' }, tema: { type: 'STRING' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' }, description: 'slides do carrossel, em ordem' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM para agendar; vazio = rascunho' }, pilar: { type: 'STRING' } }, required: ['formato', 'legenda'] } },
     { name: 'listar_calendario', description: 'Lista a programação de posts (rascunho, agendado, publicado) num período; use para "o que temos programado"', parameters: { type: 'OBJECT', properties: { inicio: { type: 'STRING' }, fim: { type: 'STRING' }, status: { type: 'STRING' } } } },
@@ -62,20 +62,34 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "gancho":
     }
     case 'listar_paletas': return render.paletas();
     case 'gerar_frase': {
-      const bytes = await render.frase(a.frase, a.paleta || 'km', a.autoria || '@kauemunchen');
+      const bytes = await render.frase(a.frase, { template: a.template || 'manual', paleta: a.paleta || 'km', autoria: a.autoria || '@kauemunchen', palavra_dourada: a.palavra_dourada, etiqueta: a.pilar });
       const url = await cdn.upload(bytes, { pasta: `assessor/${conta.id}/frases` });
-      return { url, frase: a.frase, paleta: a.paleta || 'km' };
+      return { url, frase: a.frase, palavra_dourada: a.palavra_dourada, template: a.template || 'manual' };
     }
     case 'gerar_carrossel': {
-      const qtd = a.qtd || 4;
-      const dados = await gerarJSON(`Crie conteudo para carrossel Instagram sobre: ${a.tema}.
+      const template = a.template || 'manual';
+      const idd = identidade(conta.id) || {};
+      const cta = idd.ctas?.[(a.objetivo_cta || 'salvar').toLowerCase()] || 'Salva para aplicar na segunda-feira.';
+      let dados;
+      if (template === 'km') {
+        const qtd = a.qtd_conteudo || 4;
+        dados = await gerarJSON(`Crie conteudo para carrossel Instagram sobre: ${a.tema}.
 ${a.instrucoes ? 'Instrucoes de estilo: ' + a.instrucoes + '\n' : ''}Formato exato: {"titulo": "TITULO CAPA MAX 3 PALAVRAS", "subtitulo": "subtitulo curto max 8 palavras", "slides": [{"num": "01", "titulo": "MAX 2 PALAVRAS", "texto": "frase curta max 10 palavras"}], "cta": "FRASE CURTA MAX 5 PALAVRAS"}
-IMPORTANTE: titulos muito curtos, maximo 2-3 palavras cada. Crie EXATAMENTE ${qtd} objetos dentro do array slides. Apenas o JSON.`);
+Crie EXATAMENTE ${qtd} objetos dentro do array slides. Apenas o JSON.`);
+      } else {
+        const n = Math.min(5, Math.max(3, a.qtd_conteudo || 3));
+        dados = await gerarJSON(`Você é a MIA, social media de Kauê München. Escreva um carrossel de Instagram seguindo o Manual da Marca KM.
+IDENTIDADE: ${JSON.stringify({ nicho: idd.nicho, publico: idd.publico, tom: idd.tom, provas: idd.provas })}
+TEMA: ${a.tema} · PILAR: ${(a.pilar || 'GESTÃO').toUpperCase()}
+${a.instrucoes ? 'INSTRUÇÕES: ' + a.instrucoes + '\n' : ''}ESTRUTURA OBRIGATÓRIA: capa → 1 slide "problema" → ${n} slides "conteudo" → 1 slide "resumo" → CTA.
+REGRAS: título da capa com até 8 palavras e UMA palavra-chave para destacar em dourado (palavra_dourada = exatamente uma palavra que aparece no título); subtítulo 1 linha; cada slide interno: título até 6 palavras (pode ter palavra_dourada) e texto de até 30 palavras, direto, de igual para igual, sem jargão; números só os das provas ou do tema; sem emoji.
+Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo": "...", "palavra_dourada": "...", "subtitulo": "...", "slides": [{"tipo": "problema", "titulo": "...", "texto": "..."}, {"tipo": "conteudo", "titulo": "...", "palavra_dourada": "...", "texto": "..."}, {"tipo": "resumo", "titulo": "...", "texto": "..."}], "cta": "${cta}"}`);
+      }
       if (!dados?.slides?.length) throw new Error('IA não devolveu slides válidos; tente de novo.');
-      const slides = await render.carrossel(dados, a.paleta || 'km');
+      const slides = await render.carrossel(dados, { template, paleta: a.paleta || 'km' });
       const urls = [];
       for (let i = 0; i < slides.length; i++) urls.push(await cdn.upload(slides[i], { pasta: `assessor/${conta.id}/carrossel`, nome: `car_${Date.now()}_${i}` }));
-      return { urls, textos: dados, paleta: a.paleta || 'km' };
+      return { urls, textos: dados, template };
     }
     case 'criar_post': {
       const status = a.data ? 'agendado' : 'rascunho';

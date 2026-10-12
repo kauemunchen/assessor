@@ -6,6 +6,7 @@ Endpoints: POST /frase {frase, paleta, autoria} -> JPEG
 """
 import os, io, json, zipfile
 from flask import Flask, request, send_file, jsonify
+import template_manual as manual
 
 LOGO_PATH = os.environ.get("LOGO_PATH", os.path.join(os.path.dirname(__file__), "logo_km.png"))
 
@@ -258,13 +259,17 @@ def paletas(): return jsonify({k: v["nome"] for k, v in PALETAS.items()})
 @app.post("/frase")
 def frase_ep():
     j = request.get_json(force=True)
-    out = renderizar_frase(j["frase"], j.get("paleta", "km"), j.get("autoria", "@kauemunchen"), j.get("custom"))
+    if j.get("template", "manual") == "manual":
+        out = manual.frase(j["frase"], j.get("palavra_dourada"), j.get("etiqueta"), j.get("autoria", "@kauemunchen"))
+    else:
+        out = renderizar_frase(j["frase"], j.get("paleta", "km"), j.get("autoria", "@kauemunchen"), j.get("custom"))
     return send_file(io.BytesIO(out), mimetype="image/jpeg")
 
 @app.post("/carrossel")
 def carrossel_ep():
     j = request.get_json(force=True)
-    slides = car_renderizar(j["dados"], j.get("paleta", "km"), j.get("custom"))
+    if j.get("template", "manual") == "manual": slides = manual.carrossel(j["dados"])
+    else: slides = car_renderizar(j["dados"], j.get("paleta", "km"), j.get("custom"))
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         for i, b in enumerate(slides): z.writestr(f"slide_{i+1:02d}.jpg", b)
@@ -273,6 +278,11 @@ def carrossel_ep():
 @app.post("/logo")
 def logo_ep():
     return send_file(io.BytesIO(add_logo(request.get_data(), True)), mimetype="image/jpeg")
+
+@app.post("/letreiro")
+def letreiro_ep():
+    j = request.get_json(force=True)
+    return send_file(io.BytesIO(manual.letreiro(j["gancho"])), mimetype="image/png")
 
 @app.get("/health")
 def health(): return jsonify(ok=True)

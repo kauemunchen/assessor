@@ -7,10 +7,11 @@ async function post(path, body, json = true) {
   return Buffer.from(await r.arrayBuffer());
 }
 export const paletas = () => fetch(BASE + '/paletas').then(r => r.json());
-export const frase = (texto, paleta = 'km', autoria = '@kauemunchen') => post('/frase', { frase: texto, paleta, autoria });
+export const frase = (texto, { paleta = 'km', autoria = '@kauemunchen', template = 'manual', palavra_dourada, etiqueta } = {}) => post('/frase', { frase: texto, paleta, autoria, template, palavra_dourada, etiqueta });
+export const letreiro = (gancho) => post('/letreiro', { gancho });
 export const comLogo = (bytes) => post('/logo', bytes, false);
-export async function carrossel(dados, paleta = 'km') {
-  const zip = await post('/carrossel', { dados, paleta });
+export async function carrossel(dados, { paleta = 'km', template = 'manual' } = {}) {
+  const zip = await post('/carrossel', { dados, paleta, template });
   return extrairZip(zip);
 }
 // ZIP "stored"/deflate mínimo sem dependência
