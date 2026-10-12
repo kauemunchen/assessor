@@ -20,13 +20,14 @@ def fonte(peso, tam):
             if os.path.exists(alt): return ImageFont.truetype(alt, tam)
         return ImageFont.load_default()
 
-_logo_branco = None
-def logo_branco():
-    global _logo_branco
-    if _logo_branco is None and os.path.exists(LOGO_PATH):
-        lg = Image.open(LOGO_PATH).convert("RGBA")
-        a = lg.getchannel("A"); _logo_branco = Image.merge("RGBA", (Image.new("L", lg.size, 255),) * 3 + (a,))
-    return _logo_branco
+# Logos oficiais (fundo transparente): escuro #37414E, claro #C8CFD7, branco
+_logos = {}
+def logo(variante="claro"):
+    if variante not in _logos:
+        p = os.path.join(AQUI, f"logo_km_{variante}.png")
+        _logos[variante] = Image.open(p).convert("RGBA") if os.path.exists(p) else None
+    return _logos[variante]
+def logo_branco(): return logo("claro")  # rodapé das artes sobre #37414E usa o claro do manual
 
 def wrap(draw, texto, font, max_w):
     linhas, linha = [], ""
@@ -158,7 +159,7 @@ def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatur
     img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
     Wf, Hf = img.size
     lw = int(Wf * proporcao); margem = int(Wf * 0.045)
-    lg0 = logo_branco()
+    lg0 = logo("claro")
     if lg0 is None:
         out = io.BytesIO(); img.convert("RGB").save(out, "JPEG", quality=95); return out.getvalue(), {"logo": "ausente"}
     lh = int(lg0.height * lw / lg0.width)
@@ -166,19 +167,20 @@ def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatur
     y = Hf - lh - margem if "inferior" in posicao else margem
     box = (max(0, x - 10), max(0, y - 10), min(Wf, x + lw + 10), min(Hf, y + lh + 10))
     lum = _luminancia_media(img, box); dev = _desvio(img, box)
-    if lum < 110: cor, nome = BRANCO, "branco"
-    elif lum > 170: cor, nome = PRIM, "azul-cinza #37414E"
-    else: cor, nome = (BRANCO, "branco") if lum < 140 else (PRIM, "azul-cinza #37414E")
-    logo = logo_colorido(cor).resize((lw, lh), Image.LANCZOS)
+    # tom pela luminosidade do canto: muito escuro → branco; escuro/médio-escuro → claro #C8CFD7; claro → escuro #37414E
+    if lum < 60: variante, nome, cor = "branco", "branco", BRANCO
+    elif lum < 140: variante, nome, cor = "claro", "claro #C8CFD7", SEC
+    else: variante, nome, cor = "escuro", "escuro #37414E", PRIM
+    logo_img = logo(variante).resize((lw, lh), Image.LANCZOS)
     # sombra suave quando fundo é médio ou ruidoso
     if 90 < lum < 190 or dev > 40:
         from PIL import ImageFilter
-        sombra_cor = (0, 0, 0, 150) if cor == BRANCO else (255, 255, 255, 150)
+        sombra_cor = (0, 0, 0, 150) if variante != "escuro" else (255, 255, 255, 150)
         sombra = Image.new("RGBA", (lw + 24, lh + 24), (0, 0, 0, 0))
-        a = logo.getchannel("A"); s = Image.new("RGBA", logo.size, sombra_cor); s.putalpha(a)
+        a = logo_img.getchannel("A"); s = Image.new("RGBA", logo_img.size, sombra_cor); s.putalpha(a)
         sombra.paste(s, (12, 12), s); sombra = sombra.filter(ImageFilter.GaussianBlur(6))
         img.alpha_composite(sombra, (x - 12, y - 12))
-    img.alpha_composite(logo, (x, y))
+    img.alpha_composite(logo_img, (x, y))
     if assinatura:
         dr = ImageDraw.Draw(img); f = fonte("Medium", max(18, int(Wf * 0.02)))
         txt = "@kauemunchen"; tw = dr.textbbox((0, 0), txt, font=f)[2]
