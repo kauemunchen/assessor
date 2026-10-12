@@ -15,9 +15,16 @@ function corpo(payload) {
   const partes = []; const walk = (p) => { if (!p) return; if (p.mimeType === 'text/plain' && p.body?.data) partes.push(Buffer.from(p.body.data, 'base64').toString('utf8')); (p.parts || []).forEach(walk); };
   walk(payload); return partes.join('\n').replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
 }
+function traduzErro(e) {
+  const m = String(e?.message || e);
+  if (/has not been used in project|is disabled/i.test(m)) return new Error('A Gmail API não está ativada no projeto Google Cloud (km-assistente). Ative em console.cloud.google.com → APIs e serviços → Biblioteca → Gmail API → Ativar.');
+  if (/insufficient.*scope|insufficientPermissions/i.test(m)) return new Error('A autorização atual não inclui o Gmail. Diga "conectar google" e aceite as permissões de e-mail.');
+  if (/invalid_grant/i.test(m)) return new Error('A autorização do Google expirou. Diga "conectar google" para renovar.');
+  return new Error(`Gmail: ${m.slice(0, 200)}`);
+}
 export async function listar(contaId, { q = 'newer_than:1d -category:promotions -category:social', max = 15 } = {}) {
   const g = auth(contaId);
-  const r = await g.users.messages.list({ userId: 'me', q, maxResults: max });
+  const r = await g.users.messages.list({ userId: 'me', q, maxResults: max }).catch(e => { throw traduzErro(e); });
   const ids = r.data.messages || [];
   const out = [];
   for (const { id } of ids) {
@@ -28,7 +35,7 @@ export async function listar(contaId, { q = 'newer_than:1d -category:promotions 
 }
 export async function ler(contaId, id) {
   const g = auth(contaId);
-  const m = await g.users.messages.get({ userId: 'me', id, format: 'full' });
+  const m = await g.users.messages.get({ userId: 'me', id, format: 'full' }).catch(e => { throw traduzErro(e); });
   return { id, de: header(m.data, 'from'), para: header(m.data, 'to'), assunto: header(m.data, 'subject'), data: header(m.data, 'date'), corpo: corpo(m.data.payload).slice(0, 6000) || m.data.snippet };
 }
 
