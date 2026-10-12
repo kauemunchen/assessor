@@ -11,18 +11,21 @@ async function comRetry(fn, tentativas = 4) {
   }
   throw new Error('IA indisponível no momento (pico de demanda no Google). Tente de novo em 1 minuto.');
 }
-const FALLBACK = process.env.MODELO_FALLBACK || '';
+// Cadeia de modelos: MODELOS="a,b,c" ou MODELO_PADRAO + MODELO_FALLBACK + reservas conhecidas
+const CADEIA = [...new Set([
+  ...(process.env.MODELOS ? process.env.MODELOS.split(',') : [MODELO, process.env.MODELO_FALLBACK]),
+  'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash',
+].map(m => (m || '').trim()).filter(Boolean))];
 export const modelo = (opts = {}) => {
-  const m = genai.getGenerativeModel({ model: MODELO, ...opts });
-  const gc = m.generateContent.bind(m);
+  const m = genai.getGenerativeModel({ model: CADEIA[0], ...opts });
   m.generateContent = async (...a) => {
-    try { return await comRetry(() => gc(...a), 2); }
-    catch (e) {
-      if (!FALLBACK || !/indisponível|503|429/i.test(String(e?.message))) throw e;
-      console.warn(`[gemini] ${MODELO} indisponível, usando ${FALLBACK}`);
-      const f = genai.getGenerativeModel({ model: FALLBACK, ...opts });
-      return comRetry(() => f.generateContent(...a), 3);
+    let ultimo;
+    for (const nome of CADEIA) {
+      const inst = genai.getGenerativeModel({ model: nome, ...opts });
+      try { return await comRetry(() => inst.generateContent(...a), nome === CADEIA[0] ? 2 : 1); }
+      catch (e) { ultimo = e; if (!transitorio(e) && !/indisponível/i.test(String(e?.message))) throw e; console.warn(`[gemini] ${nome} indisponível, tentando próximo`); }
     }
+    throw ultimo;
   };
   return m;
 };
