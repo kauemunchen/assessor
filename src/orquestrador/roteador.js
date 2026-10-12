@@ -11,7 +11,19 @@ export async function tratarMensagem(msg, canal) {
   const conta = await obterConta(msg.chatId);
   if (!conta) return onboarding(msg);
 
-  if (msg.tipo === 'audio') msg.texto = await transcrever(await canal.baixarMidia(msg.midia.ref), msg.midia.mime);
+  if (msg.tipo === 'audio') {
+    await canal.enviar(msg.conta, msg.chatId, '🎧 Ouvindo…');
+    const bytes = await canal.baixarMidia(msg.midia.ref);
+    console.log(`[audio] ${msg.chatId} ${msg.midia.mime} ${bytes.byteLength} bytes`);
+    msg.texto = await transcrever(bytes, msg.midia.mime);
+    console.log(`[audio] transcrição: ${msg.texto.slice(0, 120)}`);
+    if (!msg.texto) return 'Não consegui entender o áudio. Pode repetir ou escrever?';
+    await canal.enviar(msg.conta, msg.chatId, `📝 "${msg.texto}"`);
+  }
+  if (msg.tipo === 'imagem' || msg.tipo === 'arquivo') {
+    msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[${msg.tipo} recebido: ${msg.midia?.mime || ''}; leitura de ${msg.tipo} entra na v2]`;
+  }
+  if (!msg.texto?.trim()) return 'Recebi uma mensagem vazia.';
 
   // confirmação de ação pendente
   const pend = db.prepare('SELECT * FROM pendencias WHERE chat_id=? ORDER BY id DESC LIMIT 1').get(msg.chatId);
@@ -26,6 +38,7 @@ export async function tratarMensagem(msg, canal) {
 
   const ativos = modulosAtivos(conta.id);
   const modulo = await classificar(msg.texto, ativos);
+  console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`);
   const prompt = montarPrompt({ modulo, conta, ativos });
   const resposta = await responder({ prompt, conta, modulo, msg });
   await memoria.registrarInteracao(conta.id, modulo, msg, resposta);

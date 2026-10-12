@@ -5,11 +5,13 @@ export class TelegramCanal {
     this.app.post('/webhook/telegram', async (req, res) => {
       res.sendStatus(200);
       const m = req.body.message; if (!m) return;
+      console.log(`[telegram] ${m.chat.id} ${m.voice ? 'voice' : m.audio ? 'audio' : m.photo ? 'photo' : m.document ? 'doc' : 'text'}`);
       await fn({
         conta: null, chatId: String(m.chat.id), remetente: String(m.from.id),
-        tipo: m.voice ? 'audio' : m.photo ? 'imagem' : m.document ? 'arquivo' : 'texto',
+        tipo: (m.voice || m.audio) ? 'audio' : m.photo ? 'imagem' : m.document ? 'arquivo' : 'texto',
         texto: m.text || m.caption || '',
         midia: m.voice ? { ref: m.voice.file_id, mime: 'audio/ogg' }
+             : m.audio ? { ref: m.audio.file_id, mime: m.audio.mime_type || 'audio/mpeg' }
              : m.photo ? { ref: m.photo.at(-1).file_id, mime: 'image/jpeg' }
              : m.document ? { ref: m.document.file_id, mime: m.document.mime_type } : null,
         recebidoEm: new Date(m.date * 1000),
