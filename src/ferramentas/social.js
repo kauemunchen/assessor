@@ -13,7 +13,7 @@ export function ferramentas(_conta) {
   return [
     { name: 'definir_identidade', description: 'Salva/atualiza a identidade da marca para conteúdo (perfil, nicho, público, tom, pilares, hashtags fixas). Chame quando o dono descrever a marca.', parameters: { type: 'OBJECT', properties: { perfil: { type: 'STRING' }, nicho: { type: 'STRING' }, publico: { type: 'STRING' }, tom: { type: 'STRING' }, pilares: { type: 'STRING' }, hashtags_fixas: { type: 'STRING' }, descricao: { type: 'STRING' } } } },
     { name: 'ver_identidade', description: 'Mostra a identidade de marca salva', parameters: { type: 'OBJECT', properties: {} } },
-    { name: 'gerar_legenda', description: 'Gera legenda + hashtags no tom da marca para um tema e formato. Retorna rascunho para aprovação.', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, formato: { type: 'STRING', description: 'post|carrossel|reels|story' }, cta: { type: 'STRING' }, ajuste: { type: 'STRING', description: 'instrução de ajuste sobre uma versão anterior' } }, required: ['tema'] } },
+    { name: 'gerar_legenda', description: 'Gera legenda no modelo do manual KM (gancho, contexto, 3 pontos, CTA único, 5 hashtags = 3 fixas + 2 do pilar). Informe o pilar (GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO) e o objetivo do CTA (salvar|compartilhar|comentar|seguir|conversa|direct).', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, formato: { type: 'STRING', description: 'post|carrossel|reels|story' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa|direct' }, serie: { type: 'STRING', description: 'Antes do processo | Método 3R | Ferramenta da semana | (vazio)' }, ajuste: { type: 'STRING', description: 'instrução de ajuste sobre uma versão anterior' } }, required: ['tema', 'pilar'] } },
     { name: 'gerar_midia', description: 'Gera imagem via fal.ai a partir de briefing visual (na identidade da marca). Retorna URL.', parameters: { type: 'OBJECT', properties: { briefing: { type: 'STRING' }, ratio: { type: 'STRING', description: '1:1|4:5|9:16' } }, required: ['briefing'] } },
     { name: 'gerar_frase', description: 'Renderiza uma frase/citação em arte KM (1080x1350) com logo. Paletas: km, preto, copa, azul, vinho. Retorna URL.', parameters: { type: 'OBJECT', properties: { frase: { type: 'STRING' }, paleta: { type: 'STRING' }, autoria: { type: 'STRING' } }, required: ['frase'] } },
     { name: 'gerar_carrossel', description: 'Gera carrossel KM: IA cria capa + N slides + CTA e renderiza as artes (template KM, com logo). Retorna URLs dos slides e os textos. Depois use criar_post com formato=carrossel e midias_urls.', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, qtd: { type: 'NUMBER', description: 'slides internos, padrão 4' }, paleta: { type: 'STRING' }, instrucoes: { type: 'STRING' } }, required: ['tema'] } },
@@ -39,15 +39,20 @@ export async function executar(nome, a, conta, ctx = {}) {
     case 'gerar_legenda': {
       const id = identidade(conta.id) || {};
       const hist = historico(conta.id);
-      const r = await gerarJSON(`Você é social media da marca abaixo. Gere conteúdo para Instagram em português do Brasil.
-MARCA: ${JSON.stringify(id)}
+      const pilarKey = (a.pilar || 'gestao').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const tagsPilar = id.hashtags_pilar?.[pilarKey] || '';
+      const cta = id.ctas?.[(a.objetivo_cta || 'salvar').toLowerCase()] || a.objetivo_cta || '';
+      const r = await gerarJSON(`Você é a MIA, social media de ${id.perfil || 'Kauê München'}. Gere legenda para Instagram em português do Brasil seguindo o MANUAL DA MARCA à risca.
+IDENTIDADE: ${JSON.stringify({ nicho: id.nicho, publico: id.publico, tom: id.tom, pilares: id.pilares, provas: id.provas, fase: id.fase })}
 HISTÓRICO APROVADO (referência de tom): ${JSON.stringify(hist)}
 TEMA: ${a.tema}
-FORMATO: ${a.formato || 'post'}
-CTA desejado: ${a.cta || 'livre'}
+FORMATO: ${a.formato || 'post'} · PILAR: ${(a.pilar || 'GESTÃO').toUpperCase()}${a.serie ? ' · SÉRIE: ' + a.serie : ''}
+CTA OBRIGATÓRIO (único, no fim, exatamente este texto): "${cta}"
+HASHTAGS OBRIGATÓRIAS (exatamente 5): fixas ${id.hashtags_fixas || ''} + 2 escolhidas de: ${tagsPilar}
 ${a.ajuste ? 'AJUSTE PEDIDO SOBRE A VERSÃO ANTERIOR: ' + a.ajuste : ''}
-Regras: gancho nas 3 primeiras palavras; uma ideia por post; parágrafos curtos; sem emoji em excesso; CTA no fim; 8 a 15 hashtags do nicho${id.hashtags_fixas ? ' incluindo ' + id.hashtags_fixas : ''}; nunca inventar número ou depoimento.
-Responda JSON: {"legenda": "...", "hashtags": "#a #b ...", "briefing_imagem": "descrição visual curta para gerar a imagem, na identidade da marca"${(a.formato === 'carrossel') ? ', "slides": ["texto slide 1", "..."]' : ''}}`);
+MODELO DA LEGENDA: [gancho 1 linha] linha em branco [história/contexto real 2–3 linhas] linha em branco [3 pontos curtos numerados 1. 2. 3.] linha em branco [CTA] linha em branco [5 hashtags].
+REGRAS: gancho nas 3 primeiras palavras (fórmulas: número+contraste, frase que dói, confissão, "e se"); uma ideia por post; números só os das provas de autoridade ou os informados; nunca inventar depoimento; sem venda na fase atual; sem emoji além de um no máximo.
+Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "gancho": "...", "legenda": "texto completo no modelo, sem as hashtags", "hashtags": "#a #b #c #d #e", "cta": "${cta}", "briefing_imagem": "descrição visual curta na identidade KM (fundo #37414E, título branco, uma palavra em dourado)"${(a.formato === 'carrossel') ? ', "slides": ["capa: título até 8 palavras com UMA palavra em dourado", "problema", "conteúdo 1", "conteúdo 2", "conteúdo 3", "resumo", "cta"]' : ''}}`);
       return r;
     }
     case 'gerar_midia': {
