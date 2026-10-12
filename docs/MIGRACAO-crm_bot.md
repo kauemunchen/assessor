@@ -23,3 +23,9 @@
 2. Migrar dados e token Google.
 3. Desligar crm_bot (pm2/systemd) e apontar agenda.kauemunchen.com.br para o painel novo (v2).
 4. Bot do Instagram: manter rodando até o módulo Social cobrir carrossel e stories; depois desligar.
+
+## Bot Instagram KM → MIA (módulo Social)
+- Renderização (frase, carrossel, logo): código Python original em `render/render_km.py`, rodando como serviço `assessor-render` (container próprio, Flask + Pillow).
+- Publicação (post, story, reels, carrossel), identidade, histórico e paletas: portados para `src/ferramentas/social.js` e `src/integracoes/instagram.js`.
+- Dados: `node scripts/migrar-instagram-km.js /root/bot/telegram-instagram-bot/dados.db 1` (dentro do container: `docker compose exec assessor node scripts/migrar-instagram-km.js /dados.db 1` com o arquivo montado).
+- Depois de validar a MIA: `systemctl disable --now kmbot.service`.

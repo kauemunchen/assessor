@@ -14,6 +14,21 @@ export async function publicar({ igUserId, token, legenda, url, tipo = 'imagem' 
   return p.id;
 }
 
+export async function publicarCarrossel({ igUserId, token, legenda, urls }) {
+  const children = [];
+  for (const url of urls) {
+    const j = await fetch(`https://graph.instagram.com/${igUserId}/media`, { method: 'POST', body: new URLSearchParams({ image_url: url, is_carousel_item: 'true', access_token: token }) }).then(r => r.json());
+    if (!j.id) throw new Error(`Instagram item: ${JSON.stringify(j)}`);
+    children.push(j.id); await sleep(2000);
+  }
+  const c = await fetch(`https://graph.instagram.com/${igUserId}/media`, { method: 'POST', body: new URLSearchParams({ media_type: 'CAROUSEL', children: children.join(','), caption: legenda, access_token: token }) }).then(r => r.json());
+  if (!c.id) throw new Error(`Instagram carrossel: ${JSON.stringify(c)}`);
+  await sleep(5000);
+  const p = await fetch(`https://graph.instagram.com/${igUserId}/media_publish`, { method: 'POST', body: new URLSearchParams({ creation_id: c.id, access_token: token }) }).then(r => r.json());
+  if (!p.id) throw new Error(`Instagram publish: ${JSON.stringify(p)}`);
+  return p.id;
+}
+
 export async function metricas({ igUserId, token, desde }) {
   const u = `https://graph.instagram.com/${igUserId}/insights?metric=reach,accounts_engaged,profile_views,follower_count&period=day&since=${desde}&access_token=${token}`;
   return fetch(u).then(r => r.json());

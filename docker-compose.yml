@@ -1,5 +1,13 @@
 services:
+  render:
+    build: ./render
+    container_name: assessor-render
+    restart: unless-stopped
+    expose: ["5055"]
   assessor:
+    depends_on: [render]
+    environment:
+      - RENDER_URL=http://render:5055
     build: .
     container_name: assessor-km
     restart: unless-stopped

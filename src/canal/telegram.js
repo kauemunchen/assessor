@@ -19,6 +19,12 @@ export class TelegramCanal {
     });
   }
   async enviar(_conta, chatId, resposta) {
+    if (resposta && typeof resposta === 'object' && resposta.fotos) {
+      const media = resposta.fotos.slice(0, 10).map((u, i) => ({ type: 'photo', media: u, caption: i === 0 ? semMarkdown(resposta.texto || '').slice(0, 1000) : undefined }));
+      const r = await fetch(`https://api.telegram.org/bot${this.token}/sendMediaGroup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, media }) }).then(r => r.json());
+      if (!r.ok) console.error('[telegram] sendMediaGroup falhou:', r.description);
+      return;
+    }
     if (resposta && typeof resposta === 'object' && resposta.foto) {
       const r = await fetch(`https://api.telegram.org/bot${this.token}/sendPhoto`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: resposta.foto, caption: semMarkdown(resposta.texto || '').slice(0, 1000) }) }).then(r => r.json());
       if (!r.ok) console.error('[telegram] sendPhoto falhou:', r.description);
