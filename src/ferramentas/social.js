@@ -20,6 +20,8 @@ export function ferramentas(_conta) {
     { name: 'aplicar_marca', description: 'Aplica o logo KM como marca d\'água numa imagem (URL) escolhendo automaticamente a cor pelo fundo (branco em fundo escuro, azul-cinza em fundo claro, com sombra se precisar). Use em toda foto enviada pelo dono antes de propor o post.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, posicao: { type: 'STRING', description: 'inferior-direito (padrão) | inferior-esquerdo | superior-direito | superior-esquerdo' }, assinatura: { type: 'BOOLEAN', description: 'escrever @kauemunchen sob o logo (padrão false — só se o dono pedir)' } }, required: ['url'] } },
     { name: 'listar_paletas', description: 'Paletas de cor disponíveis para artes KM', parameters: { type: 'OBJECT', properties: {} } },
     { name: 'criar_post', description: 'Salva post no calendário editorial com legenda/hashtags/mídia aprovados. status: rascunho ou agendado (com data).', parameters: { type: 'OBJECT', properties: { formato: { type: 'STRING' }, tema: { type: 'STRING' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' }, description: 'slides do carrossel, em ordem' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM para agendar; vazio = rascunho' }, pilar: { type: 'STRING' } }, required: ['formato', 'legenda'] } },
+    { name: 'agendar_post', description: 'Agenda um post salvo (rascunho) para uma data/hora; cria o evento no marcador Social Media da agenda. Use quando o dono aprovar e disser quando.', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM' } }, required: ['post_id', 'data'] } },
+    { name: 'atualizar_post', description: 'Altera legenda, hashtags, mídia, tema, pilar ou formato de um post salvo', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' } }, tema: { type: 'STRING' }, pilar: { type: 'STRING' }, formato: { type: 'STRING' } }, required: ['post_id'] } },
     { name: 'listar_calendario', description: 'Lista a programação de posts (rascunho, agendado, publicado) num período; use para "o que temos programado"', parameters: { type: 'OBJECT', properties: { inicio: { type: 'STRING' }, fim: { type: 'STRING' }, status: { type: 'STRING' } } } },
     { name: 'publicar', description: 'Publica um post salvo no Instagram agora (requer confirmação)', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' } }, required: ['post_id'] } },
     { name: 'ler_metricas', description: 'Métricas da conta nos últimos N dias', parameters: { type: 'OBJECT', properties: { dias: { type: 'NUMBER' } } } },
@@ -110,6 +112,25 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo":
         } catch (e) { agenda = `não entrou na agenda: ${e.message}`; }
       }
       return { id: postId, status, data: a.data || null, tem_midia: !!a.midia_url, agenda };
+    }
+    case 'agendar_post': {
+      const p = db.prepare('SELECT * FROM posts WHERE id=? AND conta_id=?').get(a.post_id, conta.id);
+      if (!p) throw new Error(`Post #${a.post_id} não existe.`);
+      if (p.status === 'publicado') throw new Error('Esse post já foi publicado.');
+      db.prepare("UPDATE posts SET status='agendado', data=? WHERE id=?").run(a.data, p.id);
+      let agenda = null;
+      try {
+        if (p.gcal_event_id) { await gcal.atualizarEvento(conta.id, p.gcal_event_id, { inicio: a.data, fim: new Date(new Date(a.data).getTime() + 15 * 60000).toISOString().slice(0, 16) }); agenda = 'evento atualizado'; }
+        else { const ev = await gcal.criarEvento(conta.id, { titulo: `📣 ${p.formato}: ${p.tema || (p.legenda || '').slice(0, 40)}`, inicio: a.data, fim: new Date(new Date(a.data).getTime() + 15 * 60000).toISOString().slice(0, 16), descricao: `Post #${p.id} · ${(p.legenda || '').slice(0, 300)}`, categoria: MARCADOR, lembreteMin: 60 }); db.prepare('UPDATE posts SET gcal_event_id=? WHERE id=?').run(ev.id, p.id); agenda = ev.link; }
+      } catch (e) { agenda = `não entrou na agenda: ${e.message}`; }
+      return { id: p.id, status: 'agendado', data: a.data, agenda, publica_sozinho: true };
+    }
+    case 'atualizar_post': {
+      const p = db.prepare('SELECT * FROM posts WHERE id=? AND conta_id=?').get(a.post_id, conta.id);
+      if (!p) throw new Error(`Post #${a.post_id} não existe.`);
+      const campos = { legenda: a.legenda, hashtags: a.hashtags, tema: a.tema, pilar: a.pilar, formato: a.formato, midia_url: a.midias_urls?.length ? JSON.stringify(a.midias_urls) : a.midia_url };
+      for (const [k, v] of Object.entries(campos)) if (v !== undefined && v !== null) db.prepare(`UPDATE posts SET ${k}=? WHERE id=?`).run(v, p.id);
+      return { id: p.id, atualizado: Object.keys(campos).filter(k => campos[k] != null) };
     }
     case 'listar_calendario': {
       let q = 'SELECT id, formato, tema, data, status, midia_url IS NOT NULL AS tem_midia FROM posts WHERE conta_id=?'; const p = [conta.id];

@@ -8,3 +8,10 @@ export function gravarFato(contaId, modulo, fato) {
 export async function registrarInteracao(contaId, modulo, msg, resposta) {
   db.prepare('INSERT INTO interacoes (conta_id, modulo, entrada, saida) VALUES (?,?,?,?)').run(contaId, modulo, msg.texto, typeof resposta === 'string' ? resposta : resposta.texto);
 }
+
+export function historicoRecente(contaId, n = 8) {
+  return db.prepare('SELECT modulo, entrada, saida FROM interacoes WHERE conta_id=? ORDER BY id DESC LIMIT ?').all(contaId, n).reverse();
+}
+export function ultimoModulo(contaId) {
+  return db.prepare('SELECT modulo, criado_em FROM interacoes WHERE conta_id=? ORDER BY id DESC LIMIT 1').get(contaId) || null;
+}

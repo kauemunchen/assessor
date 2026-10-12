@@ -2,6 +2,7 @@
 import { modelo } from '../integracoes/gemini.js';
 import { ferramentasDe, executarFerramenta, precisaConfirmar } from '../ferramentas/index.js';
 import { db } from '../db/index.js';
+import { historicoRecente } from './memoria.js';
 export { transcrever } from '../integracoes/gemini.js';
 
 export async function classificar(texto, ativos) {
@@ -17,9 +18,18 @@ export async function responder({ prompt, conta, modulo, msg }) {
   const decls = ferramentasDe(modulo, conta);
   const m = modelo({ systemInstruction: `${prompt}\n\nAGORA: ${agoraBR()} (America/Sao_Paulo). Datas relativas ("amanhã", "quinta") são calculadas a partir daqui e passadas às ferramentas no formato YYYY-MM-DDTHH:MM.
 
+CONTEXTO: as mensagens anteriores desta conversa estão no histórico (respostas de outros assessores vêm marcadas com [módulo]). Use-as: se o dono responder "aprovar", "agenda", "ajusta", "sim", refere-se ao que foi proposto por último.
+
 FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas, sem linhas ---. Negrito só com *uma palavra*. Listas com "-" e no máximo 5 itens. Resposta "curta" = até 6 linhas; "média" = até 12; "completa" = até 25. Vá direto ao ponto, sem introdução nem fechamento.`,
     tools: decls.length ? [{ functionDeclarations: decls }] : undefined });
-  const contents = [{ role: 'user', parts: [{ text: msg.texto }] }];
+  const corta = (t, n = 1800) => (t || '').length > n ? (t || '').slice(0, n) + ' […]' : (t || '');
+  const contents = [];
+  for (const h of historicoRecente(conta.id, 8)) {
+    if (!h.entrada || !h.saida) continue;
+    contents.push({ role: 'user', parts: [{ text: corta(h.entrada) }] });
+    contents.push({ role: 'model', parts: [{ text: `[${h.modulo}] ` + corta(h.saida) }] });
+  }
+  contents.push({ role: 'user', parts: [{ text: msg.texto }] });
   let ultimoErro = null, assinaturaAnterior = '';
   for (let i = 0; i < 5; i++) {
     const r = await m.generateContent({ contents });

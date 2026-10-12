@@ -53,6 +53,13 @@ export async function tratarMensagem(msg, canal) {
     const nomes = [...(nomesPadrao[mod] || []), (configPersona(conta.id, mod).nome || '').toLowerCase()].filter(Boolean);
     if (nomes.some(n => new RegExp(`^${n}\\b[,:!]?\\s`).test(cabeca + ' '))) { modulo = mod; break; }
   }
+  // Resposta curta de continuação ("aprovar", "agenda pra…", "ajusta", "sim") → fica com quem falou por último (até 30 min)
+  if (!modulo) {
+    const ult = memoria.ultimoModulo(conta.id);
+    const recente = ult && (Date.now() - new Date(ult.criado_em + 'Z').getTime()) < 30 * 60000;
+    const continuacao = /^(aprov|sim\b|ok\b|pode|confirm|agend|ajust|troca|muda|mudar|publica|refaz|outra|outro|mais |menos |n[ãa]o\b|cancela|deixa|essa|esse|isso|a segunda|a primeira|prefiro)/i.test(msg.texto.trim()) || msg.texto.trim().length < 25;
+    if (recente && continuacao && ativos.includes(ult.modulo)) modulo = ult.modulo;
+  }
   if (!modulo) modulo = await classificar(msg.texto, ativos);
   console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`);
   const prompt = montarPrompt({ modulo, conta, ativos });
