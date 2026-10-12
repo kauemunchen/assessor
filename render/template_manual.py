@@ -53,13 +53,12 @@ def titulo_destacado(draw, texto, palavra, font, x, y, max_w, lh, cor=BRANCO):
     return y
 
 def rodape(img, draw, cor_texto=BRANCO):
+    # Só o símbolo KM, sem nome (decisão do dono, 11/10/2026)
     lg = logo_branco()
-    y = H - M - 44
+    y = H - M - 52
     if lg is not None:
-        lh = 44; lw = int(lg.width * lh / lg.height); l2 = lg.resize((lw, lh), Image.LANCZOS)
-        img.paste(l2, (M, y), l2); x = M + lw + 16
-    else: x = M
-    draw.text((x, y + 10), "KAUÊ MÜNCHEN", fill=h2r(cor_texto), font=fonte("Medium", 22))
+        lh = 52; lw = int(lg.width * lh / lg.height); l2 = lg.resize((lw, lh), Image.LANCZOS)
+        img.paste(l2, (M, y), l2)
 
 def etiqueta(draw, texto):
     draw.text((M, M), texto.upper(), fill=h2r(OURO), font=fonte("Bold", 30))
