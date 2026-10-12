@@ -5,6 +5,7 @@ import { executarFerramenta } from '../ferramentas/index.js';
 import * as memoria from './memoria.js';
 import { db } from '../db/index.js';
 import { onboarding } from './onboarding.js';
+import { governanca } from './governanca.js';
 
 export async function tratarMensagem(msg, canal) {
   const conta = await obterConta(msg.chatId);
@@ -20,6 +21,8 @@ export async function tratarMensagem(msg, canal) {
     catch (e) { return `❌ Não consegui: ${e.message}`; }
   }
   if (pend && /^(n[aã]o|cancela|deixa)\b/i.test(msg.texto.trim())) { db.prepare('DELETE FROM pendencias WHERE id=?').run(pend.id); return 'Cancelado.'; }
+
+  const gov = governanca(msg, conta); if (gov) return gov;
 
   const ativos = modulosAtivos(conta.id);
   const modulo = await classificar(msg.texto, ativos);

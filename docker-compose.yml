@@ -10,7 +10,7 @@ services:
       - ./src/conhecimento:/app/src/conhecimento
     labels:
       - traefik.enable=true
-      - traefik.http.routers.assessor.rule=Host(`assessor.SEUDOMINIO.com.br`)
+      - traefik.http.routers.assessor.rule=Host(`assessor.kauemunchen.com.br`)
       - traefik.http.routers.assessor.entrypoints=websecure
       - traefik.http.routers.assessor.tls.certresolver=letsencrypt
       - traefik.http.services.assessor.loadbalancer.server.port=3000

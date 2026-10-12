@@ -3,4 +3,4 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
-CMD ["node", "src/index.js"]
+CMD ["sh", "-c", "node src/db/migrate.js && node src/index.js"]
