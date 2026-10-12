@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS lembretes (
 CREATE TABLE IF NOT EXISTS google_auth (conta_id INTEGER PRIMARY KEY, token_json TEXT NOT NULL, atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS instagram_auth (conta_id INTEGER PRIMARY KEY, ig_user_id TEXT, token TEXT, atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS retornos (id INTEGER PRIMARY KEY, conta_id INTEGER, pessoa TEXT, assunto TEXT, direcao TEXT, status TEXT DEFAULT 'aberto', criado_em TEXT DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, conta_id INTEGER, formato TEXT, pilar TEXT, tema TEXT, data TEXT, legenda TEXT, hashtags TEXT, briefing_imagem TEXT, midia_url TEXT, status TEXT DEFAULT 'rascunho', ig_media_id TEXT, publicado_em TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, conta_id INTEGER, formato TEXT, pilar TEXT, tema TEXT, data TEXT, legenda TEXT, hashtags TEXT, briefing_imagem TEXT, midia_url TEXT, status TEXT DEFAULT 'rascunho', ig_media_id TEXT, gcal_event_id TEXT, publicado_em TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS notas (id INTEGER PRIMARY KEY, conta_id INTEGER, titulo TEXT, conteudo TEXT, tags TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS contatos (id INTEGER PRIMARY KEY, conta_id INTEGER, nome TEXT, telefone TEXT, email TEXT, empresa TEXT, chat_id TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS pendencias (id INTEGER PRIMARY KEY, conta_id INTEGER, chat_id TEXT, modulo TEXT, ferramenta TEXT, args TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);

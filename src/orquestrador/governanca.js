@@ -1,8 +1,8 @@
 // Comandos de governança tratados antes da IA: ligar/desligar módulos, conectar Google, ajustar persona.
 import { db } from '../db/index.js';
 import { urlAutorizacao, listarEventos, listarCalendarios, obterOuCriarCalendario } from '../integracoes/google-calendar.js';
-const MODS = { secretaria: 'Secretária', producao: 'Produção', documentos: 'Documentos', financeiro: 'Financeiro', social: 'Social' };
-const alias = { secretária: 'secretaria', produção: 'producao', financeira: 'financeiro', 'social media': 'social', instagram: 'social', docs: 'documentos' };
+const MODS = { secretaria: 'Secretária', producao: 'Produção', documentos: 'Documentos', financeiro: 'Financeiro', social: 'MIA (Social Media)' };
+const alias = { secretária: 'secretaria', produção: 'producao', financeira: 'financeiro', 'social media': 'social', instagram: 'social', mia: 'social', docs: 'documentos' };
 const norm = (s) => alias[s] || s;
 
 const fmtHora = (e) => e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : 'dia todo';
@@ -41,6 +41,11 @@ export async function governanca(msg, conta) {
   if (/^agenda( de)? hoje$|^(o que|oq) (eu )?tenho hoje\??$|^hoje\??$/.test(t)) return agenda(conta, 'hoje', 'Hoje');
   if (/^agenda( de)? amanh[ãa]$|^(o que|oq) (eu )?tenho amanh[ãa]\??$/.test(t)) return agenda(conta, 'amanha', 'Amanhã');
   if (/^agenda( da)? semana$|^(o que|oq) (eu )?tenho (essa |nesta |na )?semana\??$|^semana$/.test(t)) return agenda(conta, 'semana', 'Próximos 7 dias');
+  if (/^(programa[çc][ãa]o|posts? agendados?|calend[áa]rio editorial)$/.test(t)) {
+    const ps = db.prepare("SELECT id, formato, tema, data, status FROM posts WHERE conta_id=? AND status IN ('rascunho','agendado') ORDER BY data IS NULL, data").all(conta.id);
+    if (!ps.length) return 'Nada programado. Peça à MIA: "cria um post sobre …".';
+    return `*Programação* (${ps.length})\n${ps.map(p => `- #${p.id} ${p.status === 'agendado' ? new Date(p.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'rascunho'} · ${p.formato}: ${p.tema || '(sem tema)'}`).join('\n')}`;
+  }
   if (/^(categorias|marcadores|calend[áa]rios)$/.test(t)) {
     const c = await listarCalendarios(conta.id);
     return `Marcadores da agenda:\n${c.map(x => `- ${x.nome}${x.primario ? ' (principal)' : ''}`).join('\n')}\n\nPara criar: "criar marcador Família". Para usar: "marca dentista quinta 15h, marcador Saúde".`;

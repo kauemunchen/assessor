@@ -1,5 +1,5 @@
 import { db } from './index.js';
-const NOMES = { diretor: 'Diretor', secretaria: 'Secretária', producao: 'Produção', documentos: 'Documentos', financeiro: 'Financeiro', social: 'Social' };
+const NOMES = { diretor: 'Diretor', secretaria: 'Secretária', producao: 'Produção', documentos: 'Documentos', financeiro: 'Financeiro', social: 'MIA' };
 export async function obterConta(chatId) {
   return db.prepare('SELECT c.* FROM contas c JOIN usuarios u ON u.conta_id=c.id WHERE u.chat_id=?').get(chatId) || null;
 }
