@@ -34,7 +34,7 @@ export async function tratarMensagem(msg, canal) {
   }
   if (pend && /^(n[aã]o|cancela|deixa)\b/i.test(msg.texto.trim())) { db.prepare('DELETE FROM pendencias WHERE id=?').run(pend.id); return 'Cancelado.'; }
 
-  const gov = governanca(msg, conta); if (gov) return gov;
+  const gov = await governanca(msg, conta); if (gov) return gov;
 
   const ativos = modulosAtivos(conta.id);
   const modulo = await classificar(msg.texto, ativos);
