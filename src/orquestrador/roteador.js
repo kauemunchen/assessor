@@ -63,6 +63,10 @@ export async function tratarMensagem(msg, canal) {
   if (!modulo) modulo = await classificar(msg.texto, ativos);
   console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`);
   const prompt = montarPrompt({ modulo, conta, ativos });
+  // Pedidos pesados (carrossel, arte, imagem): avisa na hora e deixa demorar
+  if (modulo === 'social' && /\b(carrossel|est[áa]tico|frase|arte|imagem|gera)\b/i.test(msg.texto)) {
+    await canal.enviar(msg.conta, msg.chatId, '🎨 Montando… isso leva de 20 a 40 segundos. Te mando a prévia assim que ficar pronta.');
+  }
   let resposta = await responder({ prompt, conta, modulo, msg });
   await memoria.registrarInteracao(conta.id, modulo, msg, resposta);
   // Social: se a resposta contém URL de imagem (fal/cloudinary), manda como foto com a legenda
