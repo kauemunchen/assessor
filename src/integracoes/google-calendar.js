@@ -12,7 +12,7 @@ export function urlAutorizacao(contaId) {
     scope: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/gmail.readonly'] });
 }
 export async function salvarCodigo(contaId, code) {
-  const { tokens } = await clienteOAuth().getToken(code);
+  const { tokens } = await clienteOAuth().getToken({ code: String(code) });
   db.prepare('INSERT INTO google_auth (conta_id, token_json) VALUES (?,?) ON CONFLICT(conta_id) DO UPDATE SET token_json=excluded.token_json').run(contaId, JSON.stringify(tokens));
 }
 function servico(contaId) {

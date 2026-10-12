@@ -26,4 +26,11 @@ app.listen(process.env.PORT || 3000, () => console.log('assessor-km up'));
 
 import { urlAutorizacao, salvarCodigo } from './integracoes/google-calendar.js';
 app.get('/oauth/google/iniciar/:contaId', (req, res) => res.redirect(urlAutorizacao(req.params.contaId)));
-app.get('/oauth/google/callback', async (req, res) => { await salvarCodigo(req.query.state, req.query.code); res.send('Google conectado. Pode voltar ao Telegram.'); });
+app.get('/oauth/google/callback', async (req, res) => {
+  const { state, code, error } = req.query;
+  if (error || !code) { console.error('[oauth] google retornou erro:', error || 'sem code', req.query); return res.status(400).send(`Google não autorizou: ${error || 'sem código'}. Volte ao Telegram e peça "conectar google" de novo.`); }
+  try { await salvarCodigo(state, code); res.send('Google conectado. Pode voltar ao Telegram.'); }
+  catch (e) { console.error('[oauth] falha ao salvar token:', e?.message); res.status(500).send(`Erro ao conectar: ${e?.message}`); }
+});
+process.on('unhandledRejection', (e) => console.error('[unhandledRejection]', e?.stack || e));
+process.on('uncaughtException', (e) => console.error('[uncaughtException]', e?.stack || e));
