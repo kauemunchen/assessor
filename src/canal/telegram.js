@@ -17,12 +17,33 @@ export class TelegramCanal {
     });
   }
   async enviar(_conta, chatId, resposta) {
-    const body = typeof resposta === 'string' ? { chat_id: chatId, text: resposta } : { chat_id: chatId, text: resposta.texto, reply_markup: resposta.botoes };
-    const r = await fetch(`https://api.telegram.org/bot${this.token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+    const texto = typeof resposta === 'string' ? resposta : resposta.texto;
+    const base = { chat_id: chatId, reply_markup: resposta?.botoes };
+    const html = paraHTML(texto);
+    let r = await this._post({ ...base, text: html, parse_mode: 'HTML' });
+    if (!r.ok) r = await this._post({ ...base, text: semMarkdown(texto) });
     if (!r.ok) console.error('[telegram] sendMessage falhou:', r.description);
+  }
+  async _post(body) {
+    return fetch(`https://api.telegram.org/bot${this.token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
   }
   async baixarMidia(ref) {
     const r = await fetch(`https://api.telegram.org/bot${this.token}/getFile?file_id=${ref}`).then(r => r.json());
     return fetch(`https://api.telegram.org/file/bot${this.token}/${r.result.file_path}`).then(r => r.arrayBuffer());
   }
+}
+
+const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function paraHTML(t) {
+  let s = esc(t);
+  s = s.replace(/^\s*#{1,6}\s*(.+)$/gm, '<b>$1</b>');        // títulos -> negrito
+  s = s.replace(/^\s*[-*_]{3,}\s*$/gm, '');                   // separadores fora
+  s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');              // **x** -> <b>
+  s = s.replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\w)/g, '$1<b>$2</b>'); // *x* -> <b>
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  s = s.replace(/^\s*[*•]\s+/gm, '- ');                       // bullets uniformes
+  return s.replace(/\n{3,}/g, '\n\n').trim();
+}
+function semMarkdown(t) {
+  return t.replace(/^\s*#{1,6}\s*/gm, '').replace(/^\s*[-*_]{3,}\s*$/gm, '').replace(/\*\*|__|`/g, '').replace(/^\s*[*•]\s+/gm, '- ').replace(/\n{3,}/g, '\n\n').trim();
 }
