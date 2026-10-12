@@ -51,3 +51,9 @@ export async function lerImagem(bytes, mime, instrucao) {
   const r = await modelo().generateContent([{ inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: mime } }, instrucao]);
   return r.response.text().trim();
 }
+
+/** Lê um arquivo (imagem/PDF) e devolve JSON conforme a instrução. Para OCR/classificação de documentos. */
+export async function lerArquivoJSON(bytes, mime, instrucao) {
+  const r = await modelo({ generationConfig: { responseMimeType: 'application/json' } }).generateContent([{ inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: mime } }, instrucao]);
+  try { return JSON.parse(r.response.text()); } catch { return {}; }
+}

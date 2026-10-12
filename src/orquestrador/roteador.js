@@ -20,17 +20,51 @@ export async function tratarMensagem(msg, canal) {
     if (!msg.texto) return 'Não consegui entender o áudio. Pode repetir ou escrever?';
     await canal.enviar(msg.conta, msg.chatId, `📝 "${msg.texto}"`);
   }
-  if (msg.tipo === 'imagem') {
-    const ativosAgora = modulosAtivos(conta.id);
-    if (ativosAgora.includes('social')) {
+  const ativosAgora = modulosAtivos(conta.id);
+  const DOC_RX = /\b(guarda|arquiva|arquivo|documento|contrato|nota|boleto|certid[ãa]o|alvar[áa]|ap[óo]lice|comprovante|recibo|cadastro|rg|cnh|cpf|cnpj|procura[çc][ãa]o|holerite|extrato)\b/i;
+  const SOCIAL_RX = /\b(post|legenda|instagram|story|stories|reels?|carrossel|marca d.?[áa]gua|publica)\b/i;
+  if (msg.tipo === 'imagem' || msg.tipo === 'arquivo') {
+    const temDoc = ativosAgora.includes('documentos'), temSocial = ativosAgora.includes('social') && msg.tipo === 'imagem';
+    let destino = temDoc && !temSocial ? 'documentos' : temSocial && !temDoc ? 'social' : null;
+    if (!destino && temDoc && temSocial) {
+      if (SOCIAL_RX.test(msg.texto)) destino = 'social'; else if (DOC_RX.test(msg.texto)) destino = 'documentos';
+    }
+    let bytes = null;
+    if (temDoc || temSocial) {
+      if (msg.midia?.tamanho > 20 * 1024 * 1024 && !process.env.TELEGRAM_API_BASE) {
+        return `📦 Esse arquivo tem ${(msg.midia.tamanho / 1048576).toFixed(0)} MB e o Telegram só me entrega até 20 MB. Suba no seu Google Drive e me mande o link do arquivo — eu guardo na pasta certa e registro do mesmo jeito.`;
+      }
+      try { bytes = await canal.baixarMidia(msg.midia.ref); } catch (e) { return `Não consegui baixar o arquivo (${e.message}). Se for grande, mande o link do Drive.`; }
+    }
+    if (!destino && temDoc && temSocial && bytes) {
+      // foto sem legenda clara: pergunta rápida à IA se é documento ou foto para post
+      try { const { lerImagem } = await import('../integracoes/gemini.js'); const r = await lerImagem(bytes, msg.midia.mime, 'Isto é um DOCUMENTO (contrato, nota, boleto, certidão, RG/CNH, print de texto, formulário, comprovante) ou uma FOTO para redes sociais (pessoa, cena, produto, paisagem)? Responda só: documento ou foto'); destino = /documento/i.test(r) ? 'documentos' : 'social'; } catch { destino = 'social'; }
+    }
+    if (destino === 'documentos') {
+      await canal.enviar(msg.conta, msg.chatId, '📂 Lendo e arquivando…');
+      try {
+        const { receberArquivo } = await import('../ferramentas/documentos.js');
+        const doc = await receberArquivo(conta, { bytes, mime: msg.midia.mime, nome: msg.midia.nome || '' });
+        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Documento recebido do dono e JÁ ARQUIVADO no Drive. Dados: ${JSON.stringify(doc)}. Confirme em até 3 linhas: o que é, onde guardou (pasta) e o link; se houver vigência, diga a data e que os avisos estão agendados; se "legivel" for false, peça uma foto melhor ou que ele descreva o documento; se faltar empresa/tipo óbvios, pergunte. Não invente dados.]`;
+        msg.forcarModulo = 'documentos';
+      } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Documento recebido mas NÃO arquivado. Erro real: ${e.message}. Repita o erro ao dono e diga o que ele precisa fazer.]`; msg.forcarModulo = 'documentos'; }
+    } else if (destino === 'social') {
       try {
         const { guardarImagemEnviada } = await import('../ferramentas/social.js');
-        const r = await guardarImagemEnviada(conta.id, await canal.baixarMidia(msg.midia.ref));
+        const r = await guardarImagemEnviada(conta.id, bytes);
         msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Foto enviada pelo dono. Original: ${r.original}. Versão com marca d'água KM já aplicada (logo ${r.info.logo || '?'}${r.info.sombra ? ' com sombra' : ''}, canto ${r.info.posicao || 'inferior-direito'}): ${r.marcada || 'falhou: ' + (r.info.erro || '')}. Use a versão marcada como midia_url. Mostre-a na resposta (vira prévia), diga qual cor de logo foi escolhida e por quê, e proponha legenda no modelo do manual (pergunte o pilar se não estiver claro).]`;
+        msg.forcarModulo = 'social';
       } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[imagem recebida, mas não consegui hospedar: ${e.message}]`; }
-    } else msg.texto = (msg.texto ? msg.texto + '\n' : '') + '[imagem recebida; leitura de imagem entra na v2]';
+    } else msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[${msg.tipo === 'imagem' ? 'imagem' : 'arquivo'} recebido; para eu guardar, ligue o módulo Documentos ("ativa documentos").]`;
   }
-  if (msg.tipo === 'arquivo') msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[arquivo recebido: ${msg.midia?.mime || ''}; entra na v2]`;
+  // Link do Google Drive em texto → módulo Documentos registra/move
+  if (msg.tipo === 'texto' && ativosAgora.includes('documentos') && /drive\.google\.com\/(file|open|uc)|docs\.google\.com\/\w+\/d\//.test(msg.texto) && !/^documentos pasta/i.test(msg.texto.trim())) {
+    await canal.enviar(msg.conta, msg.chatId, '📂 Lendo o arquivo do Drive e arquivando…');
+    try { const { receberLinkDrive } = await import('../ferramentas/documentos.js'); const doc = await receberLinkDrive(conta, msg.texto);
+      msg.texto += `\n[Arquivo do Drive JÁ MOVIDO para a pasta certa e registrado. Dados: ${JSON.stringify(doc)}. Confirme em até 3 linhas (o que é, pasta, link, vigência se houver). Não invente dados.]`; }
+    catch (e) { msg.texto += `\n[Link do Drive recebido mas não consegui arquivar. Erro real: ${e.message}. Repita ao dono.]`; }
+    msg.forcarModulo = 'documentos';
+  }
   if (!msg.texto?.trim()) return 'Recebi uma mensagem vazia.';
 
   // confirmação de ação pendente
@@ -46,10 +80,10 @@ export async function tratarMensagem(msg, canal) {
 
   const ativos = modulosAtivos(conta.id);
   // Chamou um assessor pelo nome? ("MIA, ...", "Tina: ...", "Secretária, ...") → vai direto para ele
-  let modulo = null;
+  let modulo = msg.forcarModulo && ativos.includes(msg.forcarModulo) ? msg.forcarModulo : null;
   const cabeca = msg.texto.trim().slice(0, 40).toLowerCase();
   const nomesPadrao = { diretor: ['diretor'], secretaria: ['secretária', 'secretaria'], producao: ['produção', 'producao'], documentos: ['documentos'], financeiro: ['financeiro'], social: ['mia', 'social'] };
-  for (const mod of ativos) {
+  for (const mod of (modulo ? [] : ativos)) {
     const nomes = [...(nomesPadrao[mod] || []), (configPersona(conta.id, mod).nome || '').toLowerCase()].filter(Boolean);
     if (nomes.some(n => new RegExp(`^${n}\\b[,:!]?\\s`).test(cabeca + ' '))) { modulo = mod; break; }
   }

@@ -6,6 +6,7 @@ import { montarPrompt } from '../orquestrador/montador-prompt.js';
 import { modelo } from '../integracoes/gemini.js';
 import * as gcal from '../integracoes/google-calendar.js';
 import { publicarPost } from '../ferramentas/social.js';
+import { avisosDeVencimento } from '../ferramentas/documentos.js';
 
 const TZ = process.env.TZ || 'America/Sao_Paulo';
 const agoraLocal = () => new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
@@ -44,6 +45,13 @@ async function resumoDoDia(canal, conta, chatId) {
   await canal.enviar(conta.id, chatId, r.response.text());
 }
 
+async function avisarVencimentos(canal) {
+  for (const u of db.prepare("SELECT u.conta_id, u.chat_id FROM usuarios u JOIN modulos m ON m.conta_id=u.conta_id AND m.modulo='documentos' AND m.ligado=1 WHERE u.papel='dono'").all()) {
+    try { const avisos = avisosDeVencimento(u.conta_id); if (avisos.length) await canal.enviar(u.conta_id, u.chat_id, `⏰ Vencimentos:\n${avisos.join('\n')}`); }
+    catch (e) { console.error('vencimentos', u.conta_id, e.message); }
+  }
+}
+
 async function publicarAgendados(canal) {
   const agora = agoraLocal().toISOString().slice(0, 16);
   for (const p of db.prepare("SELECT p.*, u.chat_id FROM posts p JOIN usuarios u ON u.conta_id=p.conta_id AND u.papel='dono' WHERE p.status='agendado' AND p.data<=?").all(agora)) {
@@ -62,4 +70,5 @@ export function iniciarRotinas(canal) {
       if (cfg.hora_resumo?.replace('h', ':00').padStart(5, '0') === agora) resumoDoDia(canal, u, u.chat_id).catch(e => console.error('resumo', e.message));
     }
   }, { timezone: TZ });
+  cron.schedule('0 8 * * *', () => avisarVencimentos(canal), { timezone: TZ });
 }

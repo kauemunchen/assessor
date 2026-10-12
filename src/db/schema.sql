@@ -38,3 +38,18 @@ CREATE TABLE IF NOT EXISTS contatos (id INTEGER PRIMARY KEY, conta_id INTEGER, n
 CREATE TABLE IF NOT EXISTS pendencias (id INTEGER PRIMARY KEY, conta_id INTEGER, chat_id TEXT, modulo TEXT, ferramenta TEXT, args TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS social_identidade (conta_id INTEGER PRIMARY KEY, dados TEXT, atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS biblioteca (id INTEGER PRIMARY KEY, conta_id INTEGER, url TEXT, tipo TEXT, nome TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE IF NOT EXISTS documentos (
+  id INTEGER PRIMARY KEY, conta_id INTEGER, empresa TEXT, tipo TEXT, titulo TEXT, contraparte TEXT, data_doc TEXT,
+  drive_id TEXT, drive_link TEXT, pasta TEXT, mime TEXT, tamanho INTEGER, resumo TEXT, dados_json TEXT, sensivel INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'ativo', criado_em TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS vigencias (
+  id INTEGER PRIMARY KEY, conta_id INTEGER, documento_id INTEGER, descricao TEXT, empresa TEXT, tipo TEXT,
+  inicio TEXT, vence_em TEXT, aviso_previo_dias INTEGER DEFAULT 0, renovacao_auto INTEGER DEFAULT 0,
+  avisos_enviados TEXT DEFAULT '', gcal_event_id TEXT, status TEXT DEFAULT 'ativa', criado_em TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS cadastros (
+  id INTEGER PRIMARY KEY, conta_id INTEGER, tipo TEXT, nome TEXT, documento TEXT, email TEXT, telefone TEXT, endereco TEXT,
+  empresa_vinculo TEXT, campos_json TEXT, completo INTEGER DEFAULT 0, criado_em TEXT DEFAULT CURRENT_TIMESTAMP, atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
+);

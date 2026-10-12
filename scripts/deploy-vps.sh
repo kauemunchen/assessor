@@ -10,5 +10,10 @@ docker compose up -d --build
 sleep 5
 TOKEN=$(grep ^TELEGRAM_BOT_TOKEN .env | cut -d= -f2)
 URL=$(grep ^PUBLIC_URL .env | cut -d= -f2)
-curl -s "https://api.telegram.org/bot${TOKEN}/setWebhook?url=${URL}/webhook/telegram" && echo
+API_BASE=$(grep -E '^TELEGRAM_API_BASE=' .env | cut -d= -f2- | tr -d '[:space:]')
+API_BASE=${API_BASE:-https://api.telegram.org}
+# Bot API local: o webhook pode apontar direto para o container (sem passar pelo Traefik)
+WEBHOOK_URL=$(grep -E '^TELEGRAM_WEBHOOK_URL=' .env | cut -d= -f2- | tr -d '[:space:]')
+WEBHOOK_URL=${WEBHOOK_URL:-${URL}/webhook/telegram}
+curl -s "${API_BASE}/bot${TOKEN}/setWebhook?url=${WEBHOOK_URL}" && echo
 docker compose logs --tail=20

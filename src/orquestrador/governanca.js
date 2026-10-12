@@ -27,7 +27,7 @@ export async function governanca(msg, conta) {
   if ((m = t.match(/^(?:diretor,?\s*)?(ativa|liga|ativar|ligar)\s+(?:o|a|módulo|modulo)?\s*([\wçãõáéíóú ]+)$/))) {
     const mod = norm(m[2].trim()); if (!MODS[mod]) return `Não conheço o módulo "${m[2]}". Disponíveis: ${Object.values(MODS).join(', ')}.`;
     db.prepare('INSERT INTO modulos (conta_id, modulo, ligado) VALUES (?,?,1) ON CONFLICT(conta_id, modulo) DO UPDATE SET ligado=1').run(conta.id, mod);
-    return `✅ ${MODS[mod]} ligado. ${mod === 'producao' ? 'Preciso do token do AgilFac da sua empresa.' : mod === 'social' ? 'Preciso conectar seu Instagram.' : 'Já pode usar.'}`;
+    return `✅ ${MODS[mod]} ligado. ${mod === 'producao' ? 'Preciso do token do AgilFac da sua empresa.' : mod === 'social' ? 'Preciso conectar seu Instagram.' : mod === 'documentos' ? 'Diga "conectar google" de novo e aceite o acesso ao Drive; depois é só mandar foto, PDF ou link do Drive. Para escolher a pasta: documentos pasta <link>.' : 'Já pode usar.'}`;
   }
   if ((m = t.match(/^(?:diretor,?\s*)?(desativa|desliga|desativar|desligar)\s+(?:o|a|módulo|modulo)?\s*([\wçãõáéíóú ]+)$/))) {
     const mod = norm(m[2].trim()); if (!MODS[mod]) return `Não conheço o módulo "${m[2]}".`;
@@ -35,9 +35,9 @@ export async function governanca(msg, conta) {
     return `${MODS[mod]} desligado. Os dados ficam guardados.`;
   }
   if (/^status$|^conex[õo]es$/.test(t)) {
-    const g = db.prepare('SELECT 1 FROM google_auth WHERE conta_id=?').get(conta.id);
+    const g = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(conta.id);
     const ig = db.prepare('SELECT 1 FROM instagram_auth WHERE conta_id=?').get(conta.id);
-    return `Conexões:\n- Google Agenda: ${g ? '✅ conectado' : '❌ não conectado (diga "conectar google")'}\n- Instagram: ${ig ? '✅' : '❌'}\n- AgilFac: ${process.env.AGILFAC_API_URL ? '✅' : '❌'}`;
+    return `Conexões:\n- Google Agenda/Gmail: ${g ? '✅ conectado' : '❌ não conectado (diga "conectar google")'}\n- Google Drive: ${g && /auth\/drive/.test(JSON.parse(g.token_json || '{}').scope || '') ? '✅' : '❌ (diga "conectar google" de novo e aceite o Drive)'}\n- Instagram: ${ig ? '✅' : '❌'}\n- AgilFac: ${process.env.AGILFAC_API_URL ? '✅' : '❌'}`;
   }
   if (/^agenda( de)? hoje$|^(o que|oq) (eu )?tenho hoje\??$|^hoje\??$/.test(t)) return agenda(conta, 'hoje', 'Hoje');
   if (/^agenda( de)? amanh[ãa]$|^(o que|oq) (eu )?tenho amanh[ãa]\??$/.test(t)) return agenda(conta, 'amanha', 'Amanhã');
@@ -67,7 +67,12 @@ export async function governanca(msg, conta) {
     const off = Object.keys(MODS).filter(k => !ligados.includes(k));
     return `Equipe ativa: ${['diretor', ...ligados].map(nomeDe).join(', ')}.\nDesligados: ${off.map(k => MODS[k]).join(', ') || 'nenhum'}.`;
   }
-  if (/conectar? (o )?google|conectar? (a )?agenda/.test(t)) {
+  if ((m = msg.texto.trim().match(/^documentos?\s+pasta\s+(\S+)$/i))) {
+    try { const { definirPastaRaiz } = await import('../integracoes/google-drive.js'); const r = await definirPastaRaiz(conta.id, m[1]); return `📂 Pasta raiz dos documentos: "${r.nome}". Vou criar dentro dela Empresa/Tipo/Ano.`; }
+    catch (e) { return `Não consegui usar essa pasta: ${e.message}`; }
+  }
+  if (/^documentos?\s+pasta$/.test(t)) { try { const d = await import('../integracoes/google-drive.js'); const id = await d.pastaRaiz(conta.id); return `📂 Documentos ficam em: https://drive.google.com/drive/folders/${id}\nPara trocar: documentos pasta <link da pasta>`; } catch (e) { return e.message; } }
+  if (/conectar? (o )?google|conectar? (a )?agenda|conectar? (o )?drive/.test(t)) {
     const base = process.env.PUBLIC_URL || '';
     return `Abra este link para autorizar o Google Agenda:\n${base}/oauth/google/iniciar/${conta.id}\n\n(ou direto: ${urlAutorizacao(conta.id)})`;
   }
