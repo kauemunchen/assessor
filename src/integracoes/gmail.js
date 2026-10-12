@@ -31,3 +31,34 @@ export async function ler(contaId, id) {
   const m = await g.users.messages.get({ userId: 'me', id, format: 'full' });
   return { id, de: header(m.data, 'from'), para: header(m.data, 'to'), assunto: header(m.data, 'subject'), data: header(m.data, 'date'), corpo: corpo(m.data.payload).slice(0, 6000) || m.data.snippet };
 }
+
+function temEscopo(contaId, parte) {
+  const row = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(contaId);
+  return !!row && (JSON.parse(row.token_json).scope || '').includes(parte);
+}
+function mime({ para, assunto, texto, cc, emResposta }) {
+  const enc = (t) => `=?UTF-8?B?${Buffer.from(t, 'utf8').toString('base64')}?=`;
+  const linhas = [`To: ${para}`, cc ? `Cc: ${cc}` : null, `Subject: ${enc(assunto)}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'];
+  if (emResposta?.messageId) { linhas.push(`In-Reply-To: ${emResposta.messageId}`); linhas.push(`References: ${emResposta.messageId}`); }
+  const raw = linhas.filter(Boolean).join('\r\n') + '\r\n\r\n' + Buffer.from(texto, 'utf8').toString('base64');
+  return Buffer.from(raw).toString('base64url');
+}
+async function cabecalhosResposta(g, id) {
+  const m = await g.users.messages.get({ userId: 'me', id, format: 'metadata', metadataHeaders: ['From', 'Reply-To', 'Subject', 'Message-ID'] });
+  const h = (n) => (m.data.payload?.headers || []).find(x => x.name.toLowerCase() === n.toLowerCase())?.value || '';
+  const assunto = h('Subject'); return { para: h('Reply-To') || h('From'), assunto: /^re:/i.test(assunto) ? assunto : `Re: ${assunto}`, messageId: h('Message-ID'), threadId: m.data.threadId };
+}
+export async function criarRascunho(contaId, { para, assunto, texto, cc, respondendo_id }) {
+  if (!temEscopo(contaId, 'gmail.compose')) throw new Error('Falta permissão de escrever e-mail. Diga "conectar google" de novo e aceite enviar/rascunhar e-mails.');
+  const g = auth(contaId); let emResposta = null, threadId;
+  if (respondendo_id) { emResposta = await cabecalhosResposta(g, respondendo_id); para = para || emResposta.para; assunto = assunto || emResposta.assunto; threadId = emResposta.threadId; }
+  const r = await g.users.drafts.create({ userId: 'me', requestBody: { message: { raw: mime({ para, assunto, texto, cc, emResposta }), threadId } } });
+  return { rascunho_id: r.data.id, para, assunto };
+}
+export async function enviar(contaId, { para, assunto, texto, cc, respondendo_id }) {
+  if (!temEscopo(contaId, 'gmail.send')) throw new Error('Falta permissão de enviar e-mail. Diga "conectar google" de novo e aceite enviar e-mails.');
+  const g = auth(contaId); let emResposta = null, threadId;
+  if (respondendo_id) { emResposta = await cabecalhosResposta(g, respondendo_id); para = para || emResposta.para; assunto = assunto || emResposta.assunto; threadId = emResposta.threadId; }
+  const r = await g.users.messages.send({ userId: 'me', requestBody: { raw: mime({ para, assunto, texto, cc, emResposta }), threadId } });
+  return { enviado_id: r.data.id, para, assunto };
+}

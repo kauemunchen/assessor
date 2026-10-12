@@ -57,6 +57,7 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
     for (const c of calls) {
       if (precisaConfirmar(modulo, c.name)) {
         db.prepare('INSERT INTO pendencias (conta_id, chat_id, modulo, ferramenta, args) VALUES (?,?,?,?,?)').run(conta.id, msg.chatId, modulo, c.name, JSON.stringify(c.args));
+        if (c.name === 'enviar_email') return `✉️ Vou enviar este e-mail${c.args.respondendo_id ? ' (em resposta)' : ''}:\n\nPara: ${c.args.para || '(remetente do e-mail original)'}\nAssunto: ${c.args.assunto || '(Re: do original)'}\n\n${c.args.texto}\n\nConfirma o envio? (sim/não)`;
         return `Vou executar ${c.name} com ${JSON.stringify(c.args)}. Confirma? (sim/não)`;
       }
       let result;

@@ -16,10 +16,12 @@ export function ferramentas(_conta) {
     { name: 'criar_lembrete', description: 'Cria lembrete pontual ou recorrente', parameters: { type: 'OBJECT', properties: { texto: { type: 'STRING' }, quando: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM' }, recorrencia: { type: 'STRING', description: 'diario|semanal|mensal|null' } }, required: ['texto', 'quando'] } },
     { name: 'ler_emails', description: 'Lista e-mails recentes do Gmail do dono (somente leitura). q = filtro Gmail (ex.: "newer_than:1d is:unread", "from:joao", "assunto"). Padrão: últimas 24h sem promoções/social.', parameters: { type: 'OBJECT', properties: { q: { type: 'STRING' }, max: { type: 'NUMBER' } } } },
     { name: 'ler_email', description: 'Lê o conteúdo completo de um e-mail pelo id (vindo de ler_emails)', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' } }, required: ['id'] } },
+    { name: 'enviar_email', description: 'Envia e-mail pelo Gmail do dono. SEMPRE exige confirmação do dono (mostre para quem, assunto e texto completo antes). Para responder um e-mail existente, passe respondendo_id (mantém a conversa); para e para assunto podem ficar vazios nesse caso.', parameters: { type: 'OBJECT', properties: { para: { type: 'STRING' }, assunto: { type: 'STRING' }, texto: { type: 'STRING' }, cc: { type: 'STRING' }, respondendo_id: { type: 'STRING' } }, required: ['texto'] } },
+    { name: 'criar_rascunho_email', description: 'Salva um rascunho na pasta Rascunhos do Gmail do dono (não envia). Útil quando ele quer revisar no celular antes.', parameters: { type: 'OBJECT', properties: { para: { type: 'STRING' }, assunto: { type: 'STRING' }, texto: { type: 'STRING' }, cc: { type: 'STRING' }, respondendo_id: { type: 'STRING' } }, required: ['texto'] } },
     { name: 'registrar_retorno', description: 'Registra quem deve resposta a quem', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, assunto: { type: 'STRING' }, direcao: { type: 'STRING', description: 'devo_responder|aguardo_resposta' } }, required: ['pessoa', 'assunto', 'direcao'] } },
   ];
 }
-export const requerConfirmacao = new Set(['cancelar_evento', 'enviar_mensagem_terceiro']);
+export const requerConfirmacao = new Set(['cancelar_evento', 'enviar_mensagem_terceiro', 'enviar_email']);
 
 export async function executar(nome, a, conta, ctx) {
   switch (nome) {
@@ -33,6 +35,8 @@ export async function executar(nome, a, conta, ctx) {
     case 'criar_lembrete': { const r = db.prepare('INSERT INTO lembretes (conta_id, modulo, texto, quando, recorrencia, destino_chat_id) VALUES (?,?,?,?,?,?)').run(conta.id, 'secretaria', a.texto, a.quando, a.recorrencia || null, ctx.chatId); return { id: r.lastInsertRowid }; }
     case 'ler_emails': return gmail.listar(conta.id, { q: a.q, max: a.max || 15 });
     case 'ler_email': return gmail.ler(conta.id, a.id);
+    case 'enviar_email': return gmail.enviar(conta.id, a);
+    case 'criar_rascunho_email': return gmail.criarRascunho(conta.id, a);
     case 'registrar_retorno': { const r = db.prepare('INSERT INTO retornos (conta_id, pessoa, assunto, direcao) VALUES (?,?,?,?)').run(conta.id, a.pessoa, a.assunto, a.direcao); return { id: r.lastInsertRowid }; }
     default: throw new Error(`secretaria.${nome}: não implementada`);
   }
