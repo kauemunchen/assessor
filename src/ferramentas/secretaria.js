@@ -1,4 +1,5 @@
 import * as gcal from '../integracoes/google-calendar.js';
+import * as gmail from '../integracoes/gmail.js';
 const mapaEv = (e) => ({ id: e.id, categoria: e.categoria, titulo: e.summary, inicio: e.start?.dateTime || e.start?.date, fim: e.end?.dateTime || e.end?.date, local: e.location, meet: e.hangoutLink, descricao: (e.description || '').slice(0, 200) });
 import { db } from '../db/index.js';
 
@@ -13,6 +14,8 @@ export function ferramentas(_conta) {
     { name: 'mover_evento', description: 'Altera data/hora/título/local de um evento', parameters: { type: 'OBJECT', properties: { event_id: { type: 'STRING' }, inicio: { type: 'STRING' }, fim: { type: 'STRING' }, titulo: { type: 'STRING' }, local: { type: 'STRING' } }, required: ['event_id'] } },
     { name: 'cancelar_evento', description: 'Cancela um evento (requer confirmação)', parameters: { type: 'OBJECT', properties: { event_id: { type: 'STRING' } }, required: ['event_id'] } },
     { name: 'criar_lembrete', description: 'Cria lembrete pontual ou recorrente', parameters: { type: 'OBJECT', properties: { texto: { type: 'STRING' }, quando: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM' }, recorrencia: { type: 'STRING', description: 'diario|semanal|mensal|null' } }, required: ['texto', 'quando'] } },
+    { name: 'ler_emails', description: 'Lista e-mails recentes do Gmail do dono (somente leitura). q = filtro Gmail (ex.: "newer_than:1d is:unread", "from:joao", "assunto"). Padrão: últimas 24h sem promoções/social.', parameters: { type: 'OBJECT', properties: { q: { type: 'STRING' }, max: { type: 'NUMBER' } } } },
+    { name: 'ler_email', description: 'Lê o conteúdo completo de um e-mail pelo id (vindo de ler_emails)', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' } }, required: ['id'] } },
     { name: 'registrar_retorno', description: 'Registra quem deve resposta a quem', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, assunto: { type: 'STRING' }, direcao: { type: 'STRING', description: 'devo_responder|aguardo_resposta' } }, required: ['pessoa', 'assunto', 'direcao'] } },
   ];
 }
@@ -28,6 +31,8 @@ export async function executar(nome, a, conta, ctx) {
     case 'mover_evento': return { id: await gcal.atualizarEvento(conta.id, a.event_id, a) };
     case 'cancelar_evento': await gcal.cancelarEvento(conta.id, a.event_id); return { ok: true };
     case 'criar_lembrete': { const r = db.prepare('INSERT INTO lembretes (conta_id, modulo, texto, quando, recorrencia, destino_chat_id) VALUES (?,?,?,?,?,?)').run(conta.id, 'secretaria', a.texto, a.quando, a.recorrencia || null, ctx.chatId); return { id: r.lastInsertRowid }; }
+    case 'ler_emails': return gmail.listar(conta.id, { q: a.q, max: a.max || 15 });
+    case 'ler_email': return gmail.ler(conta.id, a.id);
     case 'registrar_retorno': { const r = db.prepare('INSERT INTO retornos (conta_id, pessoa, assunto, direcao) VALUES (?,?,?,?)').run(conta.id, a.pessoa, a.assunto, a.direcao); return { id: r.lastInsertRowid }; }
     default: throw new Error(`secretaria.${nome}: não implementada`);
   }
