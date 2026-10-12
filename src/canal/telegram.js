@@ -18,7 +18,8 @@ export class TelegramCanal {
   }
   async enviar(_conta, chatId, resposta) {
     const body = typeof resposta === 'string' ? { chat_id: chatId, text: resposta } : { chat_id: chatId, text: resposta.texto, reply_markup: resposta.botoes };
-    await fetch(`https://api.telegram.org/bot${this.token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(`https://api.telegram.org/bot${this.token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+    if (!r.ok) console.error('[telegram] sendMessage falhou:', r.description);
   }
   async baixarMidia(ref) {
     const r = await fetch(`https://api.telegram.org/bot${this.token}/getFile?file_id=${ref}`).then(r => r.json());

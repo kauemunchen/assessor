@@ -6,8 +6,12 @@ const alias = { secretária: 'secretaria', produção: 'producao', financeira: '
 const norm = (s) => alias[s] || s;
 
 export function governanca(msg, conta) {
-  const t = msg.texto.trim().toLowerCase();
+  const orig = msg.texto.trim();
+  const t = orig.toLowerCase();
+  const caso = (frag) => orig.slice(t.indexOf(frag), t.indexOf(frag) + frag.length); // mesmo trecho com a caixa original
   let m;
+  if ((m = t.match(/^(?:me chamo|meu nome é|pode me chamar de)\s+(.+)$/))) { db.prepare('UPDATE contas SET nome_dono=? WHERE id=?').run(caso(m[1]), conta.id); return `Anotado, ${caso(m[1])}.`; }
+  if ((m = t.match(/^(?:minha empresa é|a empresa é|empresa:)\s+(.+)$/))) { db.prepare('UPDATE contas SET empresa=? WHERE id=?').run(caso(m[1]), conta.id); return `Empresa principal: ${caso(m[1])}.`; }
   if ((m = t.match(/^(?:diretor,?\s*)?(ativa|liga|ativar|ligar)\s+(?:o|a|módulo|modulo)?\s*([\wçãõáéíóú ]+)$/))) {
     const mod = norm(m[2].trim()); if (!MODS[mod]) return `Não conheço o módulo "${m[2]}". Disponíveis: ${Object.values(MODS).join(', ')}.`;
     db.prepare('INSERT INTO modulos (conta_id, modulo, ligado) VALUES (?,?,1) ON CONFLICT(conta_id, modulo) DO UPDATE SET ligado=1').run(conta.id, mod);
@@ -28,13 +32,13 @@ export function governanca(msg, conta) {
   }
   if ((m = t.match(/^(?:diretor,?\s*)?(?:a|o)?\s*(\w+) (?:agora )?se chama (.+)$/))) {
     const mod = norm(m[1]); if (!MODS[mod] && mod !== 'diretor') return null;
-    db.prepare('INSERT INTO persona_config (conta_id, modulo, nome) VALUES (?,?,?) ON CONFLICT(conta_id, modulo) DO UPDATE SET nome=excluded.nome').run(conta.id, mod, m[2].trim());
-    return `Combinado. ${MODS[mod] || 'Diretor'} agora se chama ${m[2].trim()}.`;
+    db.prepare('INSERT INTO persona_config (conta_id, modulo, nome) VALUES (?,?,?) ON CONFLICT(conta_id, modulo) DO UPDATE SET nome=excluded.nome').run(conta.id, mod, caso(m[2].trim()));
+    return `Combinado. ${MODS[mod] || 'Diretor'} agora se chama ${caso(m[2].trim())}.`;
   }
   if ((m = t.match(/^(?:me )?(?:chame|trate|chama) (?:de|como) (.+)$/))) {
-    db.prepare('INSERT INTO persona_config (conta_id, modulo, tratamento) VALUES (?,?,?) ON CONFLICT(conta_id, modulo) DO UPDATE SET tratamento=excluded.tratamento').run(conta.id, 'diretor', m[1].trim());
-    return `Certo, ${m[1].trim()}.`;
+    db.prepare('INSERT INTO persona_config (conta_id, modulo, tratamento) VALUES (?,?,?) ON CONFLICT(conta_id, modulo) DO UPDATE SET tratamento=excluded.tratamento').run(conta.id, 'diretor', caso(m[1].trim()));
+    return `Certo, ${caso(m[1].trim())}.`;
   }
-  if ((m = t.match(/^foco do m[êe]s[:\s]+(.+)$/))) { db.prepare('UPDATE contas SET foco_mes=? WHERE id=?').run(m[1].trim(), conta.id); return `Foco do mês: ${m[1].trim()}. Toda a equipe vai priorizar isso.`; }
+  if ((m = t.match(/^foco do m[êe]s[:\s]+(.+)$/))) { db.prepare('UPDATE contas SET foco_mes=? WHERE id=?').run(caso(m[1].trim()), conta.id); return `Foco do mês: ${caso(m[1].trim())}. Toda a equipe vai priorizar isso.`; }
   return null;
 }

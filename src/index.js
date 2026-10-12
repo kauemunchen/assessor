@@ -11,8 +11,13 @@ app.use(express.json());
 
 const canal = criarCanal(process.env.CANAL || 'telegram', app);
 canal.aoReceber(async (msg) => {
-  const resposta = await tratarMensagem(msg, canal);
-  if (resposta) await canal.enviar(msg.conta, msg.chatId, resposta);
+  try {
+    const resposta = await tratarMensagem(msg, canal);
+    if (resposta) await canal.enviar(msg.conta, msg.chatId, resposta);
+  } catch (e) {
+    console.error('[erro]', msg.chatId, e?.stack || e);
+    await canal.enviar(msg.conta, msg.chatId, `⚠️ Deu erro aqui: ${String(e?.message || e).slice(0, 300)}`).catch(() => {});
+  }
 });
 
 iniciarRotinas(canal);
