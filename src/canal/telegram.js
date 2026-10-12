@@ -49,7 +49,7 @@ export class TelegramCanal {
 const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 function paraHTML(t) {
   let s = esc(t);
-  s = s.replace(/^\s*#{1,6}\s*(.+)$/gm, '<b>$1</b>');        // títulos -> negrito
+  s = s.replace(/^\s*#{1,6}\s+(.+)$/gm, '<b>$1</b>');        // títulos (# seguido de espaço) -> negrito; #hashtag fica
   s = s.replace(/^\s*[-*_]{3,}\s*$/gm, '');                   // separadores fora
   s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');              // **x** -> <b>
   s = s.replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\w)/g, '$1<b>$2</b>'); // *x* -> <b>
@@ -58,5 +58,5 @@ function paraHTML(t) {
   return s.replace(/\n{3,}/g, '\n\n').trim();
 }
 function semMarkdown(t) {
-  return t.replace(/^\s*#{1,6}\s*/gm, '').replace(/^\s*[-*_]{3,}\s*$/gm, '').replace(/\*\*|__|`/g, '').replace(/^\s*[*•]\s+/gm, '- ').replace(/\n{3,}/g, '\n\n').trim();
+  return t.replace(/^\s*#{1,6}\s+/gm, '').replace(/^\s*[-*_]{3,}\s*$/gm, '').replace(/\*\*|__|`/g, '').replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\w)/g, '$1$2').replace(/^\s*[*•]\s+/gm, '- ').replace(/\n{3,}/g, '\n\n').trim();
 }

@@ -61,7 +61,7 @@ export async function tratarMensagem(msg, canal) {
   // Social: se a resposta contém URL de imagem (fal/cloudinary), manda como foto com a legenda
   if (modulo === 'social' && typeof resposta === 'string') {
     const todas = [...resposta.matchAll(/https?:\/\/res\.cloudinary\.com\/\S+?\.(?:jpg|jpeg|png|webp)/gi)].map(x => x[0]);
-    if (todas.length > 1) return { fotos: [...new Set(todas)], texto: todas.reduce((t, u) => t.replace(u, ''), resposta).replace(/\n{3,}/g, '\n\n').trim() };
+    if (todas.length > 1) { const txt = todas.reduce((t, u) => t.replace(u, ''), resposta).replace(/^\s*[-•]\s*[^\n:]{0,30}:\s*$/gm, '').replace(/^\s*Pr[ée]via[^\n]*:\s*$/gmi, '').replace(/\n{3,}/g, '\n\n').trim(); return { fotos: [...new Set(todas)], texto: txt }; }
     const m = resposta.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)(?:\?\S*)?|https?:\/\/(?:[\w.-]*fal\.media|res\.cloudinary\.com)\/\S+/i);
     if (m) resposta = { foto: m[0], texto: resposta.replace(m[0], '').trim() };
   }
