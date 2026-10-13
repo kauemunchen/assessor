@@ -1,6 +1,7 @@
 import { montarPrompt } from './montador-prompt.js';
 import { transcrever, classificar, responder } from './ia.js';
-import { obterConta, modulosAtivos, configPersona } from '../db/contas.js';
+import { obterConta, obterUsuario, modulosAtivos, configPersona } from '../db/contas.js';
+import { tentarEntrar, fluxoColaborador } from './equipe.js';
 import { executarFerramenta } from '../ferramentas/index.js';
 import * as memoria from './memoria.js';
 import { db } from '../db/index.js';
@@ -9,7 +10,9 @@ import { governanca } from './governanca.js';
 
 export async function tratarMensagem(msg, canal) {
   const conta = await obterConta(msg.chatId);
-  if (!conta) return onboarding(msg);
+  if (!conta) return (await tentarEntrar(msg)) || onboarding(msg);
+  const usuario = obterUsuario(msg.chatId);
+  if (usuario && usuario.papel !== 'dono') return fluxoColaborador(msg, conta, usuario);
 
   if (msg.tipo === 'audio') {
     await canal.enviar(msg.conta, msg.chatId, '🎧 Ouvindo…');

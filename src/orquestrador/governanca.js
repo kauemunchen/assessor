@@ -67,6 +67,18 @@ export async function governanca(msg, conta) {
     const off = Object.keys(MODS).filter(k => !ligados.includes(k));
     return `Equipe ativa: ${['diretor', ...ligados].map(nomeDe).join(', ')}.\nDesligados: ${off.map(k => MODS[k]).join(', ') || 'nenhum'}.`;
   }
+  if ((m = msg.texto.trim().match(/^convidar?\s+(.+)$/i))) {
+    const { criarConvite } = await import('./equipe.js'); const nome = caso(m[1].trim()); const codigo = criarConvite(conta.id, nome);
+    return `Convite para ${nome} criado. Peça para a pessoa abrir @${process.env.TELEGRAM_BOT_USERNAME || 'AssessorKM_bot'} no Telegram e mandar:\n\nentrar ${codigo}\n\nQuando entrar, eu te aviso. Depois: "Olga, avisa ${nome.split(' ')[0]} que…" ou "Olga, repassa para ${nome.split(' ')[0]}: <tarefa> até sexta".`;
+  }
+  if (/^(pessoas|minha equipe|equipe externa|colaboradores)$/.test(t)) {
+    const { listarPessoas } = await import('./equipe.js'); const ps = listarPessoas(conta.id);
+    return ps.length ? `Pessoas no Telegram:\n${ps.map(p => `- ${p.nome}`).join('\n')}\n\nPara adicionar: convidar <Nome>. Para tirar: remover pessoa <Nome>.` : 'Ninguém da sua equipe entrou ainda. Use: convidar <Nome>.';
+  }
+  if ((m = msg.texto.trim().match(/^remover pessoa\s+(.+)$/i))) {
+    const { acharPessoa } = await import('./equipe.js'); const p = acharPessoa(conta.id, m[1]); if (!p) return `Não achei ${m[1]}.`;
+    db.prepare('DELETE FROM usuarios WHERE id=?').run(p.id); return `${p.nome} removido(a) da equipe.`;
+  }
   if ((m = msg.texto.trim().match(/^(?:minhas )?empresas\s*[:=]\s*(.+)$/i))) {
     const lista = m[1].split(/[,;\n]/).map(x => x.trim()).filter(Boolean);
     db.prepare('UPDATE contas SET empresas=? WHERE id=?').run(JSON.stringify(lista), conta.id);

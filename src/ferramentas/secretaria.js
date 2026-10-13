@@ -1,6 +1,7 @@
 import * as gcal from '../integracoes/google-calendar.js';
 import * as gmail from '../integracoes/gmail.js';
 import * as gtasks from '../integracoes/google-tasks.js';
+import * as equipe from '../orquestrador/equipe.js';
 const mapaEv = (e) => ({ id: e.id, categoria: e.categoria, titulo: e.summary, inicio: e.start?.dateTime || e.start?.date, fim: e.end?.dateTime || e.end?.date, local: e.location, meet: e.hangoutLink, descricao: (e.description || '').slice(0, 200) });
 import { db } from '../db/index.js';
 
@@ -23,10 +24,14 @@ export function ferramentas(_conta) {
     { name: 'listar_tarefas', description: 'Lista tarefas abertas do Google Tasks (todas as listas ou uma).', parameters: { type: 'OBJECT', properties: { lista: { type: 'STRING' }, concluidas: { type: 'BOOLEAN' } } } },
     { name: 'concluir_tarefa', description: 'Marca tarefa do Google Tasks como concluída (por id ou título exato).', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' } }, required: ['id'] } },
     { name: 'atualizar_tarefa', description: 'Altera título, notas ou prazo de uma tarefa do Google Tasks.', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' }, titulo: { type: 'STRING' }, notas: { type: 'STRING' }, prazo: { type: 'STRING' } }, required: ['id'] } },
+    { name: 'enviar_recado', description: 'Manda um recado pelo Telegram para alguém da equipe do dono (pessoa já cadastrada via convite). Requer confirmação. Escreva o recado em nome do dono, claro e curto.', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, texto: { type: 'STRING' } }, required: ['pessoa', 'texto'] } },
+    { name: 'delegar_tarefa', description: 'Repassa uma tarefa para alguém da equipe pelo Telegram, com prazo (YYYY-MM-DD) e detalhes. A pessoa recebe, pode responder e marca "feito"; o dono é avisado. Requer confirmação.', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, titulo: { type: 'STRING' }, prazo: { type: 'STRING' }, detalhes: { type: 'STRING' } }, required: ['pessoa', 'titulo'] } },
+    { name: 'listar_pessoas', description: 'Lista as pessoas da equipe que estão no Telegram (para recados e tarefas).', parameters: { type: 'OBJECT', properties: {} } },
+    { name: 'listar_delegadas', description: 'Lista tarefas delegadas à equipe (abertas por padrão), opcionalmente de uma pessoa.', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, status: { type: 'STRING', description: 'aberta|concluida|todas' } } } },
     { name: 'registrar_retorno', description: 'Registra quem deve resposta a quem', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, assunto: { type: 'STRING' }, direcao: { type: 'STRING', description: 'devo_responder|aguardo_resposta' } }, required: ['pessoa', 'assunto', 'direcao'] } },
   ];
 }
-export const requerConfirmacao = new Set(['cancelar_evento', 'enviar_mensagem_terceiro', 'enviar_email']);
+export const requerConfirmacao = new Set(['cancelar_evento', 'enviar_recado', 'delegar_tarefa', 'enviar_email']);
 
 export async function executar(nome, a, conta, ctx) {
   switch (nome) {
@@ -46,6 +51,10 @@ export async function executar(nome, a, conta, ctx) {
     case 'listar_tarefas': return gtasks.listarTarefas(conta.id, { lista: a.lista, concluidas: !!a.concluidas });
     case 'concluir_tarefa': return gtasks.concluirTarefa(conta.id, a.id);
     case 'atualizar_tarefa': return gtasks.atualizarTarefa(conta.id, a.id, a);
+    case 'enviar_recado': return equipe.enviarRecado(conta, a);
+    case 'delegar_tarefa': return equipe.delegarTarefa(conta, a);
+    case 'listar_pessoas': return equipe.listarPessoas(conta.id).map(p => p.nome);
+    case 'listar_delegadas': return equipe.listarDelegadas(conta.id, { pessoa: a.pessoa, status: a.status === 'todas' ? null : (a.status || 'aberta') });
     case 'registrar_retorno': { const r = db.prepare('INSERT INTO retornos (conta_id, pessoa, assunto, direcao) VALUES (?,?,?,?)').run(conta.id, a.pessoa, a.assunto, a.direcao); return { id: r.lastInsertRowid }; }
     default: throw new Error(`secretaria.${nome}: não implementada`);
   }

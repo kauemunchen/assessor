@@ -4,12 +4,14 @@ import { criarCanal } from './canal/index.js';
 import { tratarMensagem } from './orquestrador/roteador.js';
 import { iniciarRotinas } from './rotinas/scheduler.js';
 import { migrar } from './db/migrate.js';
+import { setCanal } from './canal/atual.js';
 
 migrar();
 const app = express();
 app.use(express.json());
 
 const canal = criarCanal(process.env.CANAL || 'telegram', app);
+setCanal(canal);
 canal.aoReceber(async (msg) => {
   const t0 = Date.now(); canal.digitando?.(msg.chatId); const tick = setInterval(() => canal.digitando?.(msg.chatId), 4500);
   try {

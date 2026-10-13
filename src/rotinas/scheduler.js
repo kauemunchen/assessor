@@ -7,6 +7,7 @@ import { modelo } from '../integracoes/gemini.js';
 import * as gcal from '../integracoes/google-calendar.js';
 import { publicarPost } from '../ferramentas/social.js';
 import { avisosDeVencimento } from '../ferramentas/documentos.js';
+import { cobrarDelegadas } from '../orquestrador/equipe.js';
 
 const TZ = process.env.TZ || 'America/Sao_Paulo';
 const agoraLocal = () => new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
@@ -71,4 +72,5 @@ export function iniciarRotinas(canal) {
     }
   }, { timezone: TZ });
   cron.schedule('0 8 * * *', () => avisarVencimentos(canal), { timezone: TZ });
+  cron.schedule('30 8 * * 1-6', () => cobrarDelegadas().catch(e => console.error('cobrarDelegadas', e.message)), { timezone: TZ });
 }

@@ -14,7 +14,7 @@ const FORTES = {
   documentos: /\b(contrato|alvar[áa]|certid[ãa]o|ap[óo]lice|cadastro)\b/i,
 };
 const PISTAS = {
-  secretaria: /\b(agenda|agendar|marca|marcar|reuni[ãa]o|compromisso|lembra|lembrete|meet|hor[áa]rio|amanh[ãa]|semana|retorno|responder|tarefas?|to-?do|pend[êe]ncias?)\b/i,
+  secretaria: /\b(agenda|agendar|marca|marcar|reuni[ãa]o|compromisso|lembra|lembrete|meet|hor[áa]rio|amanh[ãa]|semana|retorno|responder|tarefas?|to-?do|pend[êe]ncias?|recado|avisa|avise|repassa|delega|cobra)\b/i,
   producao: /\b(op|ops|produ[çc][ãa]o|efici[êe]ncia|c[ée]lula|embarque|lan[çc]amento|costureira|agilfac)\b/i,
   documentos: /\b(contrato|documento|arquivo|cadastro|alvar[áa]|certid[ãa]o|ap[óo]lice|guarda|pasta)\b/i,
   financeiro: /\b(paguei|pagar|recebi|receber|boleto|dre|extrato|saldo|cobran[çc]a|nota fiscal|nfs|carteira|gasto|despesa|receita|vencimento)\b/i,
@@ -113,6 +113,8 @@ export function descreverAcao(c) {
     case 'cancelar_evento': return `cancelar o evento ${a.titulo ? `"${a.titulo}"` : a.event_id?.slice(0, 12) + '…'}`;
     case 'criar_evento': return `criar "${a.titulo}" em ${a.inicio?.replace('T', ' ')}${a.categoria ? ` [${a.categoria}]` : ''}`;
     case 'mover_evento': return `mover evento ${a.titulo ? `"${a.titulo}"` : ''} para ${a.inicio?.replace('T', ' ') || '(mesma data)'}`;
+    case 'enviar_recado': return `mandar recado para ${a.pessoa}: "${a.texto}"`;
+    case 'delegar_tarefa': return `repassar para ${a.pessoa}: "${a.titulo}"${a.prazo ? ` até ${a.prazo.split('-').reverse().join('/')}` : ''}${a.detalhes ? ` — ${a.detalhes}` : ''}`;
     case 'enviar_email': return `enviar e-mail para ${a.para || '(remetente original)'} — "${a.assunto || 'Re:'}"`;
     case 'publicar': return `publicar o post #${a.post_id || ''} no Instagram`;
     case 'criar_cobranca': return `criar cobrança de ${a.valor || ''} para ${a.cliente || ''}`;

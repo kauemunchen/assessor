@@ -53,3 +53,5 @@ CREATE TABLE IF NOT EXISTS cadastros (
   id INTEGER PRIMARY KEY, conta_id INTEGER, tipo TEXT, nome TEXT, documento TEXT, email TEXT, telefone TEXT, endereco TEXT,
   empresa_vinculo TEXT, campos_json TEXT, completo INTEGER DEFAULT 0, criado_em TEXT DEFAULT CURRENT_TIMESTAMP, atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS convites (id INTEGER PRIMARY KEY, conta_id INTEGER, codigo TEXT UNIQUE, nome TEXT, usado INTEGER DEFAULT 0, chat_id TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);

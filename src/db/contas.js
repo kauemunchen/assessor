@@ -3,6 +3,7 @@ const NOMES = { diretor: 'Diretor', secretaria: 'SecretÃ¡ria', producao: 'ProduÃ
 export async function obterConta(chatId) {
   return db.prepare('SELECT c.* FROM contas c JOIN usuarios u ON u.conta_id=c.id WHERE u.chat_id=?').get(chatId) || null;
 }
+export function obterUsuario(chatId) { return db.prepare('SELECT * FROM usuarios WHERE chat_id=?').get(chatId) || null; }
 export function modulosAtivos(contaId) {
   const ligados = db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(contaId).map(r => r.modulo);
   return ['diretor', ...ligados.filter(m => m !== 'diretor')];
