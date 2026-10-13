@@ -105,7 +105,7 @@ export async function tratarMensagem(msg, canal) {
   if (modulo === 'social' && /\b(carrossel|est[áa]tico|frase|arte|imagem|gera)\b/i.test(msg.texto)) {
     await canal.enviar(msg.conta, msg.chatId, '🎨 Montando… isso leva de 20 a 40 segundos. Te mando a prévia assim que ficar pronta.');
   }
-  let resposta = await responder({ prompt, conta, modulo, msg });
+  let resposta = await responder({ prompt, conta, modulo, msg, ativos });
   await memoria.registrarInteracao(conta.id, modulo, msg, resposta);
   // Social: se a resposta contém URL de imagem (fal/cloudinary), manda como foto com a legenda
   if (modulo === 'social' && typeof resposta === 'string') {

@@ -81,6 +81,7 @@ async function registrarVigencia(conta, a) {
 export function ferramentas(_conta) {
   return [
     { name: 'buscar_documento', description: 'Busca documentos arquivados por descrição (título, contraparte, empresa, tipo, texto). Devolve até 5 com link do Drive.', parameters: { type: 'OBJECT', properties: { texto: { type: 'STRING' }, empresa: { type: 'STRING' }, tipo: { type: 'STRING', description: TIPOS.join('|') } }, required: ['texto'] } },
+    { name: 'ler_documento', description: 'Abre o arquivo (do banco por documento_id, ou qualquer arquivo do Drive por drive_id) e responde uma pergunta sobre o conteúdo: "qual o CPF?", "qual a data de validade?", "qual o valor e a vigência?". Devolve o dado completo. Use depois de buscar_documento.', parameters: { type: 'OBJECT', properties: { documento_id: { type: 'NUMBER' }, drive_id: { type: 'STRING' }, pergunta: { type: 'STRING' } }, required: ['pergunta'] } },
     { name: 'listar_documentos', description: 'Lista documentos recentes, filtrando por empresa/tipo/período.', parameters: { type: 'OBJECT', properties: { empresa: { type: 'STRING' }, tipo: { type: 'STRING' }, de: { type: 'STRING', description: 'YYYY-MM-DD' }, ate: { type: 'STRING' }, max: { type: 'NUMBER' } } } },
     { name: 'atualizar_documento', description: 'Corrige dados de um documento já arquivado (título, empresa, tipo, contraparte, data). Se empresa/tipo mudar, move o arquivo de pasta no Drive.', parameters: { type: 'OBJECT', properties: { documento_id: { type: 'NUMBER' }, titulo: { type: 'STRING' }, empresa: { type: 'STRING' }, tipo: { type: 'STRING' }, contraparte: { type: 'STRING' }, data_doc: { type: 'STRING' } }, required: ['documento_id'] } },
     { name: 'registrar_vigencia', description: 'Registra vencimento/validade (contrato, certidão, alvará, seguro, CNH…). Cria evento no marcador Profissional e avisos 30/7/1 dias antes. Use quando o dono informar uma data que o OCR não pegou.', parameters: { type: 'OBJECT', properties: { descricao: { type: 'STRING' }, vence_em: { type: 'STRING', description: 'YYYY-MM-DD' }, documento_id: { type: 'NUMBER' }, empresa: { type: 'STRING' }, tipo: { type: 'STRING' }, inicio: { type: 'STRING' }, aviso_previo_dias: { type: 'NUMBER' }, renovacao_auto: { type: 'BOOLEAN' } }, required: ['descricao', 'vence_em'] } },
@@ -106,6 +107,18 @@ export async function executar(nome, a, conta, ctx) {
       rows = rows.map(d => ({ d, s: score(d) })).filter(x => x.s > 0 || termos.length === 0).sort((x, y) => y.s - x.s).slice(0, 5).map(x => mapaDoc(x.d));
       if (!rows.length) { try { const dr = await drive.buscarNoDrive(conta.id, a.texto, 5); return { no_banco: [], no_drive: dr, aviso: dr.length ? 'Achei só na busca geral do Drive (não registrados por mim).' : 'Nada encontrado.' }; } catch (e) { return { no_banco: [], erro_drive: e.message }; } }
       return rows;
+    }
+    case 'ler_documento': {
+      let driveId = a.drive_id, mime, tamanho, titulo;
+      if (a.documento_id) { const d = db.prepare('SELECT * FROM documentos WHERE id=? AND conta_id=?').get(a.documento_id, conta.id); if (!d) throw new Error('Documento não encontrado.'); driveId = d.drive_id; mime = d.mime; tamanho = d.tamanho; titulo = d.titulo; }
+      if (!driveId) throw new Error('Informe documento_id ou drive_id.');
+      const m = await drive.metadados(conta.id, driveId); mime = m.mime || mime; tamanho = m.tamanho || tamanho; titulo = titulo || m.nome;
+      if (mime?.startsWith('application/vnd.google-apps')) { const d2 = await import('../integracoes/google-drive.js'); const txt = await d2.exportarTexto(conta.id, driveId); const { gerarJSON } = await import('../integracoes/gemini.js'); const r = await gerarJSON(`Documento "${titulo}":\n${txt.slice(0, 30000)}\n\nPergunta do dono do documento: ${a.pergunta}\nResponda em JSON {"resposta": "...", "confianca": "alta|media|baixa"} com o dado completo e exato.`); return { titulo, link: m.link, ...r }; }
+      if (!/^(image\/|application\/pdf)/.test(mime || '')) throw new Error(`Não consigo ler ${mime} — só PDF, imagem ou Google Docs.`);
+      if (tamanho > LIMITE_OCR) throw new Error('Arquivo acima de 18 MB — não consigo ler o conteúdo; mando só o link.');
+      const bytes = await drive.baixar(conta.id, driveId);
+      const r = await lerArquivoJSON(bytes, mime, `Este é um documento do próprio dono (ou de sua família), que ele está consultando. Pergunta: ${a.pergunta}\nResponda em JSON {"resposta": "dado completo e exato, com todos os dígitos", "onde": "trecho/campo do documento onde está", "confianca": "alta|media|baixa"}. Se não estiver no documento, "resposta": null e explique em "onde".`);
+      return { titulo, link: m.link, ...r };
     }
     case 'listar_documentos': {
       const rows = db.prepare(`SELECT * FROM documentos WHERE conta_id=? AND status='ativo' ${a.empresa ? 'AND lower(empresa) LIKE ?' : ''} ${a.tipo ? 'AND lower(tipo) LIKE ?' : ''} ${a.de ? 'AND data_doc>=?' : ''} ${a.ate ? 'AND data_doc<=?' : ''} ORDER BY data_doc DESC LIMIT ?`)

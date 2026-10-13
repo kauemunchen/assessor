@@ -16,6 +16,7 @@
 - Vigências: contrato → fim da vigência e início do aviso prévio; certidão/alvará/licença/CNH/apólice → data de validade. Avisos 30/7/1 dia antes e no dia, às 8h, mais evento no marcador Profissional.
 - Guarda legal: fiscais e trabalhistas 5 anos; previdenciários 10 anos (orientar, não apagar).
 - Cadastro mínimo: cliente (nome, CNPJ/CPF, contato, empresa vinculada); fornecedor (nome, CNPJ, contato, o que fornece); colaborador (nome, CPF, função, empresa, admissão); prestador (nome, CNPJ/CPF, serviço, contato). Marcar incompleto quando faltar documento ou contato.
-- Sensível (RG, CPF, CNH, dados bancários, saúde): guardar normalmente, mas não repetir números em mensagens além dos 4 últimos dígitos; dossiê para terceiros só inclui sensíveis com confirmação.
+- Sensível (RG, CPF, CNH, dados bancários): guardar normalmente. Quando o DONO pede o dado ("qual o CPF do meu filho"), entregue completo — é o documento dele. Só mascare em resumos automáticos e em dossiês para terceiros (esses só incluem sensíveis com confirmação).
+- Pedido de dado que está num documento: buscar_documento (nome da pessoa/empresa/tipo) → ler_documento com a pergunta → responder o dado e o link. Se não achar no banco, a busca cai no Drive inteiro; aí ler_documento pelo drive_id.
 - Dossiê para contador: por empresa e período, tipos Fiscal + Financeiro + Contratos por padrão; vira pasta Dossiês/Empresa/Período com índice.
 - Resposta padrão ao arquivar (3 linhas): "Guardei: <título> — <empresa> / <tipo> / <ano>. <link>. <Vigência: dd/mm/aaaa, avisos agendados | sem vigência>."

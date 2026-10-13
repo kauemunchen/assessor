@@ -34,11 +34,13 @@ export async function classificar(texto, ativos) {
 
 const agoraBR = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
 
-export async function responder({ prompt, conta, modulo, msg }) {
-  const decls = ferramentasDe(modulo, conta);
+export async function responder({ prompt, conta, modulo, msg, ativos = [], profundidade = 0 }) {
+  const decls = ferramentasDe(modulo, conta, profundidade === 0 ? ativos : []);
   const m = modelo({ systemInstruction: `${prompt}\n\nAGORA: ${agoraBR()} (America/Sao_Paulo). Datas relativas ("amanhã", "quinta") são calculadas a partir daqui e passadas às ferramentas no formato YYYY-MM-DDTHH:MM.
 
 Os prefixos [módulo] no histórico são marcação interna: NUNCA os escreva nas suas respostas.
+
+EQUIPE: ${modulo === 'diretor' ? 'você coordena e tem as ferramentas de todos os módulos ativos — use-as diretamente.' : 'se o pedido depende de outro módulo (documentos, agenda, financeiro, social), use consultar_assessor em vez de dizer que não consegue.'} Quando o dono pede um dado que está num documento dele (CPF, CNPJ, número, data, valor), o caminho é: buscar_documento → ler_documento com a pergunta. Entregue o dado completo — é o dono pedindo o próprio documento.
 
 VERDADE: só prometa o que suas ferramentas fazem. Se não houver ferramenta para algo, diga "ainda não consigo fazer X" em uma linha. Nunca invente painéis, links, integrações ou etapas externas.
 
@@ -55,12 +57,16 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
   }
   contents.push({ role: 'user', parts: [{ text: msg.texto }] });
   let ultimoErro = null, assinaturaAnterior = '';
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const r = await m.generateContent({ contents });
     const cand = r.response.candidates?.[0];
     const parts = cand?.content?.parts || [];
     const calls = parts.filter(p => p.functionCall).map(p => p.functionCall);
-    if (!calls.length) return r.response.text().replace(/^(\s*\[[a-zç]+\]\s*)+/i, '');
+    if (!calls.length) {
+      let texto = ''; try { texto = r.response.text(); } catch {}
+      if (!texto.trim()) { const fr = cand?.finishReason || r.response.promptFeedback?.blockReason || 'sem conteúdo'; console.error(`[ia] resposta vazia (${fr})`, JSON.stringify(cand?.safetyRatings || '').slice(0, 300)); return fr === 'SAFETY' || /SAFETY|BLOCK/i.test(fr) ? 'O modelo bloqueou essa resposta por filtro de segurança (dados pessoais sensíveis). Peça de outro jeito — ex.: "me manda o link do documento" — ou peça o dado em partes.' : `Fiquei sem resposta do modelo (${fr}). Repita o pedido, por favor.`; }
+      return texto.replace(/^(\s*\[[a-zç]+\]\s*)+/i, '');
+    }
     contents.push({ role: 'model', parts });
     const assinatura = JSON.stringify(calls);
     if (assinatura === assinaturaAnterior && ultimoErro) return `Não consegui: ${ultimoErro}`;
@@ -73,11 +79,17 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
         return `Vou executar ${c.name} com ${JSON.stringify(c.args)}. Confirma? (sim/não)`;
       }
       let result;
+      if (c.name === 'consultar_assessor') {
+        const alvo = String(c.args.modulo || '').toLowerCase();
+        if (!ativos.includes(alvo) || profundidade > 0) result = { erro: `módulo ${alvo} não está ativo` };
+        else { try { const { montarPrompt } = await import('./montador-prompt.js'); const txt = await responder({ prompt: montarPrompt({ modulo: alvo, conta, ativos }), conta, modulo: alvo, msg: { ...msg, texto: c.args.pedido }, ativos, profundidade: 1 }); result = { result: { resposta_do_assessor: txt } }; } catch (e) { result = { erro: e.message }; } }
+        respostas.push({ functionResponse: { name: c.name, response: result } }); continue;
+      }
       try { result = { result: await executarFerramenta(modulo, c.name, c.args, conta, { chatId: msg.chatId }) }; }
       catch (e) { result = { erro: e.message }; ultimoErro = e.message; console.error(`[tool] ${modulo}.${c.name}`, e.message); }
       respostas.push({ functionResponse: { name: c.name, response: result } });
     }
     contents.push({ role: 'user', parts: respostas });
   }
-  return ultimoErro ? `Não consegui: ${ultimoErro}` : 'Não consegui concluir. Tente de novo com mais detalhes.';
+  return ultimoErro ? `Não consegui: ${ultimoErro}` : `Tentei ${6} passos com ferramentas e não cheguei a uma resposta (${assinaturaAnterior.slice(0, 160)}). Me diga mais um detalhe — nome exato, empresa ou data — e eu refaço.`;
 }

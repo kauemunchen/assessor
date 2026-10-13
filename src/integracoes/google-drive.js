@@ -95,7 +95,14 @@ export async function criarTexto(contaId, { nome, conteudo, pastaId }) {
 }
 export async function buscarNoDrive(contaId, texto, max = 10) {
   const raiz = await pastaRaiz(contaId);
-  const r = await auth(contaId).files.list({ q: `fullText contains '${esc(texto)}' and trashed=false and mimeType!='${PASTA}'`, fields: 'files(id,name,webViewLink,mimeType,modifiedTime)', pageSize: max, orderBy: 'modifiedTime desc' }).catch(e => { throw traduzErro(e); });
-  return (r.data.files || []).map(f => ({ id: f.id, nome: f.name, link: f.webViewLink, mime: f.mimeType, modificado: f.modifiedTime, raiz }));
+  const termos = texto.split(/\s+/).filter(t => t.length > 2);
+  const porNome = termos.map(t => `name contains '${esc(t)}'`).join(' and ');
+  const q = `(fullText contains '${esc(texto)}'${porNome ? ` or (${porNome})` : ''}) and trashed=false and mimeType!='${PASTA}'`;
+  const r = await auth(contaId).files.list({ q, fields: 'files(id,name,webViewLink,mimeType,size,modifiedTime)', pageSize: max, orderBy: 'modifiedTime desc' }).catch(e => { throw traduzErro(e); });
+  return (r.data.files || []).map(f => ({ drive_id: f.id, nome: f.name, link: f.webViewLink, mime: f.mimeType, tamanho: Number(f.size || 0), modificado: f.modifiedTime, raiz }));
 }
 export async function linkPasta(contaId, pastaId) { return `https://drive.google.com/drive/folders/${pastaId}`; }
+export async function exportarTexto(contaId, fileId) {
+  const r = await auth(contaId).files.export({ fileId, mimeType: 'text/plain' }, { responseType: 'text' }).catch(e => { throw traduzErro(e); });
+  return String(r.data || '');
+}
