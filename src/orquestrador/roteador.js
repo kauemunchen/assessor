@@ -69,10 +69,20 @@ export async function tratarMensagem(msg, canal) {
 
   // confirmação de ação pendente
   const pend = db.prepare('SELECT * FROM pendencias WHERE chat_id=? ORDER BY id DESC LIMIT 1').get(msg.chatId);
-  if (pend && /^(sim|ok|confirmo|pode|vai)\b/i.test(msg.texto.trim())) {
+  if (pend && /^(sim|ok|confirmo|pode|vai|isso|confirmado)\b/i.test(msg.texto.trim())) {
     db.prepare('DELETE FROM pendencias WHERE id=?').run(pend.id);
-    try { const r = await executarFerramenta(pend.modulo, pend.ferramenta, JSON.parse(pend.args), conta, { chatId: msg.chatId }); return `✅ Feito. ${JSON.stringify(r)}`; }
-    catch (e) { return `❌ Não consegui: ${e.message}`; }
+    const acoes = pend.ferramenta === '__lote__' ? JSON.parse(pend.args) : [{ name: pend.ferramenta, args: JSON.parse(pend.args) }];
+    const resultados = [];
+    for (const a of acoes) {
+      try { resultados.push({ acao: a.name, args: a.args, ok: true, resultado: await executarFerramenta(pend.modulo, a.name, a.args, conta, { chatId: msg.chatId, confirmado: true }) }); }
+      catch (e) { resultados.push({ acao: a.name, args: a.args, ok: false, erro: e.message }); }
+    }
+    // Devolve à persona para ela relatar e terminar o que faltava (ex.: criar o evento novo depois de cancelar os antigos)
+    const ativosC = modulosAtivos(conta.id);
+    const prompt = montarPrompt({ modulo: pend.modulo, conta, ativos: ativosC });
+    const texto = `[O dono CONFIRMOU. Ações executadas: ${JSON.stringify(resultados)}. Relate em até 4 linhas o que foi feito (e o que falhou, com o erro real). Se o pedido original tinha etapas que ainda não foram feitas (ex.: criar o compromisso novo), execute-as AGORA com suas ferramentas e inclua no relato.]`;
+    try { const resposta = await responder({ prompt, conta, modulo: pend.modulo, msg: { ...msg, texto }, ativos: ativosC }); await memoria.registrarInteracao(conta.id, pend.modulo, { ...msg, texto: 'sim (confirmação)' }, resposta); return resposta; }
+    catch (e) { return resultados.map(r => r.ok ? `✅ ${r.acao}` : `❌ ${r.acao}: ${r.erro}`).join('\n'); }
   }
   if (pend && /^(n[aã]o|cancela|deixa)\b/i.test(msg.texto.trim())) { db.prepare('DELETE FROM pendencias WHERE id=?').run(pend.id); return 'Cancelado.'; }
 

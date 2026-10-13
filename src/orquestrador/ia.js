@@ -72,12 +72,15 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
     if (assinatura === assinaturaAnterior && ultimoErro) return `Não consegui: ${ultimoErro}`;
     assinaturaAnterior = assinatura;
     const respostas = [];
+    // Alguma ação do lote exige confirmação? Guarda o LOTE inteiro (todas as chamadas desta rodada) e pergunta uma vez só.
+    if (calls.some(c => precisaConfirmar(modulo, c.name))) {
+      db.prepare('INSERT INTO pendencias (conta_id, chat_id, modulo, ferramenta, args) VALUES (?,?,?,?,?)').run(conta.id, msg.chatId, modulo, '__lote__', JSON.stringify(calls.map(c => ({ name: c.name, args: c.args }))));
+      const email = calls.find(c => c.name === 'enviar_email');
+      if (email && calls.length === 1) return `✉️ Vou enviar este e-mail${email.args.respondendo_id ? ' (em resposta)' : ''}:\n\nPara: ${email.args.para || '(remetente do e-mail original)'}\nAssunto: ${email.args.assunto || '(Re: do original)'}\n\n${email.args.texto}\n\nConfirma o envio? (sim/não)`;
+      const linhas = calls.map(c => `- ${descreverAcao(c)}`);
+      return `Vou fazer o seguinte:\n${linhas.join('\n')}\n\nConfirma? (sim/não)`;
+    }
     for (const c of calls) {
-      if (precisaConfirmar(modulo, c.name)) {
-        db.prepare('INSERT INTO pendencias (conta_id, chat_id, modulo, ferramenta, args) VALUES (?,?,?,?,?)').run(conta.id, msg.chatId, modulo, c.name, JSON.stringify(c.args));
-        if (c.name === 'enviar_email') return `✉️ Vou enviar este e-mail${c.args.respondendo_id ? ' (em resposta)' : ''}:\n\nPara: ${c.args.para || '(remetente do e-mail original)'}\nAssunto: ${c.args.assunto || '(Re: do original)'}\n\n${c.args.texto}\n\nConfirma o envio? (sim/não)`;
-        return `Vou executar ${c.name} com ${JSON.stringify(c.args)}. Confirma? (sim/não)`;
-      }
       let result;
       if (c.name === 'consultar_assessor') {
         const alvo = String(c.args.modulo || '').toLowerCase();
@@ -101,4 +104,19 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
     const txt = r.response.text().trim(); if (txt) return txt.replace(/^(\s*\[[a-zç]+\]\s*)+/i, '');
   } catch {}
   return ultimoErro ? `Não consegui: ${ultimoErro}` : `Não consegui fechar isso${ultimoResultado ? ` — último retorno: ${JSON.stringify(ultimoResultado).slice(0, 200)}` : ''}. Me diga mais um detalhe — nome exato ou data — e eu refaço.`;
+}
+
+/** Descrição humana de uma chamada de ferramenta, para o pedido de confirmação. */
+export function descreverAcao(c) {
+  const a = c.args || {};
+  switch (c.name) {
+    case 'cancelar_evento': return `cancelar o evento ${a.titulo ? `"${a.titulo}"` : a.event_id?.slice(0, 12) + '…'}`;
+    case 'criar_evento': return `criar "${a.titulo}" em ${a.inicio?.replace('T', ' ')}${a.categoria ? ` [${a.categoria}]` : ''}`;
+    case 'mover_evento': return `mover evento ${a.titulo ? `"${a.titulo}"` : ''} para ${a.inicio?.replace('T', ' ') || '(mesma data)'}`;
+    case 'enviar_email': return `enviar e-mail para ${a.para || '(remetente original)'} — "${a.assunto || 'Re:'}"`;
+    case 'publicar': return `publicar o post #${a.post_id || ''} no Instagram`;
+    case 'criar_cobranca': return `criar cobrança de ${a.valor || ''} para ${a.cliente || ''}`;
+    case 'encerrar_vigencia': return `encerrar a vigência #${a.vigencia_id}${a.nova_data ? ` e registrar nova até ${a.nova_data}` : ''}`;
+    default: return `${c.name} ${JSON.stringify(a).slice(0, 120)}`;
+  }
 }

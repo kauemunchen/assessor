@@ -81,13 +81,21 @@ export async function criarEvento(contaId, { titulo, inicio, fim, descricao = ''
   const r = await servico(contaId).events.insert({ calendarId, requestBody: body, conferenceDataVersion: meet ? 1 : 0, sendUpdates: convidados.length ? 'all' : 'none' });
   return { id: r.data.id, link: r.data.htmlLink, meet: r.data.hangoutLink || null, categoria: categoria || 'Principal' };
 }
+/** Acha em qual calendário (marcador) o evento está. */
+async function localizarEvento(contaId, eventId) {
+  const svc = servico(contaId);
+  for (const c of await listarCalendarios(contaId)) {
+    try { const { data } = await svc.events.get({ calendarId: c.id, eventId }); if (data && data.status !== 'cancelled') return { calendarId: c.id, ev: data }; } catch {}
+  }
+  throw new Error('Evento não encontrado em nenhum marcador (já cancelado?).');
+}
 export async function atualizarEvento(contaId, eventId, campos) {
-  const svc = servico(contaId); const { data: ev } = await svc.events.get({ calendarId: 'primary', eventId });
+  const svc = servico(contaId); const { calendarId, ev } = await localizarEvento(contaId, eventId);
   if (campos.titulo) ev.summary = campos.titulo;
   if (campos.inicio) ev.start = { dateTime: norm(campos.inicio), timeZone: TZ };
   if (campos.fim) ev.end = { dateTime: norm(campos.fim), timeZone: TZ };
   if (campos.descricao != null) ev.description = campos.descricao;
   if (campos.local != null) ev.location = campos.local;
-  return (await svc.events.update({ calendarId: 'primary', eventId, requestBody: ev, sendUpdates: 'all' })).data.id;
+  return (await svc.events.update({ calendarId, eventId, requestBody: ev, sendUpdates: 'all' })).data.id;
 }
-export async function cancelarEvento(contaId, eventId) { await servico(contaId).events.delete({ calendarId: 'primary', eventId }); }
+export async function cancelarEvento(contaId, eventId) { const { calendarId, ev } = await localizarEvento(contaId, eventId); await servico(contaId).events.delete({ calendarId, eventId }); return { cancelado: ev.summary }; }
