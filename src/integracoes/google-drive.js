@@ -106,3 +106,11 @@ export async function exportarTexto(contaId, fileId) {
   const r = await auth(contaId).files.export({ fileId, mimeType: 'text/plain' }, { responseType: 'text' }).catch(e => { throw traduzErro(e); });
   return String(r.data || '');
 }
+export async function compartilharLeitor(contaId, fileId, email) {
+  await auth(contaId).permissions.create({ fileId, sendNotificationEmail: false, requestBody: { role: 'reader', type: 'user', emailAddress: email } }).catch(e => { if (!/already|exists|duplicate/i.test(String(e?.message))) throw traduzErro(e); });
+  return { fileId, email, papel: 'leitor' };
+}
+export async function exportarPDF(contaId, fileId) {
+  const r = await auth(contaId).files.export({ fileId, mimeType: 'application/pdf' }, { responseType: 'arraybuffer' }).catch(e => { throw traduzErro(e); });
+  return r.data;
+}

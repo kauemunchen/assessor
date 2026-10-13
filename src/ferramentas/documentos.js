@@ -90,6 +90,7 @@ export function ferramentas(_conta) {
     { name: 'salvar_cadastro', description: 'Cria ou atualiza cadastro de cliente, fornecedor, colaborador ou prestador. Se já existir pelo nome/documento, atualiza (requer confirmação quando sobrescreve).', parameters: { type: 'OBJECT', properties: { tipo: { type: 'STRING', description: 'cliente|fornecedor|colaborador|prestador|outro' }, nome: { type: 'STRING' }, documento: { type: 'STRING', description: 'CNPJ/CPF' }, email: { type: 'STRING' }, telefone: { type: 'STRING' }, endereco: { type: 'STRING' }, empresa_vinculo: { type: 'STRING', description: 'empresa do dono a que se vincula' }, campos: { type: 'OBJECT', description: 'outros campos livres' } }, required: ['tipo', 'nome'] } },
     { name: 'buscar_cadastro', description: 'Busca cadastros por nome, documento, e-mail ou telefone.', parameters: { type: 'OBJECT', properties: { texto: { type: 'STRING' }, tipo: { type: 'STRING' } }, required: ['texto'] } },
     { name: 'montar_dossie', description: 'Junta todos os documentos de uma empresa num período numa pasta "Dossiês/<empresa>/<período>" do Drive, com um índice. Devolve o link da pasta. Use para "manda para o contador".', parameters: { type: 'OBJECT', properties: { empresa: { type: 'STRING' }, de: { type: 'STRING', description: 'YYYY-MM-DD' }, ate: { type: 'STRING' }, tipos: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['empresa', 'de', 'ate'] } },
+    { name: 'compartilhar_documento', description: 'Libera leitura de um documento do Drive para um e-mail (sem notificação). Use quando o dono pedir para "liberar acesso" de um arquivo já enviado.', parameters: { type: 'OBJECT', properties: { documento_id: { type: 'NUMBER' }, drive_id: { type: 'STRING' }, email: { type: 'STRING' } }, required: ['email'] } },
     { name: 'pasta_raiz', description: 'Mostra onde os documentos estão sendo guardados no Drive (link da pasta raiz).', parameters: { type: 'OBJECT', properties: {} } },
   ];
 }
@@ -178,6 +179,14 @@ export async function executar(nome, a, conta, ctx) {
       for (const d of docs) { try { await drive.copiar(conta.id, d.drive_id, pasta); } catch {} linhas.push(`[${d.tipo}] ${d.data_doc} — ${d.titulo}${d.contraparte ? ` (${d.contraparte})` : ''}${d.resumo ? `\n    ${d.resumo}` : ''}`); }
       await drive.criarTexto(conta.id, { nome: '00_indice.txt', conteudo: linhas.join('\n'), pastaId: pasta });
       return { itens: docs.length, link: await drive.linkPasta(conta.id, pasta), tipos: [...new Set(docs.map(d => d.tipo))] };
+    }
+    case 'compartilhar_documento': {
+      let id = a.drive_id ? drive.extrairId(a.drive_id) || a.drive_id : null;
+      if (a.documento_id) { const d = db.prepare('SELECT drive_id, titulo FROM documentos WHERE id=? AND conta_id=?').get(a.documento_id, conta.id); if (!d) throw new Error('Documento não encontrado.'); id = d.drive_id; }
+      if (!id) throw new Error('Informe documento_id ou drive_id.');
+      const emails = String(a.email).split(/[,;\s]+/).filter(e => /@/.test(e)); const out = [];
+      for (const em of emails) out.push(await drive.compartilharLeitor(conta.id, id, em));
+      return out;
     }
     case 'pasta_raiz': { const id = await drive.pastaRaiz(conta.id); return { link: await drive.linkPasta(conta.id, id), estrutura: 'Raiz / Empresa / Tipo / Ano' }; }
     default: throw new Error(`documentos.${nome}: não implementada`);

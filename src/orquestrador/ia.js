@@ -42,6 +42,8 @@ Os prefixos [módulo] no histórico são marcação interna: NUNCA os escreva na
 
 EQUIPE: ${modulo === 'diretor' ? 'você coordena e tem as ferramentas de todos os módulos ativos — use-as diretamente.' : 'se o pedido depende de outro módulo (documentos, agenda, financeiro, social), use consultar_assessor em vez de dizer que não consegue.'} Quando o dono pede um dado que está num documento dele (CPF, CNPJ, número, data, valor), o caminho é: buscar_documento → ler_documento com a pergunta. Entregue o dado completo — é o dono pedindo o próprio documento.
 
+CONFIRMAÇÕES: ações sensíveis (e-mail, cancelar, recado, publicar) são confirmadas pelo SISTEMA quando você chama a ferramenta. Nunca escreva uma "proposta" ou "prévia" em texto e espere um sim — chame a ferramenta de uma vez; o dono confirma uma única vez.
+
 VERDADE: só prometa o que suas ferramentas fazem. Se não houver ferramenta para algo, diga "ainda não consigo fazer X" em uma linha. Nunca invente painéis, links, integrações ou etapas externas.
 
 CONTEXTO: as mensagens anteriores desta conversa estão no histórico (respostas de outros assessores vêm marcadas com [módulo]). Use-as: se o dono responder "aprovar", "agenda", "ajusta", "sim", refere-se ao que foi proposto por último.
@@ -76,7 +78,10 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
     if (calls.some(c => precisaConfirmar(modulo, c.name))) {
       db.prepare('INSERT INTO pendencias (conta_id, chat_id, modulo, ferramenta, args) VALUES (?,?,?,?,?)').run(conta.id, msg.chatId, modulo, '__lote__', JSON.stringify(calls.map(c => ({ name: c.name, args: c.args }))));
       const email = calls.find(c => c.name === 'enviar_email');
-      if (email && calls.length === 1) return `✉️ Vou enviar este e-mail${email.args.respondendo_id ? ' (em resposta)' : ''}:\n\nPara: ${email.args.para || '(remetente do e-mail original)'}\nAssunto: ${email.args.assunto || '(Re: do original)'}\n\n${email.args.texto}\n\nConfirma o envio? (sim/não)`;
+      if (email && calls.length === 1) {
+        const links = (email.args.texto.match(/https?:\/\/(?:drive|docs)\.google\.com\/[^\s)>\]]+/g) || []).length; const n = (email.args.anexos_drive_ids || []).length + links;
+        return `✉️ Vou enviar este e-mail${email.args.respondendo_id ? ' (em resposta)' : ''}:\n\nPara: ${email.args.para || '(remetente do e-mail original)'}\nAssunto: ${email.args.assunto || '(Re: do original)'}\n\n${email.args.texto}${n ? `\n\n📎 ${n} arquivo(s) do Drive vão como ANEXO e com leitura liberada para o destinatário.` : ''}\n\nConfirma o envio? (sim/não)`;
+      }
       const linhas = calls.map(c => `- ${descreverAcao(c)}`);
       return `Vou fazer o seguinte:\n${linhas.join('\n')}\n\nConfirma? (sim/não)`;
     }
