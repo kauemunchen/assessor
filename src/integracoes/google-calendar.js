@@ -9,7 +9,7 @@ function clienteOAuth() {
 }
 export function urlAutorizacao(contaId) {
   return clienteOAuth().generateAuthUrl({ access_type: 'offline', prompt: 'consent', state: String(contaId),
-    scope: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/drive'] });
+    scope: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/tasks'] });
 }
 export async function salvarCodigo(contaId, code) {
   const { tokens } = await clienteOAuth().getToken({ code: String(code) });

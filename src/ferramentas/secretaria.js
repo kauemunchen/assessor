@@ -1,5 +1,6 @@
 import * as gcal from '../integracoes/google-calendar.js';
 import * as gmail from '../integracoes/gmail.js';
+import * as gtasks from '../integracoes/google-tasks.js';
 const mapaEv = (e) => ({ id: e.id, categoria: e.categoria, titulo: e.summary, inicio: e.start?.dateTime || e.start?.date, fim: e.end?.dateTime || e.end?.date, local: e.location, meet: e.hangoutLink, descricao: (e.description || '').slice(0, 200) });
 import { db } from '../db/index.js';
 
@@ -18,6 +19,10 @@ export function ferramentas(_conta) {
     { name: 'ler_email', description: 'Lê o conteúdo completo de um e-mail pelo id (vindo de ler_emails)', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' } }, required: ['id'] } },
     { name: 'enviar_email', description: 'Envia e-mail pelo Gmail do dono. SEMPRE exige confirmação do dono (mostre para quem, assunto e texto completo antes). Para responder um e-mail existente, passe respondendo_id (mantém a conversa); para e para assunto podem ficar vazios nesse caso.', parameters: { type: 'OBJECT', properties: { para: { type: 'STRING' }, assunto: { type: 'STRING' }, texto: { type: 'STRING' }, cc: { type: 'STRING' }, respondendo_id: { type: 'STRING' } }, required: ['texto'] } },
     { name: 'criar_rascunho_email', description: 'Salva um rascunho na pasta Rascunhos do Gmail do dono (não envia). Útil quando ele quer revisar no celular antes.', parameters: { type: 'OBJECT', properties: { para: { type: 'STRING' }, assunto: { type: 'STRING' }, texto: { type: 'STRING' }, cc: { type: 'STRING' }, respondendo_id: { type: 'STRING' } }, required: ['texto'] } },
+    { name: 'criar_tarefa', description: 'Cria tarefa no Google Tasks do dono (aparece no app Tarefas e na lateral do Gmail/Agenda). Use para "anota uma tarefa", "coloca na minha lista", "preciso fazer X até sexta". prazo = YYYY-MM-DD (Tasks só guarda a data). lista = nome da lista (opcional; cria se não existir).', parameters: { type: 'OBJECT', properties: { titulo: { type: 'STRING' }, notas: { type: 'STRING' }, prazo: { type: 'STRING' }, lista: { type: 'STRING' } }, required: ['titulo'] } },
+    { name: 'listar_tarefas', description: 'Lista tarefas abertas do Google Tasks (todas as listas ou uma).', parameters: { type: 'OBJECT', properties: { lista: { type: 'STRING' }, concluidas: { type: 'BOOLEAN' } } } },
+    { name: 'concluir_tarefa', description: 'Marca tarefa do Google Tasks como concluída (por id ou título exato).', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' } }, required: ['id'] } },
+    { name: 'atualizar_tarefa', description: 'Altera título, notas ou prazo de uma tarefa do Google Tasks.', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' }, titulo: { type: 'STRING' }, notas: { type: 'STRING' }, prazo: { type: 'STRING' } }, required: ['id'] } },
     { name: 'registrar_retorno', description: 'Registra quem deve resposta a quem', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, assunto: { type: 'STRING' }, direcao: { type: 'STRING', description: 'devo_responder|aguardo_resposta' } }, required: ['pessoa', 'assunto', 'direcao'] } },
   ];
 }
@@ -37,6 +42,10 @@ export async function executar(nome, a, conta, ctx) {
     case 'ler_email': return gmail.ler(conta.id, a.id);
     case 'enviar_email': return gmail.enviar(conta.id, a);
     case 'criar_rascunho_email': return gmail.criarRascunho(conta.id, a);
+    case 'criar_tarefa': return gtasks.criarTarefa(conta.id, a);
+    case 'listar_tarefas': return gtasks.listarTarefas(conta.id, { lista: a.lista, concluidas: !!a.concluidas });
+    case 'concluir_tarefa': return gtasks.concluirTarefa(conta.id, a.id);
+    case 'atualizar_tarefa': return gtasks.atualizarTarefa(conta.id, a.id, a);
     case 'registrar_retorno': { const r = db.prepare('INSERT INTO retornos (conta_id, pessoa, assunto, direcao) VALUES (?,?,?,?)').run(conta.id, a.pessoa, a.assunto, a.direcao); return { id: r.lastInsertRowid }; }
     default: throw new Error(`secretaria.${nome}: não implementada`);
   }
