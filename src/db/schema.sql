@@ -55,3 +55,5 @@ CREATE TABLE IF NOT EXISTS cadastros (
 );
 
 CREATE TABLE IF NOT EXISTS convites (id INTEGER PRIMARY KEY, conta_id INTEGER, codigo TEXT UNIQUE, nome TEXT, usado INTEGER DEFAULT 0, chat_id TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE IF NOT EXISTS planilhas (id INTEGER PRIMARY KEY, conta_id INTEGER, nome TEXT, spreadsheet_id TEXT, aba_padrao TEXT, cabecalhos TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(conta_id, nome));

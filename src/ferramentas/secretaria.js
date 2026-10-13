@@ -2,6 +2,7 @@ import * as gcal from '../integracoes/google-calendar.js';
 import * as gmail from '../integracoes/gmail.js';
 import * as gtasks from '../integracoes/google-tasks.js';
 import * as equipe from '../orquestrador/equipe.js';
+import * as sheets from '../integracoes/google-sheets.js';
 const mapaEv = (e) => ({ id: e.id, categoria: e.categoria, titulo: e.summary, inicio: e.start?.dateTime || e.start?.date, fim: e.end?.dateTime || e.end?.date, local: e.location, meet: e.hangoutLink, descricao: (e.description || '').slice(0, 200) });
 import { db } from '../db/index.js';
 
@@ -28,10 +29,16 @@ export function ferramentas(_conta) {
     { name: 'delegar_tarefa', description: 'Repassa uma tarefa para alguém da equipe pelo Telegram, com prazo (YYYY-MM-DD) e detalhes. A pessoa recebe, pode responder e marca "feito"; o dono é avisado. Requer confirmação.', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, titulo: { type: 'STRING' }, prazo: { type: 'STRING' }, detalhes: { type: 'STRING' } }, required: ['pessoa', 'titulo'] } },
     { name: 'listar_pessoas', description: 'Lista as pessoas da equipe que estão no Telegram (para recados e tarefas).', parameters: { type: 'OBJECT', properties: {} } },
     { name: 'listar_delegadas', description: 'Lista tarefas delegadas à equipe (abertas por padrão), opcionalmente de uma pessoa.', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, status: { type: 'STRING', description: 'aberta|concluida|todas' } } } },
+    { name: 'listar_planilhas', description: 'Lista as planilhas Google (Sheets) cadastradas do dono, com abas e colunas.', parameters: { type: 'OBJECT', properties: {} } },
+    { name: 'cadastrar_planilha', description: 'Cadastra uma planilha Google existente pelo link, dando um nome curto para o dono se referir a ela depois ("planilha de gastos").', parameters: { type: 'OBJECT', properties: { link: { type: 'STRING' }, nome: { type: 'STRING' }, aba: { type: 'STRING' } }, required: ['link'] } },
+    { name: 'criar_planilha', description: 'Cria uma planilha Google nova no Drive do dono (pasta Assessor KM/Planilhas) com abas e cabeçalhos. Use quando ele pedir "cria uma planilha de X".', parameters: { type: 'OBJECT', properties: { nome: { type: 'STRING' }, abas: { type: 'ARRAY', items: { type: 'OBJECT', properties: { nome: { type: 'STRING' }, cabecalhos: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['nome'] } } }, required: ['nome'] } },
+    { name: 'lancar_na_planilha', description: 'Acrescenta uma ou mais linhas ao final de uma planilha cadastrada. Informe colunas (nomes exatamente como no cabeçalho — veja listar_planilhas) e linhas (valores na mesma ordem das colunas). O sistema encaixa cada valor na coluna certa. Datas em DD/MM/AAAA, valores numéricos sem R$.', parameters: { type: 'OBJECT', properties: { planilha: { type: 'STRING' }, aba: { type: 'STRING' }, colunas: { type: 'ARRAY', items: { type: 'STRING' } }, linhas: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } } }, required: ['planilha', 'colunas', 'linhas'] } },
+    { name: 'ler_planilha', description: 'Lê uma planilha cadastrada (últimas linhas ou um intervalo A1 como "A1:F20") para consultar, somar ou conferir.', parameters: { type: 'OBJECT', properties: { planilha: { type: 'STRING' }, aba: { type: 'STRING' }, intervalo: { type: 'STRING' }, max: { type: 'NUMBER' } }, required: ['planilha'] } },
+    { name: 'atualizar_planilha', description: 'Altera células específicas (intervalo A1, ex.: "D7" ou "B2:C2") de uma planilha cadastrada. Requer confirmação.', parameters: { type: 'OBJECT', properties: { planilha: { type: 'STRING' }, aba: { type: 'STRING' }, intervalo: { type: 'STRING' }, valores: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } } }, required: ['planilha', 'intervalo', 'valores'] } },
     { name: 'registrar_retorno', description: 'Registra quem deve resposta a quem', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, assunto: { type: 'STRING' }, direcao: { type: 'STRING', description: 'devo_responder|aguardo_resposta' } }, required: ['pessoa', 'assunto', 'direcao'] } },
   ];
 }
-export const requerConfirmacao = new Set(['cancelar_evento', 'enviar_recado', 'delegar_tarefa', 'enviar_email']);
+export const requerConfirmacao = new Set(['cancelar_evento', 'enviar_recado', 'delegar_tarefa', 'enviar_email', 'atualizar_planilha']);
 
 export async function executar(nome, a, conta, ctx) {
   switch (nome) {
@@ -55,6 +62,12 @@ export async function executar(nome, a, conta, ctx) {
     case 'delegar_tarefa': return equipe.delegarTarefa(conta, a);
     case 'listar_pessoas': return equipe.listarPessoas(conta.id).map(p => p.nome);
     case 'listar_delegadas': return equipe.listarDelegadas(conta.id, { pessoa: a.pessoa, status: a.status === 'todas' ? null : (a.status || 'aberta') });
+    case 'listar_planilhas': return sheets.listarCadastradas(conta.id);
+    case 'cadastrar_planilha': return sheets.cadastrar(conta.id, { link_ou_id: a.link, nome: a.nome, aba: a.aba });
+    case 'criar_planilha': return sheets.criar(conta.id, { nome: a.nome, abas: a.abas?.length ? a.abas : undefined });
+    case 'lancar_na_planilha': return sheets.adicionarLinhas(conta.id, { planilha: a.planilha, aba: a.aba, linhas: (a.linhas || []).map(l => a.colunas?.length ? Object.fromEntries(a.colunas.map((c, i) => [c, l[i] ?? ''])) : l) });
+    case 'ler_planilha': return sheets.ler(conta.id, { planilha: a.planilha, aba: a.aba, intervalo: a.intervalo, max: a.max || 50 });
+    case 'atualizar_planilha': return sheets.atualizarCelulas(conta.id, { planilha: a.planilha, aba: a.aba, intervalo: a.intervalo, valores: a.valores });
     case 'registrar_retorno': { const r = db.prepare('INSERT INTO retornos (conta_id, pessoa, assunto, direcao) VALUES (?,?,?,?)').run(conta.id, a.pessoa, a.assunto, a.direcao); return { id: r.lastInsertRowid }; }
     default: throw new Error(`secretaria.${nome}: não implementada`);
   }
