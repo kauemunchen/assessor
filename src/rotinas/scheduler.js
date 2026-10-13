@@ -50,6 +50,13 @@ async function resumoDoDia(canal, conta, chatId) {
   await canal.enviar(conta.id, chatId, r.response.text());
 }
 
+async function avisarTokenInstagram(canal) {
+  const hoje = hojeISO(); const limite = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  for (const r of db.prepare("SELECT a.conta_id, a.expira_em, u.chat_id FROM instagram_auth a JOIN usuarios u ON u.conta_id=a.conta_id AND u.papel='dono' WHERE a.expira_em IS NOT NULL AND a.expira_em<=?").all(limite)) {
+    const dias = Math.round((new Date(r.expira_em) - new Date(hoje)) / 864e5);
+    await canal.enviar(r.conta_id, r.chat_id, `📸 O token do Instagram ${dias <= 0 ? 'venceu' : `vence em ${dias} dia(s)`} (${r.expira_em.split('-').reverse().join('/')}). Gere um novo em Meus apps → KM Graph API → Instagram → Gerar tokens e mande "conectar instagram <token>".`).catch(() => {});
+  }
+}
 async function avisarVencimentos(canal) {
   for (const u of db.prepare("SELECT u.conta_id, u.chat_id FROM usuarios u JOIN modulos m ON m.conta_id=u.conta_id AND m.modulo='documentos' AND m.ligado=1 WHERE u.papel='dono'").all()) {
     try { const avisos = avisosDeVencimento(u.conta_id); if (avisos.length) await canal.enviar(u.conta_id, u.chat_id, `⏰ Vencimentos:\n${avisos.join('\n')}`); }
@@ -82,5 +89,6 @@ export function iniciarRotinas(canal) {
     }
   }, { timezone: TZ });
   cron.schedule('0 8 * * *', () => avisarVencimentos(canal), { timezone: TZ });
+  cron.schedule('5 8 * * *', () => avisarTokenInstagram(canal), { timezone: TZ });
   cron.schedule('30 8 * * 1-6', () => cobrarDelegadas().catch(e => console.error('cobrarDelegadas', e.message)), { timezone: TZ });
 }

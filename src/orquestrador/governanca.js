@@ -57,12 +57,20 @@ export async function governanca(msg, conta) {
     const c = await obterOuCriarCalendario(conta.id, caso(m[1].trim()));
     return `✅ Marcador *${c.nome}* pronto na sua agenda Google.`;
   }
-  if ((m = t.match(/^conectar? instagram\s+(\d{5,})\s+(\S+)$/))) {
-    db.prepare('INSERT INTO instagram_auth (conta_id, ig_user_id, token) VALUES (?,?,?) ON CONFLICT(conta_id) DO UPDATE SET ig_user_id=excluded.ig_user_id, token=excluded.token').run(conta.id, m[1], caso(m[2]));
+  if ((m = msg.texto.trim().match(/^conectar?\s+instagram\s+(.+)$/i))) {
+    // Aceita: "conectar instagram <token>" ou "conectar instagram <id|@usuario> <token>", com ou sem < >
+    const partes = m[1].replace(/[<>]/g, ' ').trim().split(/\s+/);
+    const token = partes.find(x => /^(IGAA|EAA)[A-Za-z0-9_-]{30,}$/.test(x)) || partes.at(-1);
+    if (!/^[A-Za-z0-9_-]{30,}$/.test(token)) return 'Não reconheci o token. Mande: `conectar instagram <token IGAA…>` (só o token já basta; o ID eu descubro).';
+    let me; try { me = await fetch(`https://graph.instagram.com/me?fields=user_id,username,account_type&access_token=${token}`).then(r => r.json()); } catch (e) { return `Não consegui validar o token na Meta: ${e.message}`; }
+    if (me.error) return `❌ A Meta recusou esse token (${me.error.code}): ${me.error.message.slice(0, 160)}. Gere outro em Meus apps → KM Graph API → Instagram → Gerar tokens.`;
+    const igId = String(me.user_id || me.id);
+    db.prepare('INSERT INTO instagram_auth (conta_id, ig_user_id, token, expira_em) VALUES (?,?,?,?) ON CONFLICT(conta_id) DO UPDATE SET ig_user_id=excluded.ig_user_id, token=excluded.token, expira_em=excluded.expira_em').run(conta.id, igId, token, new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10));
     db.prepare('INSERT INTO modulos (conta_id, modulo, ligado) VALUES (?,?,1) ON CONFLICT(conta_id, modulo) DO UPDATE SET ligado=1').run(conta.id, 'social');
-    return '✅ Instagram conectado e módulo Social ligado. Agora me conte a identidade da marca (perfil, nicho, público, tom, pilares) ou peça "cria um post sobre …".';
+    const pausados = db.prepare("SELECT id, tema, data FROM posts WHERE conta_id=? AND status='erro' ORDER BY data").all(conta.id);
+    return `✅ Instagram conectado: @${me.username} (ID ${igId}, ${me.account_type || 'business'}). Token válido por ~60 dias; eu aviso 7 dias antes de vencer.${pausados.length ? `\n\nPosts que falharam e podem ser reagendados: ${pausados.map(p => `#${p.id}`).join(', ')} — diga "MIA, reagenda o post #N para <dia hora>".` : ''}\n\n⚠️ Apague a mensagem com o token do seu histórico do Telegram.`;
   }
-  if (/^conectar? instagram$/.test(t)) return 'Me mande numa linha: `conectar instagram <IG_USER_ID> <ACCESS_TOKEN>` (os mesmos do bot antigo). Depois eu apago a mensagem do histórico.';
+  if (/^conectar? instagram$/.test(t)) return 'Me mande numa linha: `conectar instagram <token IGAA…>` (gerado em Meus apps → KM Graph API → Instagram → Gerar tokens de acesso). O ID da conta eu descubro pelo token.';
   if (/^(quais|que) módulos|^módulos$|^equipe$/.test(t)) {
     const nomeDe = (mod) => { const r = db.prepare('SELECT nome FROM persona_config WHERE conta_id=? AND modulo=?').get(conta.id, mod); return r?.nome ? `${r.nome} (${mod === 'diretor' ? 'Diretor' : MODS[mod]})` : (mod === 'diretor' ? 'Diretor' : MODS[mod]); };
     const ligados = db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(conta.id).map(r => r.modulo);
