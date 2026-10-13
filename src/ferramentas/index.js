@@ -4,7 +4,7 @@ import * as documentos from './documentos.js';
 import * as financeiro from './financeiro.js';
 import * as social from './social.js';
 const MAPA = { secretaria, producao, documentos, financeiro, social };
-const CONSULTAR = { name: 'consultar_assessor', description: 'Pede algo a outro assessor da equipe e recebe a resposta dele em texto. Use quando o pedido do dono depende de outro módulo (ex.: Secretária precisa de um dado que está nos Documentos; Documentos precisa marcar algo na agenda). modulo: secretaria|documentos|financeiro|producao|social.', parameters: { type: 'OBJECT', properties: { modulo: { type: 'STRING' }, pedido: { type: 'STRING', description: 'o pedido completo, com todos os detalhes que o dono deu' } }, required: ['modulo', 'pedido'] } };
+const CONSULTAR = { name: 'consultar_assessor', description: 'ÚLTIMO RECURSO: pede algo a outro assessor e recebe a resposta em texto. Só use quando o pedido é claramente do domínio de OUTRO módulo (um dado que está num documento arquivado; um lançamento financeiro; um post). NUNCA use para o que suas próprias ferramentas fazem (agenda, e-mail, tarefas são da Secretária; arquivos são de Documentos). Uma chamada por pedido. modulo: secretaria|documentos|financeiro|producao|social.', parameters: { type: 'OBJECT', properties: { modulo: { type: 'STRING' }, pedido: { type: 'STRING', description: 'o pedido completo, com todos os detalhes que o dono deu' } }, required: ['modulo', 'pedido'] } };
 
 /** Diretor usa as ferramentas de todos os módulos ativos; os demais usam as suas + consultar_assessor. */
 export function ferramentasDe(modulo, conta, ativos = []) {

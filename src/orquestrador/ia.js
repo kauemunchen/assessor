@@ -56,7 +56,7 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
     contents.push({ role: 'model', parts: [{ text: `[${h.modulo}] ` + corta(h.saida) }] });
   }
   contents.push({ role: 'user', parts: [{ text: msg.texto }] });
-  let ultimoErro = null, assinaturaAnterior = '';
+  let ultimoErro = null, assinaturaAnterior = ''; const consultados = new Set(); let ultimoResultado = null;
   for (let i = 0; i < 6; i++) {
     const r = await m.generateContent({ contents });
     const cand = r.response.candidates?.[0];
@@ -82,14 +82,23 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
       if (c.name === 'consultar_assessor') {
         const alvo = String(c.args.modulo || '').toLowerCase();
         if (!ativos.includes(alvo) || profundidade > 0) result = { erro: `módulo ${alvo} não está ativo` };
-        else { try { const { montarPrompt } = await import('./montador-prompt.js'); const txt = await responder({ prompt: montarPrompt({ modulo: alvo, conta, ativos }), conta, modulo: alvo, msg: { ...msg, texto: c.args.pedido }, ativos, profundidade: 1 }); result = { result: { resposta_do_assessor: txt } }; } catch (e) { result = { erro: e.message }; } }
+        else if (consultados.has(alvo)) result = { erro: `Você já consultou ${alvo} nesta conversa e recebeu a resposta. Não consulte de novo: use suas próprias ferramentas (ex.: buscar_evento/mover_evento para agenda) ou responda ao dono com o que tem.` };
+        else { consultados.add(alvo); try { const { montarPrompt } = await import('./montador-prompt.js'); const txt = await responder({ prompt: montarPrompt({ modulo: alvo, conta, ativos }), conta, modulo: alvo, msg: { ...msg, texto: c.args.pedido }, ativos, profundidade: 1 }); result = { result: { resposta_do_assessor: txt } }; } catch (e) { result = { erro: e.message }; } }
+        ultimoResultado = result;
         respostas.push({ functionResponse: { name: c.name, response: result } }); continue;
       }
       try { result = { result: await executarFerramenta(modulo, c.name, c.args, conta, { chatId: msg.chatId }) }; }
       catch (e) { result = { erro: e.message }; ultimoErro = e.message; console.error(`[tool] ${modulo}.${c.name}`, e.message); }
+      ultimoResultado = result;
       respostas.push({ functionResponse: { name: c.name, response: result } });
     }
     contents.push({ role: 'user', parts: respostas });
   }
-  return ultimoErro ? `Não consegui: ${ultimoErro}` : `Tentei ${6} passos com ferramentas e não cheguei a uma resposta (${assinaturaAnterior.slice(0, 160)}). Me diga mais um detalhe — nome exato, empresa ou data — e eu refaço.`;
+  // Esgotou os passos: síntese final SEM ferramentas, com o que já foi apurado
+  try {
+    const sem = modelo({ systemInstruction: `${prompt}\n\nFORMATO: canal de mensagem; até 6 linhas; sem títulos.` });
+    const r = await sem.generateContent({ contents: [...contents, { role: 'user', parts: [{ text: 'Você não tem mais chamadas de ferramenta. Responda ao dono AGORA com o que apurou acima: o que foi feito, o que foi encontrado e, se algo ficou faltando, exatamente qual detalhe ele precisa dar (uma linha). Não diga "vou verificar".' }] }] });
+    const txt = r.response.text().trim(); if (txt) return txt.replace(/^(\s*\[[a-zç]+\]\s*)+/i, '');
+  } catch {}
+  return ultimoErro ? `Não consegui: ${ultimoErro}` : `Não consegui fechar isso${ultimoResultado ? ` — último retorno: ${JSON.stringify(ultimoResultado).slice(0, 200)}` : ''}. Me diga mais um detalhe — nome exato ou data — e eu refaço.`;
 }
