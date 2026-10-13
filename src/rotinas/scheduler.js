@@ -10,20 +10,24 @@ import { avisosDeVencimento } from '../ferramentas/documentos.js';
 import { cobrarDelegadas } from '../orquestrador/equipe.js';
 
 const TZ = process.env.TZ || 'America/Sao_Paulo';
+// Hora local como texto "YYYY-MM-DDTHH:MM" (sem passar por UTC — evita o deslocamento de 3h)
+const agoraISO = () => new Date().toLocaleString('sv-SE', { timeZone: TZ }).replace(' ', 'T').slice(0, 16);
+const hojeISO = () => agoraISO().slice(0, 10);
 const agoraLocal = () => new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
-const hhmm = (d) => d.toTimeString().slice(0, 5);
+const hhmm = () => agoraISO().slice(11, 16);
 
 function proximaOcorrencia(iso, rec) {
-  const d = new Date(iso);
+  const d = new Date(iso + (iso.length === 16 ? ':00' : '')); // interpretado como hora de parede
   if (rec === 'diario') d.setDate(d.getDate() + 1);
   else if (rec === 'semanal') d.setDate(d.getDate() + 7);
   else if (rec === 'mensal') d.setMonth(d.getMonth() + 1);
   else return null;
-  return d.toISOString().slice(0, 16);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 async function dispararLembretes(canal) {
-  const agora = agoraLocal().toISOString().slice(0, 16);
+  const agora = agoraISO();
   for (const l of db.prepare('SELECT * FROM lembretes WHERE enviado=0 AND quando<=?').all(agora)) {
     try {
       await canal.enviar(l.conta_id, l.destino_chat_id, `🔔 ${l.texto}`);
@@ -35,10 +39,10 @@ async function dispararLembretes(canal) {
 }
 
 async function resumoDoDia(canal, conta, chatId) {
-  const ini = agoraLocal(); ini.setHours(0, 0, 0, 0); const fim = new Date(ini); fim.setDate(fim.getDate() + 1);
-  let eventos = []; try { eventos = await gcal.listarEventos(conta.id, { inicio: ini.toISOString(), fim: fim.toISOString() }); } catch {}
-  const lembretes = db.prepare('SELECT texto, quando FROM lembretes WHERE conta_id=? AND enviado=0 AND quando BETWEEN ? AND ?').all(conta.id, ini.toISOString().slice(0, 16), fim.toISOString().slice(0, 16));
-  const tarefas = db.prepare(`SELECT titulo, responsavel, prazo FROM tarefas WHERE conta_id=? AND status='aberta' AND prazo<=?`).all(conta.id, fim.toISOString().slice(0, 10));
+  const hoje = hojeISO(); const amanha = new Date(new Date(hoje + 'T12:00:00').getTime() + 864e5).toISOString().slice(0, 10);
+  let eventos = []; try { eventos = await gcal.listarEventos(conta.id, { inicio: new Date(hoje + 'T00:00:00-03:00').toISOString(), fim: new Date(amanha + 'T00:00:00-03:00').toISOString() }); } catch {}
+  const lembretes = db.prepare('SELECT texto, quando FROM lembretes WHERE conta_id=? AND enviado=0 AND quando BETWEEN ? AND ?').all(conta.id, hoje + 'T00:00', amanha + 'T00:00');
+  const tarefas = db.prepare(`SELECT titulo, responsavel, prazo FROM tarefas WHERE conta_id=? AND status='aberta' AND prazo<=?`).all(conta.id, hoje);
   const retornos = db.prepare(`SELECT pessoa, assunto, direcao FROM retornos WHERE conta_id=? AND status='aberto'`).all(conta.id);
   const dados = JSON.stringify({ eventos: eventos.map(e => ({ h: (e.start?.dateTime || '').slice(11, 16), t: e.summary, local: e.location })), lembretes, tarefas, retornos });
   const prompt = montarPrompt({ modulo: 'diretor', conta, ativos: modulosAtivos(conta.id) });
@@ -54,10 +58,16 @@ async function avisarVencimentos(canal) {
 }
 
 async function publicarAgendados(canal) {
-  const agora = agoraLocal().toISOString().slice(0, 16);
+  const agora = agoraISO();
   for (const p of db.prepare("SELECT p.*, u.chat_id FROM posts p JOIN usuarios u ON u.conta_id=p.conta_id AND u.papel='dono' WHERE p.status='agendado' AND p.data<=?").all(agora)) {
     try { const r = await publicarPost(p.conta_id, p.id); await canal.enviar(p.conta_id, p.chat_id, `📣 Post #${p.id} publicado no Instagram (${r.ig_media_id}).`); }
-    catch (e) { db.prepare("UPDATE posts SET status='erro' WHERE id=?").run(p.id); await canal.enviar(p.conta_id, p.chat_id, `⚠️ Post #${p.id} não publicou: ${e.message}`).catch(() => {}); }
+    catch (e) {
+      const m = String(e.message || e); const token = /code":190|access token|OAuthException|invalidated|expired/i.test(m);
+      db.prepare("UPDATE posts SET status='erro' WHERE id=?").run(p.id);
+      const motivo = token ? 'o token do Instagram foi invalidado (senha alterada ou sessão encerrada pela Meta). Nenhum post sai até reconectar: gere um token novo e mande "conectar instagram <IG_USER_ID> <TOKEN>". Depois: "MIA, reagenda o post #' + p.id + '".' : m.slice(0, 300);
+      await canal.enviar(p.conta_id, p.chat_id, `⚠️ Post #${p.id} (${(p.tema || '').slice(0, 50)}) não publicou às ${p.data.slice(11, 16)}: ${motivo}`).catch(() => {});
+      if (token) { db.prepare("UPDATE posts SET status='erro' WHERE conta_id=? AND status='agendado'").run(p.conta_id); await canal.enviar(p.conta_id, p.chat_id, '⏸️ Pausei os demais posts agendados desta conta até o Instagram ser reconectado (ficam como "erro"; é só reagendar depois).').catch(() => {}); }
+    }
   }
 }
 
@@ -65,7 +75,7 @@ export function iniciarRotinas(canal) {
   cron.schedule('* * * * *', async () => {
     await dispararLembretes(canal);
     await publicarAgendados(canal).catch(e => console.error('publicarAgendados', e.message));
-    const agora = hhmm(agoraLocal());
+    const agora = hhmm();
     for (const u of db.prepare(`SELECT u.chat_id, c.* FROM usuarios u JOIN contas c ON c.id=u.conta_id WHERE u.papel='dono'`).all()) {
       const cfg = configPersona(u.id, 'diretor');
       if (cfg.hora_resumo?.replace('h', ':00').padStart(5, '0') === agora) resumoDoDia(canal, u, u.chat_id).catch(e => console.error('resumo', e.message));
