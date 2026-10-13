@@ -38,7 +38,7 @@ export async function governanca(msg, conta) {
     const g = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(conta.id);
     const ig = db.prepare('SELECT * FROM instagram_auth WHERE conta_id=?').get(conta.id);
     let igStatus = ig ? '✅' : '❌';
-    if (ig) { try { const r = await fetch(`https://graph.instagram.com/me?fields=usernamehttps://graph.facebook.com/v21.0/${ig.ig_user_id}?fields=username&access_token=${ig.token}access_token=${ig.token}`).then(r => r.json()); igStatus = r.error ? `❌ token inválido (${r.error.code}) — gere um novo e mande "conectar instagram <id> <token>"` : `✅ @${r.username}`; } catch { igStatus = '⚠️ não consegui validar'; } }
+    if (ig) { try { const r = await fetch(`https://graph.instagram.com/me?fields=username&access_token=${ig.token}`).then(r => r.json()); igStatus = r.error ? `❌ token inválido (${r.error.code}) — gere um novo e mande "conectar instagram <id> <token>"` : `✅ @${r.username}`; } catch { igStatus = '⚠️ não consegui validar'; } }
     return `Conexões:\n- Google Agenda/Gmail: ${g ? '✅ conectado' : '❌ não conectado (diga "conectar google")'}\n- Google Drive: ${g && /auth\/drive/.test(JSON.parse(g.token_json || '{}').scope || '') ? '✅' : '❌ (diga "conectar google" de novo e aceite o Drive)'}\n- Google Tasks: ${g && /auth\/tasks/.test(JSON.parse(g.token_json || '{}').scope || '') ? '✅' : '❌ (diga "conectar google" de novo e aceite as tarefas)'}\n- Instagram: ${igStatus}\n- AgilFac: ${process.env.AGILFAC_API_URL ? '✅' : '❌'}`;
   }
   if (/^agenda( de)? hoje$|^(o que|oq) (eu )?tenho hoje\??$|^hoje\??$/.test(t)) return agenda(conta, 'hoje', 'Hoje');
