@@ -16,7 +16,7 @@ export function inferirBotoes(texto = '') {
   }
   // 1b) várias perguntas com opções conhecidas no mesmo texto → junta os pares
   const juntos = [];
-  if (/\bmanter\b.*\b[áa]udio\b|\bretirar\b.*\b[áa]udio\b/i.test(t)) juntos.push([{ t: '🔊 Manter áudio', d: 'manter áudio' }, { t: '🔇 Retirar áudio', d: 'retirar áudio' }]);
+  if (/\bmanter\b.*[áa]udio|\bretirar\b.*[áa]udio|\bmanter o som\b/i.test(t)) juntos.push([{ t: '🔊 Manter áudio', d: 'manter áudio' }, { t: '🔇 Retirar áudio', d: 'retirar áudio' }]);
   if (/\breels\b.*\bou\b.*\bstory\b|\bstory\b.*\bou\b.*\breels\b/i.test(t)) juntos.push([{ t: '🎞 Reels', d: 'reels' }, { t: '📣 Story', d: 'story' }]);
   if (/\bagora\b.*\bou\b.*\bagend/i.test(t)) juntos.push([{ t: '📣 Publicar agora', d: 'publicar agora' }, { t: '📅 Agendar', d: 'agendar' }]);
   if (juntos.length >= 2) return juntos;
@@ -25,7 +25,7 @@ export function inferirBotoes(texto = '') {
   // 3) pares conhecidos
   const pares = [
     [/\breels\b.*\bou\b.*\bstory\b|\bstory\b.*\bou\b.*\breels\b/i, [[{ t: '🎞 Reels', d: 'reels' }, { t: '📣 Story', d: 'story' }]]],
-    [/\bmanter\b.*\b[áa]udio\b.*\bou\b.*\bretirar\b|\bretirar\b.*\b[áa]udio\b|\bmanter o som\b/i, [[{ t: '🔊 Manter áudio', d: 'manter áudio' }, { t: '🔇 Retirar áudio', d: 'retirar áudio' }]]],
+    [/\bmanter\b.*[áa]udio.*\bou\b.*\bretirar\b|\bretirar\b.*[áa]udio|\bmanter o som\b/i, [[{ t: '🔊 Manter áudio', d: 'manter áudio' }, { t: '🔇 Retirar áudio', d: 'retirar áudio' }]]],
     [/\bpost\b.*\bou\b.*\bstory\b|\bfeed\b.*\bou\b.*\bstory\b/i, [[{ t: '🖼 Post (feed)', d: 'post' }, { t: '📣 Story', d: 'story' }]]],
     [/\bpublicar agora\b.*\bou\b.*\bagendar\b|\bagora ou agend/i, [[{ t: '📣 Publicar agora', d: 'publicar agora' }, { t: '📅 Agendar', d: 'agendar' }]]],
     [/\brascunho\b.*\bou\b.*\benviar\b|\benviar\b.*\bou\b.*\brascunho\b/i, [[{ t: '✉️ Enviar', d: 'enviar' }, { t: '📝 Rascunho', d: 'rascunho' }]]],
