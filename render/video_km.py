@@ -75,12 +75,17 @@ def editar(video_bytes, ops):
         else:
             if W % 2 or H % 2: filtros.append("scale=trunc(iw/2)*2:trunc(ih/2)*2")
         # 2) letreiro / faixa
-        ov = []; alt_faixa_base = 0
+        ov = []; alt_faixa_base = 0; logo_sobe = 0
         lt = ops.get("letreiro")
         if lt and lt.get("texto"):
-            fp, alt = _png_faixa(lt["texto"], lt.get("palavra_dourada"), W, lt.get("posicao", "base"), lt.get("etiqueta"))
-            if lt.get("posicao", "base") == "base": alt_faixa_base = alt
-            inputs += ["-i", fp]; y = (H - int(H * 0.16) - alt) if lt.get("posicao", "base") == "base" else int(H * 0.13)
+            pos = lt.get("posicao", "base")
+            fp, alt = _png_faixa(lt["texto"], lt.get("palavra_dourada"), W, pos, lt.get("etiqueta"))
+            if pos in ("base", "rodape"): alt_faixa_base = alt
+            if pos == "rodape": y = H - alt; logo_sobe = alt            # colado no rodapé; logo sobe para cima da faixa
+            elif pos == "topo": y = int(H * 0.13)
+            elif pos == "meio": y = (H - alt) // 2
+            else: y = H - int(H * 0.16) - alt                           # base (acima da zona da UI do Instagram)
+            inputs += ["-i", fp]
             en = ""
             if lt.get("inicio") is not None or lt.get("fim") is not None:
                 en = f":enable='between(t,{float(lt.get('inicio') or 0)},{float(lt.get('fim') or 9999)})'"
@@ -97,7 +102,7 @@ def editar(video_bytes, ops):
         # 4) logo KM (regra dura)
         lum = _lum_canto(src, W, H); variante = "branco" if lum < 60 else ("claro" if lum < 140 else "escuro")
         lw = int(W * 0.13); lp, lh = _png_logo(variante, lw); inputs += ["-i", lp]
-        ov.append((idx, f"overlay=W-w-{int(W*0.045)}:H-h-{int(H*0.03)}")); idx += 1
+        ov.append((idx, f"overlay=W-w-{int(W*0.045)}:H-h-{int(H*0.03) + logo_sobe}")); idx += 1
         info["logo"] = {"branco": "branco", "claro": "claro #C8CFD7", "escuro": "escuro #37414E"}[variante]
         # montar filter_complex
         chain = "[0:v]" + (",".join(filtros) if filtros else "null") + "[v0]"; last = "v0"; parts = [chain]
