@@ -50,6 +50,27 @@ async function resumoDoDia(canal, conta, chatId) {
   await canal.enviar(conta.id, chatId, r.response.text());
 }
 
+// Limpeza automática da biblioteca: mídia com mais de RETENCAO_DIAS (padrão 15) some do Cloudinary e do registro.
+// Nunca apaga mídia que ainda está em post agendado/rascunho/erro (vai publicar) — essas só depois de publicadas/canceladas.
+async function limparBiblioteca(canal) {
+  const dias = Number(process.env.BIBLIOTECA_RETENCAO_DIAS || 15);
+  const { apagar } = await import('../integracoes/cloudinary.js');
+  const limite = new Date(Date.now() - dias * 864e5).toISOString().slice(0, 19).replace('T', ' ');
+  const rows = db.prepare("SELECT * FROM biblioteca WHERE criado_em <= ? AND (protegida IS NULL OR protegida=0)").all(limite);
+  const porConta = {};
+  for (const b of rows) {
+    const urls = [b.url, b.marcada_url].filter(Boolean);
+    const emUso = urls.some(u => db.prepare("SELECT 1 FROM posts WHERE conta_id=? AND status IN ('agendado','rascunho','erro') AND midia_url LIKE ?").get(b.conta_id, `%${u}%`));
+    if (emUso) continue;
+    for (const u of urls) { try { await apagar(u); } catch (e) { console.error('[biblioteca] apagar', e.message); } }
+    db.prepare('DELETE FROM biblioteca WHERE id=?').run(b.id);
+    (porConta[b.conta_id] ||= []).push(b);
+  }
+  for (const [contaId, itens] of Object.entries(porConta)) {
+    const u = db.prepare("SELECT chat_id FROM usuarios WHERE conta_id=? AND papel='dono'").get(contaId);
+    if (u) await canal.enviar(contaId, u.chat_id, `🧹 Biblioteca: ${itens.length} mídia(s) com mais de ${dias} dias apagada(s) automaticamente (${itens.filter(x => x.tipo === 'video').length} vídeo(s), ${itens.length - itens.filter(x => x.tipo === 'video').length} imagem/story). Para manter algo, use "guarda #ID" na biblioteca.`).catch(() => {});
+  }
+}
 async function avisarTokenInstagram(canal) {
   const hoje = hojeISO(); const limite = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
   for (const r of db.prepare("SELECT a.conta_id, a.expira_em, u.chat_id FROM instagram_auth a JOIN usuarios u ON u.conta_id=a.conta_id AND u.papel='dono' WHERE a.expira_em IS NOT NULL AND a.expira_em<=?").all(limite)) {
@@ -90,5 +111,6 @@ export function iniciarRotinas(canal) {
   }, { timezone: TZ });
   cron.schedule('0 8 * * *', () => avisarVencimentos(canal), { timezone: TZ });
   cron.schedule('5 8 * * *', () => avisarTokenInstagram(canal), { timezone: TZ });
+  cron.schedule('0 3 * * *', () => limparBiblioteca(canal).catch(e => console.error('limparBiblioteca', e.message)), { timezone: TZ });
   cron.schedule('30 8 * * 1-6', () => cobrarDelegadas().catch(e => console.error('cobrarDelegadas', e.message)), { timezone: TZ });
 }

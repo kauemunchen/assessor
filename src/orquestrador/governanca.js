@@ -82,7 +82,26 @@ export async function governanca(msg, conta) {
     const tipo = /v[íi]deo/.test(t) ? 'video' : /foto/.test(t) ? 'imagem' : /stor/.test(t) ? 'story' : undefined;
     const b = listarBiblioteca(conta.id, { tipo, max: 12 });
     if (!b.length) return 'Biblioteca vazia. Fotos e vídeos que você manda para a MIA ficam guardados aqui.';
-    return `📚 Biblioteca (${b.length} últimas):\n` + b.map(x => `- #${x.id} ${x.tipo}${x.duracao ? ` ${Math.round(x.duracao)}s` : ''} · ${x.descricao || '(sem descrição)'}${x.usada ? ' · usada' : ''} · ${x.em.slice(5, 10).split('-').reverse().join('/')}`).join('\n') + '\n\nPara usar: "MIA, cria um post com a mídia #ID".';
+    const dias = Number(process.env.BIBLIOTECA_RETENCAO_DIAS || 15);
+    const rest = (em) => { const d = dias - Math.floor((Date.now() - new Date(em.replace(' ', 'T') + 'Z')) / 864e5); return d; };
+    return `📚 Biblioteca (${b.length} últimas · apaga sozinha após ${dias} dias):\n` + b.map(x => { const p = db.prepare('SELECT protegida FROM biblioteca WHERE id=?').get(x.id)?.protegida; const r = rest(x.em); return `- #${x.id} ${x.tipo}${x.duracao ? ` ${Math.round(x.duracao)}s` : ''} · ${x.descricao || '(sem descrição)'}${x.usada ? ' · usada' : ''} · ${p ? '🔒 guardada' : r <= 0 ? '⏳ apaga hoje' : `⏳ ${r}d`}`; }).join('\n') + '\n\nUsar: "MIA, cria um post com a mídia #ID" · manter: "guarda #ID" · apagar: "apaga #ID".';
+  }
+  if ((m = t.match(/^(guarda|guardar|proteger?|mant[eé]m|manter)\s+#?(\d+)$/))) {
+    const r = db.prepare('UPDATE biblioteca SET protegida=1 WHERE id=? AND conta_id=?').run(m[2], conta.id);
+    return r.changes ? `🔒 Mídia #${m[2]} guardada — não entra na limpeza automática. Para liberar: "libera #${m[2]}".` : `Não achei a mídia #${m[2]}.`;
+  }
+  if ((m = t.match(/^(libera|liberar|desproteger?)\s+#?(\d+)$/))) {
+    const r = db.prepare('UPDATE biblioteca SET protegida=0 WHERE id=? AND conta_id=?').run(m[2], conta.id);
+    return r.changes ? `Mídia #${m[2]} volta a seguir a limpeza de ${process.env.BIBLIOTECA_RETENCAO_DIAS || 15} dias.` : `Não achei a mídia #${m[2]}.`;
+  }
+  if ((m = t.match(/^(apaga|apagar|exclui|excluir|remove|remover)\s+(?:a\s+)?(?:m[íi]dia\s+)?#?(\d+)(?:\s+da\s+biblioteca)?$/))) {
+    const b = db.prepare('SELECT * FROM biblioteca WHERE id=? AND conta_id=?').get(m[2], conta.id); if (!b) return `Não achei a mídia #${m[2]}.`;
+    const emUso = db.prepare("SELECT id FROM posts WHERE conta_id=? AND status IN ('agendado','rascunho') AND (midia_url LIKE ? OR midia_url LIKE ?)").get(conta.id, `%${b.url}%`, `%${b.marcada_url || '∅'}%`);
+    if (emUso) return `A mídia #${m[2]} está no post #${emUso.id} (${db.prepare('SELECT status FROM posts WHERE id=?').get(emUso.id).status}). Cancele o post antes.`;
+    const { apagar } = await import('../integracoes/cloudinary.js');
+    for (const u of [b.url, b.marcada_url].filter(Boolean)) { try { await apagar(u); } catch {} }
+    db.prepare('DELETE FROM biblioteca WHERE id=?').run(b.id);
+    return `🗑 Mídia #${m[2]} apagada da biblioteca e do armazenamento.`;
   }
   if ((m = msg.texto.trim().match(/^convidar?\s+(.+)$/i))) {
     const { criarConvite } = await import('./equipe.js'); const nome = caso(m[1].trim()); const codigo = criarConvite(conta.id, nome);

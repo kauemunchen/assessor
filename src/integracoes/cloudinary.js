@@ -28,3 +28,15 @@ export async function uploadVideo(bytes, { pasta = 'assessor' } = {}) {
   if (!r.secure_url) throw new Error(`Cloudinary vídeo: ${r.error?.message || JSON.stringify(r)}`);
   return { url: r.secure_url, duracao: r.duration, largura: r.width, altura: r.height, bytes: r.bytes, formato: r.format };
 }
+
+/** Apaga um arquivo do Cloudinary pela URL (image ou video). Ignora se não for do nosso cloud. */
+export async function apagar(url) {
+  if (!configurado() || !url) return false;
+  const m = String(url).match(/res\.cloudinary\.com\/([^/]+)\/(image|video)\/upload\/(?:v\d+\/)?(.+?)\.\w+(?:\?.*)?$/);
+  if (!m || m[1] !== process.env.CLOUDINARY_CLOUD_NAME) return false;
+  const tipo = m[2], publicId = m[3]; const ts = Math.floor(Date.now() / 1000);
+  const assinar = `public_id=${publicId}&timestamp=${ts}${process.env.CLOUDINARY_API_SECRET}`;
+  const fd = new FormData(); fd.append('public_id', publicId); fd.append('timestamp', String(ts)); fd.append('api_key', process.env.CLOUDINARY_API_KEY); fd.append('signature', crypto.createHash('sha1').update(assinar).digest('hex'));
+  const r = await fetch(`https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${tipo}/destroy`, { method: 'POST', body: fd }).then(r => r.json());
+  return r.result === 'ok' || r.result === 'not found';
+}
