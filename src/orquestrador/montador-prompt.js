@@ -31,7 +31,7 @@ export function montarPrompt({ modulo, conta, ativos, texto: mensagem = '' }) {
     memoria: lerMemoria(conta.id, modulo).map(m => `- ${m}`).join('\n') || '- (nada ainda)',
   };
   let texto = base(modulo).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
-  const leve = mensagem && !mensagem.startsWith('[') && (CURTA(mensagem) || !(PRECISA_CONHECIMENTO[modulo] || /./).test(mensagem));
+  const leve = modulo === 'social' && mensagem && !mensagem.startsWith('[') && (CURTA(mensagem) || !PRECISA_CONHECIMENTO.social.test(mensagem)); // redução só na MIA; os demais sempre com expertise completa
   let ref = leve ? '' : conhecimento(MAPA_CONHECIMENTO[modulo]);
   if (leve) texto += '\n\n(Referência de expertise omitida nesta mensagem por ser curta/operacional; se precisar do manual para responder, diga ao dono para repetir o pedido com mais detalhe.)';
   if (ref) {
