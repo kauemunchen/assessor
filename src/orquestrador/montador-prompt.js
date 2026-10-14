@@ -8,7 +8,18 @@ const conhecimento = (n) => { const p = path.resolve(`src/conhecimento/${n}.md`)
 const MAPA_CONHECIMENTO = { diretor: 'metodo-km', secretaria: 'secretariado', producao: 'agilfac-regras', documentos: 'taxonomia-docs', financeiro: 'plano-de-contas', social: 'estrategia-conteudo' };
 
 /** Prompt final = base da persona + ajustes do dono + conhecimento + memória. Ferramentas e regras duras entram por código. */
-export function montarPrompt({ modulo, conta, ativos }) {
+// Conhecimento pesado só entra quando a mensagem precisa dele (gera conteúdo/analisa). Perguntas curtas, confirmações e escolhas numéricas não carregam.
+const PRECISA_CONHECIMENTO = {
+  social: /\b(legenda|carrossel|post|reels?|story|stories|frase|arte|hashtag|pilar|identidade|manual|marca|conte[úu]do|estrat[ée]gia|calend[áa]rio|s[ée]rie|cta|tema|ideia|planeja|cria|gera|monta|escreve|texto)\b/i,
+  diretor: /\b(m[ée]todo|estrat[ée]gia|prioridade|an[áa]lise|decis|processo|indicador|meta|resultado|o que voc[êe] faria|conselho|plano)\b/i,
+  financeiro: /\b(dre|plano de contas|categoria|classific|an[áa]lise|margem|resultado|relat[óo]rio)\b/i,
+  documentos: /\b(tipo|pasta|classific|guarda|prazo|validade|cadastro|doss)/i,
+  secretaria: /\b(e-?mail|redig|escreve|resposta|rascunho|resumo|prioriza)\b/i,
+  producao: /./,
+};
+const CURTA = (t = '') => t.trim().length < 25 || /^(sim|n[ãa]o|ok|\d{1,2}|[a-e]|aprov|confirm|pode|cancela|essa|esse|isso|a primeira|a segunda|prefiro|troca|muda|agenda|publica|guarda|reels|story|foto|v[íi]deo|agora|hoje|amanh[ãa])\b/i.test(t.trim());
+
+export function montarPrompt({ modulo, conta, ativos, texto: mensagem = '' }) {
   const cfg = configPersona(conta.id, modulo);
   const vars = {
     nome: cfg.nome, dono: conta.nome_dono, tratamento: cfg.tratamento, tom: cfg.tom, tamanho: cfg.tamanho,
@@ -20,7 +31,9 @@ export function montarPrompt({ modulo, conta, ativos }) {
     memoria: lerMemoria(conta.id, modulo).map(m => `- ${m}`).join('\n') || '- (nada ainda)',
   };
   let texto = base(modulo).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
-  let ref = conhecimento(MAPA_CONHECIMENTO[modulo]);
+  const leve = mensagem && !mensagem.startsWith('[') && (CURTA(mensagem) || !(PRECISA_CONHECIMENTO[modulo] || /./).test(mensagem));
+  let ref = leve ? '' : conhecimento(MAPA_CONHECIMENTO[modulo]);
+  if (leve) texto += '\n\n(Referência de expertise omitida nesta mensagem por ser curta/operacional; se precisar do manual para responder, diga ao dono para repetir o pedido com mais detalhe.)';
   if (ref) {
     // se o arquivo tiver um bloco "## Regras operacionais", usa só dali para baixo (resumo executável); senão corta em 7000 chars
     const i = ref.indexOf('## Regras operacionais'); if (i > 0) ref = ref.slice(i);
