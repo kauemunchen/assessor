@@ -126,7 +126,12 @@ export async function tratarMensagem(msg, canal) {
     try { const resposta = await responder({ prompt, conta, modulo: pend.modulo, msg: { ...msg, texto }, ativos: ativosC }); await memoria.registrarInteracao(conta.id, pend.modulo, { ...msg, texto: 'sim (confirmação)' }, resposta); return resposta; }
     catch (e) { return resultados.map(r => r.ok ? `✅ ${r.acao}` : `❌ ${r.acao}: ${r.erro}`).join('\n'); }
   }
-  if (pend && /^(n[aã]o|cancela|deixa)\b/i.test(msg.texto.trim())) { db.prepare('DELETE FROM pendencias WHERE id=?').run(pend.id); return 'Cancelado.'; }
+  if (pend && /^(n[aã]o|cancela|deixa)\b/i.test(msg.texto.trim())) {
+    db.prepare('DELETE FROM pendencias WHERE id=?').run(pend.id);
+    const acoes = pend.ferramenta === '__lote__' ? JSON.parse(pend.args) : [{ name: pend.ferramenta, args: JSON.parse(pend.args) }];
+    const { descreverAcao } = await import('./ia.js');
+    return `👍 Ok, não fiz nada — descartei: ${acoes.map(a => descreverAcao(a)).join('; ')}. Tudo continua como estava.`;
+  }
 
   const gov = await governanca(msg, conta); if (gov) return gov;
 
