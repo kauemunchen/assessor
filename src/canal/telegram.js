@@ -6,12 +6,14 @@ export class TelegramCanal {
     this.app.post('/webhook/telegram', async (req, res) => {
       res.sendStatus(200);
       const m = req.body.message; if (!m) return;
-      console.log(`[telegram] ${m.chat.id} ${m.voice ? 'voice' : m.audio ? 'audio' : m.photo ? 'photo' : m.document ? 'doc' : 'text'}`);
+      const vid = m.video || m.video_note || m.animation || (m.document && /^video\//.test(m.document.mime_type || '') ? m.document : null);
+      console.log(`[telegram] ${m.chat.id} ${m.voice ? 'voice' : m.audio ? 'audio' : vid ? 'video' : m.photo ? 'photo' : m.document ? 'doc' : 'text'}`);
       await fn({
         conta: null, chatId: String(m.chat.id), remetente: String(m.from.id),
-        tipo: (m.voice || m.audio) ? 'audio' : m.photo ? 'imagem' : m.document ? 'arquivo' : 'texto',
+        tipo: (m.voice || m.audio) ? 'audio' : vid ? 'video' : m.photo ? 'imagem' : m.document ? 'arquivo' : 'texto',
         texto: m.text || m.caption || '',
-        midia: m.voice ? { ref: m.voice.file_id, mime: 'audio/ogg' }
+        midia: vid ? { ref: vid.file_id, mime: vid.mime_type || 'video/mp4', nome: vid.file_name, tamanho: vid.file_size, duracao: vid.duration }
+             : m.voice ? { ref: m.voice.file_id, mime: 'audio/ogg' }
              : m.audio ? { ref: m.audio.file_id, mime: m.audio.mime_type || 'audio/mpeg' }
              : m.photo ? { ref: m.photo.at(-1).file_id, mime: 'image/jpeg', tamanho: m.photo.at(-1).file_size }
              : m.document ? { ref: m.document.file_id, mime: m.document.mime_type, nome: m.document.file_name, tamanho: m.document.file_size } : null,
@@ -24,6 +26,11 @@ export class TelegramCanal {
       const media = resposta.fotos.slice(0, 10).map((u, i) => ({ type: 'photo', media: u, caption: i === 0 ? semMarkdown(resposta.texto || '').slice(0, 1000) : undefined }));
       const r = await fetch(`${API}/bot${this.token}/sendMediaGroup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, media }) }).then(r => r.json());
       if (!r.ok) console.error('[telegram] sendMediaGroup falhou:', r.description);
+      return;
+    }
+    if (resposta && typeof resposta === 'object' && resposta.video) {
+      const r = await fetch(`${API}/bot${this.token}/sendVideo`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, video: resposta.video, caption: semMarkdown(resposta.texto || '').slice(0, 1000), supports_streaming: true }) }).then(r => r.json());
+      if (!r.ok) { console.error('[telegram] sendVideo falhou:', r.description); await this._post({ chat_id: chatId, text: semMarkdown((resposta.texto || '') + '\n' + resposta.video) }); }
       return;
     }
     if (resposta && typeof resposta === 'object' && resposta.foto) {

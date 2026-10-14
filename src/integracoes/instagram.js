@@ -1,14 +1,27 @@
 // Instagram Graph API + fal.ai. Portado de telegram-instagram-bot/bot.py (publicar_ig, gerar_imagem_fal).
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+export const ehVideo = (url = '') => /\.(mp4|mov|m4v|webm)(\?|$)/i.test(url) || /\/video\/upload\//.test(url);
+/** Espera o container de mídia ficar pronto (vídeos levam de 10 s a alguns minutos). */
+async function aguardarContainer(id, token, maxMs = 240000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    const s = await fetch(`https://graph.instagram.com/${id}?fields=status_code,status&access_token=${token}`).then(r => r.json()).catch(() => ({}));
+    if (s.status_code === 'FINISHED') return;
+    if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') throw new Error(`Instagram recusou a mídia: ${s.status || s.status_code}. Para vídeo: MP4 (H.264/AAC), 9:16 ou 4:5, até 100 MB para Story (≤60 s) e Reels (3 s a 15 min).`);
+    await sleep(5000);
+  }
+  throw new Error('Instagram demorou demais para processar a mídia. Tente de novo em alguns minutos.');
+}
 export async function publicar({ igUserId, token, legenda, url, tipo = 'imagem' }) {
   const params = new URLSearchParams({ access_token: token });
-  if (tipo === 'story') { params.set('media_type', 'STORIES'); params.set('image_url', url); }
-  else if (tipo === 'reels') { params.set('media_type', 'REELS'); params.set('video_url', url); params.set('caption', legenda); }
+  const video = ehVideo(url);
+  if (tipo === 'story') { params.set('media_type', 'STORIES'); params.set(video ? 'video_url' : 'image_url', url); }
+  else if (tipo === 'reels' || video) { params.set('media_type', 'REELS'); params.set('video_url', url); params.set('caption', legenda); params.set('share_to_feed', 'true'); }
   else { params.set('image_url', url); params.set('caption', legenda); }
   const c = await fetch(`https://graph.instagram.com/${igUserId}/media`, { method: 'POST', body: params }).then(r => r.json());
   if (!c.id) throw new Error(`Instagram: ${JSON.stringify(c)}`);
-  await sleep(5000);
+  await aguardarContainer(c.id, token, video ? 300000 : 60000);
   const p = await fetch(`https://graph.instagram.com/${igUserId}/media_publish`, { method: 'POST', body: new URLSearchParams({ creation_id: c.id, access_token: token }) }).then(r => r.json());
   if (!p.id) throw new Error(`Instagram publish: ${JSON.stringify(p)}`);
   return p.id;

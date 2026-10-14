@@ -19,7 +19,7 @@ export function ferramentas(_conta) {
     { name: 'gerar_carrossel', description: 'Carrossel do manual KM (6–8 slides, 3:4): capa (etiqueta + título ≤8 palavras com UMA palavra dourada + subtítulo) → problema → 3–5 conteúdo → resumo → CTA. IA escreve, serviço renderiza em Poppins/fundo #37414E. Retorna URLs + textos. Depois criar_post(formato=carrossel, midias_urls). template=km usa o visual antigo.', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa' }, qtd_conteudo: { type: 'NUMBER', description: 'slides de conteúdo, 3 a 5 (padrão 3)' }, instrucoes: { type: 'STRING' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' } }, required: ['tema', 'pilar'] } },
     { name: 'aplicar_marca', description: 'Aplica o logo KM como marca d\'água numa imagem (URL) escolhendo automaticamente a cor pelo fundo (branco em fundo escuro, azul-cinza em fundo claro, com sombra se precisar). Use em toda foto enviada pelo dono antes de propor o post.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, posicao: { type: 'STRING', description: 'inferior-direito (padrão) | inferior-esquerdo | superior-direito | superior-esquerdo' }, assinatura: { type: 'BOOLEAN', description: 'escrever @kauemunchen sob o logo (padrão false — só se o dono pedir)' } }, required: ['url'] } },
     { name: 'listar_paletas', description: 'Paletas de cor disponíveis para artes KM', parameters: { type: 'OBJECT', properties: {} } },
-    { name: 'criar_post', description: 'Salva post no calendário editorial com legenda/hashtags/mídia aprovados. status: rascunho ou agendado (com data).', parameters: { type: 'OBJECT', properties: { formato: { type: 'STRING' }, tema: { type: 'STRING' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' }, description: 'slides do carrossel, em ordem' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM para agendar; vazio = rascunho' }, pilar: { type: 'STRING' } }, required: ['formato', 'legenda'] } },
+    { name: 'criar_post', description: 'Salva post no calendário editorial com legenda/hashtags/mídia aprovados. formato: post (foto) | carrossel | reels (vídeo, com legenda) | story (foto ou vídeo ≤60 s, sem legenda). midia_url pode ser imagem ou vídeo (URL do Cloudinary vinda do upload). status: rascunho ou agendado (com data).', parameters: { type: 'OBJECT', properties: { formato: { type: 'STRING' }, tema: { type: 'STRING' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' }, description: 'slides do carrossel, em ordem' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM para agendar; vazio = rascunho' }, pilar: { type: 'STRING' } }, required: ['formato', 'legenda'] } },
     { name: 'agendar_post', description: 'Agenda um post salvo (rascunho) para uma data/hora; cria o evento no marcador Social Media da agenda. Use quando o dono aprovar e disser quando.', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM' } }, required: ['post_id', 'data'] } },
     { name: 'atualizar_post', description: 'Altera legenda, hashtags, mídia, tema, pilar ou formato de um post salvo', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' } }, tema: { type: 'STRING' }, pilar: { type: 'STRING' }, formato: { type: 'STRING' } }, required: ['post_id'] } },
     { name: 'listar_calendario', description: 'Lista a programação de posts (rascunho, agendado, publicado) num período; use para "o que temos programado"', parameters: { type: 'OBJECT', properties: { inicio: { type: 'STRING' }, fim: { type: 'STRING' }, status: { type: 'STRING' } } } },
@@ -150,7 +150,7 @@ export async function publicarPost(contaId, postId) {
   if (!cred) throw new Error('Instagram não conectado. Diga "conectar instagram".');
   const p = db.prepare('SELECT * FROM posts WHERE id=? AND conta_id=?').get(postId, contaId);
   if (!p) throw new Error(`Post #${postId} não existe.`);
-  if (!p.midia_url && p.formato !== 'story') throw new Error('Post sem imagem. Gere ou envie uma imagem antes.');
+  if (!p.midia_url) throw new Error('Post sem mídia. Gere ou envie uma imagem/vídeo antes.');
   const legenda = [p.legenda, p.hashtags].filter(Boolean).join('\n\n');
   let id;
   if (p.midia_url?.startsWith('[')) id = await ig.publicarCarrossel({ igUserId: cred.ig_user_id, token: cred.token, legenda, urls: JSON.parse(p.midia_url) });
@@ -160,6 +160,17 @@ export async function publicarPost(contaId, postId) {
   return { ig_media_id: id, post_id: p.id };
 }
 
+// Vídeo enviado pelo dono (Telegram ou Drive) → Cloudinary → URL pública para Reels/Story
+export async function guardarVideoEnviado(contaId, bytes) {
+  const v = await cdn.uploadVideo(bytes, { pasta: `assessor/${contaId}/videos` });
+  db.prepare('INSERT INTO biblioteca (conta_id, url, tipo) VALUES (?,?,?)').run(contaId, v.url, 'video');
+  const prop = v.largura && v.altura ? (v.largura / v.altura).toFixed(2) : null;
+  const avisos = [];
+  if (v.duracao > 60) avisos.push('acima de 60 s: serve para Reels, não para Story');
+  if (prop && Math.abs(prop - 0.5625) > 0.05) avisos.push(`proporção ${v.largura}x${v.altura} (ideal 9:16 = 1080x1920 para Reels/Story)`);
+  if (v.bytes > 100 * 1024 * 1024) avisos.push('acima de 100 MB: o Instagram pode recusar');
+  return { ...v, avisos };
+}
 // Upload de imagem enviada pelo dono no chat → URL pública (vira mídia do próximo post)
 export async function guardarImagemEnviada(contaId, bytes) {
   const [original, m] = await Promise.all([

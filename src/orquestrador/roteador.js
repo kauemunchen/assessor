@@ -26,6 +26,20 @@ export async function tratarMensagem(msg, canal) {
   const ativosAgora = modulosAtivos(conta.id);
   const DOC_RX = /\b(guarda|arquiva|arquivo|documento|contrato|nota|boleto|certid[ãa]o|alvar[áa]|ap[óo]lice|comprovante|recibo|cadastro|rg|cnh|cpf|cnpj|procura[çc][ãa]o|holerite|extrato)\b/i;
   const SOCIAL_RX = /\b(post|legenda|instagram|story|stories|reels?|carrossel|marca d.?[áa]gua|publica)\b/i;
+  if (msg.tipo === 'video') {
+    if (!ativosAgora.includes('social')) msg.texto = (msg.texto ? msg.texto + '\n' : '') + '[vídeo recebido; para publicar no Instagram, ligue a MIA: "ativa social"]';
+    else if (msg.midia?.tamanho > 20 * 1024 * 1024 && !process.env.TELEGRAM_API_BASE) return `🎬 Esse vídeo tem ${(msg.midia.tamanho / 1048576).toFixed(0)} MB e o Telegram só me entrega até 20 MB. Suba no Google Drive e me mande o link aqui dizendo "MIA, esse é o reels de quinta" — eu baixo, hospedo e agendo igual.`;
+    else {
+      await canal.enviar(msg.conta, msg.chatId, '🎬 Recebi o vídeo, hospedando… (30 a 60 s)');
+      try {
+        const bytes = await canal.baixarMidia(msg.midia.ref);
+        const { guardarVideoEnviado } = await import('../ferramentas/social.js');
+        const v = await guardarVideoEnviado(conta.id, bytes);
+        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Vídeo enviado pelo dono, já hospedado: ${v.url} (${Math.round(v.duracao || 0)} s, ${v.largura}x${v.altura}${v.avisos.length ? '; atenção: ' + v.avisos.join('; ') : ''}). Use como midia_url. Se o dono não disse, pergunte em uma linha: Reels (com legenda) ou Story (sem legenda)? e quando. Se disse, salve com criar_post (formato reels|story) já com a data e confirme. Não gere imagem nem marca d'água para vídeo.]`;
+      } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[vídeo recebido, mas não consegui hospedar: ${e.message}]`; }
+      msg.forcarModulo = 'social';
+    }
+  }
   if (msg.tipo === 'imagem' || msg.tipo === 'arquivo') {
     const temDoc = ativosAgora.includes('documentos'), temSocial = ativosAgora.includes('social') && msg.tipo === 'imagem';
     let destino = temDoc && !temSocial ? 'documentos' : temSocial && !temDoc ? 'social' : null;
@@ -61,7 +75,21 @@ export async function tratarMensagem(msg, canal) {
     } else msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[${msg.tipo === 'imagem' ? 'imagem' : 'arquivo'} recebido; para eu guardar, ligue o módulo Documentos ("ativa documentos").]`;
   }
   // Link do Google Drive em texto → módulo Documentos registra/move
-  if (msg.tipo === 'texto' && ativosAgora.includes('documentos') && /drive\.google\.com\/(file|open|uc)|docs\.google\.com\/(document|presentation)\/d\//.test(msg.texto) && !/^documentos pasta/i.test(msg.texto.trim())) {
+  if (msg.tipo === 'texto' && ativosAgora.includes('social') && /drive\.google\.com\/(file|open|uc)/.test(msg.texto) && !/^documentos pasta/i.test(msg.texto.trim())) {
+    // Link do Drive: se for vídeo (ou imagem com pedido de post/story), é mídia para a MIA
+    try {
+      const drive = await import('../integracoes/google-drive.js'); const id = drive.extrairId(msg.texto); const meta = id ? await drive.metadados(conta.id, id) : null;
+      const social = meta && (/^video\//.test(meta.mime) || (/^image\//.test(meta.mime) && (SOCIAL_RX.test(msg.texto) || !ativosAgora.includes('documentos'))));
+      if (social) {
+        await canal.enviar(msg.conta, msg.chatId, `🎬 Baixando "${meta.nome}" do Drive e hospedando…`);
+        const bytes = await drive.baixar(conta.id, id); const soc = await import('../ferramentas/social.js');
+        if (/^video\//.test(meta.mime)) { const v = await soc.guardarVideoEnviado(conta.id, bytes); msg.texto += `\n[Vídeo do Drive já hospedado: ${v.url} (${Math.round(v.duracao || 0)} s, ${v.largura}x${v.altura}${v.avisos.length ? '; atenção: ' + v.avisos.join('; ') : ''}). Use como midia_url. Pergunte Reels ou Story e quando, se o dono não disse; senão salve com criar_post e confirme.]`; }
+        else { const r = await soc.guardarImagemEnviada(conta.id, bytes); msg.texto += `\n[Imagem do Drive hospedada. Original: ${r.original}. Com marca d'água: ${r.marcada || 'falhou'}. Use a marcada como midia_url (story ou post, conforme o dono).]`; }
+        msg.forcarModulo = 'social'; msg.linkTratado = true;
+      }
+    } catch (e) { console.error('[drive→social]', e.message); }
+  }
+  if (msg.tipo === 'texto' && !msg.linkTratado && ativosAgora.includes('documentos') && /drive\.google\.com\/(file|open|uc)|docs\.google\.com\/(document|presentation)\/d\//.test(msg.texto) && !/^documentos pasta/i.test(msg.texto.trim())) {
     await canal.enviar(msg.conta, msg.chatId, '📂 Lendo o arquivo do Drive e arquivando…');
     try { const { receberLinkDrive } = await import('../ferramentas/documentos.js'); const doc = await receberLinkDrive(conta, msg.texto);
       msg.texto += `\n[Arquivo do Drive JÁ MOVIDO para a pasta certa e registrado. Dados: ${JSON.stringify(doc)}. Confirme em até 3 linhas (o que é, pasta, link, vigência se houver). Não invente dados.]`; }
@@ -125,7 +153,9 @@ export async function tratarMensagem(msg, canal) {
     const todas = [...resposta.matchAll(/https?:\/\/res\.cloudinary\.com\/\S+?\.(?:jpg|jpeg|png|webp)/gi)].map(x => x[0]);
     if (todas.length > 1) { const txt = todas.reduce((t, u) => t.replace(u, ''), resposta).replace(/^\s*[-•]\s*[^\n:]{0,30}:\s*$/gm, '').replace(/^\s*Pr[ée]via[^\n]*:\s*$/gmi, '').replace(/\n{3,}/g, '\n\n').trim(); return { fotos: [...new Set(todas)], texto: txt }; }
     const m = resposta.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)(?:\?\S*)?|https?:\/\/(?:[\w.-]*fal\.media|res\.cloudinary\.com)\/\S+/i);
-    if (m) resposta = { foto: m[0], texto: resposta.replace(m[0], '').trim() };
+    const ehVideo = m && (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(m[0]) || /\/video\/upload\//.test(m[0]));
+    if (m && !ehVideo) resposta = { foto: m[0], texto: resposta.replace(m[0], '').trim() };
+    else if (m && ehVideo) resposta = { video: m[0], texto: resposta.replace(m[0], '').trim() };
   }
   return resposta;
 }
