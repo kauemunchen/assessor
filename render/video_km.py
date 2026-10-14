@@ -117,7 +117,8 @@ def editar(video_bytes, ops):
         cmd += inputs
         if ct and ct.get("duracao"): cmd += ["-t", str(float(ct["duracao"]))]
         cmd += ["-filter_complex", fc, "-map", f"[{last}]"]
-        if p["audio"]: cmd += ["-map", "0:a?", "-c:a", "aac", "-b:a", "128k"]
+        if p["audio"] and not ops.get("sem_audio"): cmd += ["-map", "0:a?", "-c:a", "aac", "-b:a", "128k"]
+        else: cmd += ["-an"]; info["audio"] = "removido" if p["audio"] else "sem áudio na origem"
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-r", "30", out]
         _run(cmd)
         data = open(out, "rb").read(); p2 = probe(out)

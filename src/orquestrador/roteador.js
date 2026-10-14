@@ -46,7 +46,7 @@ export async function tratarMensagem(msg, canal) {
         const bytes = await canal.baixarMidia(msg.midia.ref);
         const { guardarVideoEnviado } = await import('../ferramentas/social.js');
         const v = await guardarVideoEnviado(conta.id, bytes);
-        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Vídeo enviado pelo dono, já hospedado: ${v.url} (${Math.round(v.duracao || 0)} s, ${v.largura}x${v.altura}${v.avisos.length ? '; atenção: ' + v.avisos.join('; ') : ''}). Use como midia_url. Se o dono não disse, pergunte em uma linha: Reels (com legenda) ou Story (sem legenda)? e quando. Se disse, salve com criar_post (formato reels|story) já com a data e confirme. Não gere imagem nem marca d'água para vídeo.]`;
+        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Vídeo enviado pelo dono, já hospedado: ${v.url} (${Math.round(v.duracao || 0)} s, ${v.largura}x${v.altura}${v.avisos.length ? '; atenção: ' + v.avisos.join('; ') : ''}). Use como midia_url. PRIMEIRO pergunte, em uma linha, as três coisas que faltarem: manter ou retirar o áudio? Reels (com legenda) ou Story? quando? Quando ele responder "sem áudio/retirar", chame remover_audio(url) e use a URL devolvida. Depois salve com criar_post (formato reels|story) com a data e confirme. Não gere imagem nem marca d'água para vídeo (o sistema aplica o logo sozinho).]`;
       } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[vídeo recebido, mas não consegui hospedar: ${e.message}]`; }
       msg.forcarModulo = 'social';
     }

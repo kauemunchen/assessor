@@ -48,13 +48,15 @@ export function iniciar(chatId, { fotoBytes, videoUrl, videoBytes, texto = '' } 
   const e = { t: Date.now(), passo: 'base', dados: {}, baseEsperada: /v[íi]deo/i.test(texto) ? 'video' : /foto/i.test(texto) ? 'foto' : null };
   if (fotoBytes) { e.base = 'foto'; e.foto = fotoBytes; e.passo = 'modelo'; }
   else if (videoUrl) { e.base = 'video'; e.videoUrl = videoUrl; e.passo = 'modelo'; }
-  else if (videoBytes) { e.base = 'video'; e.video = videoBytes; e.passo = 'modelo'; }
+  else if (videoBytes) { e.base = 'video'; e.video = videoBytes; e.passo = 'audio'; }
   sessoes.set(chatId, e);
+  if (e.passo === 'audio') return perguntaAudio(e);
   if (e.passo === 'base' && e.baseEsperada === 'video') return '🎬 Modo edição de vídeo para Story. Manda o vídeo (até 20 MB) ou o link dele no Drive.';
   if (e.passo === 'base' && e.baseEsperada === 'foto') return '🎬 Modo edição de foto para Story. Manda a foto.';
   if (e.passo === 'base') return '🎬 Modo edição de Story. Qual é a base?\n1️⃣ Foto\n2️⃣ Vídeo\n3️⃣ Só texto (fundo KM)\n\n(ou mande a foto/vídeo agora · "cancela" sai)';
   return perguntaModelo(e);
 }
+const perguntaAudio = (e) => `Vídeo recebido${e.vinfo ? ` (${e.vinfo.w}x${e.vinfo.h}, ${Math.round(e.vinfo.dur)} s${e.vinfo.audio === false ? ', sem áudio' : ''})` : ''}. Manter o som?\n1️⃣ Manter áudio\n2️⃣ Retirar áudio`;
 function perguntaModelo(e) {
   if (e.base === 'foto') return `Foto recebida. Modelo:\n${lista(MODELOS_FOTO)}\n\nResponda o número.`;
   if (e.base === 'texto') return `Modelo de story em texto:\n${lista(MODELOS_TEXTO)}\n\nResponda o número.`;
@@ -74,16 +76,22 @@ async function _tratar(e, msg, conta, canal) {
   if (msg.tipo === 'imagem' && msg.midia) { e.base = 'foto'; e.foto = Buffer.from(await canal.baixarMidia(msg.midia.ref)); e.passo = 'modelo'; return perguntaModelo(e); }
   if (msg.tipo === 'video' && msg.midia) {
     if (msg.midia.tamanho > 20 * 1024 * 1024 && !process.env.TELEGRAM_API_BASE) return 'Vídeo acima de 20 MB: suba no Drive e cole o link aqui dentro do modo edição.';
-    e.base = 'video'; e.video = Buffer.from(await canal.baixarMidia(msg.midia.ref)); e.passo = 'modelo';
+    e.base = 'video'; e.video = Buffer.from(await canal.baixarMidia(msg.midia.ref)); e.passo = 'audio';
     try { e.vinfo = await render.infoVideo(e.video); } catch {}
-    return perguntaModelo(e);
+    return perguntaAudio(e);
   }
   if (msg.tipo === 'texto' && /drive\.google\.com\/(file|open|uc)/.test(t) && (e.passo === 'base' || e.base === 'video')) {
     const drive = await import('../integracoes/google-drive.js'); const id = drive.extrairId(t); const meta = await drive.metadados(conta.id, id);
     if (!/^video\//.test(meta.mime)) return 'Esse link não é de vídeo.';
-    e.base = 'video'; e.video = Buffer.from(await drive.baixar(conta.id, id)); e.passo = 'modelo';
+    e.base = 'video'; e.video = Buffer.from(await drive.baixar(conta.id, id)); e.passo = 'audio';
     try { e.vinfo = await render.infoVideo(e.video); } catch {}
-    return perguntaModelo(e);
+    return perguntaAudio(e);
+  }
+  if (e.passo === 'audio') {
+    if (/^1\b|mant[eé]m|manter|com (som|[áa]udio)/i.test(t)) e.semAudio = false;
+    else if (/^2\b|retira|tira|remove|sem (som|[áa]udio)|mudo/i.test(t)) e.semAudio = true;
+    else return 'Responda 1 (manter áudio) ou 2 (retirar áudio).';
+    e.passo = 'modelo'; return perguntaModelo(e);
   }
 
   if (e.passo === 'base') {
@@ -128,6 +136,8 @@ async function _tratar(e, msg, conta, canal) {
   }
   if (e.passo === 'previa') {
     if (/^(sim|aprov|ok|boa|fechou|perfeit)/i.test(t)) { e.passo = 'destino'; return e.base === 'video' ? 'Fechado. Story ou Reels? E o que faço?\n1️⃣ Publicar agora\n2️⃣ Agendar (diga dia e hora)\n3️⃣ Guardar na biblioteca\n(ex.: "story 1", "reels 2 amanhã 19h")' : 'Fechado. O que faço?\n1️⃣ Publicar agora\n2️⃣ Agendar (diga dia e hora)\n3️⃣ Guardar na biblioteca'; }
+    if (e.base === 'video' && /\b(sem|tira|retira|remove)\b.*\b(som|[áa]udio)\b|\bmudo\b/i.test(t)) { e.semAudio = true; return gerar(e, msg.chatId, conta); }
+    if (e.base === 'video' && /\b(com|mant[eé]m|manter|volta)\b.*\b(som|[áa]udio)\b/i.test(t)) { e.semAudio = false; return gerar(e, msg.chatId, conta); }
     if (e.base === 'video' && /rodap[ée]|embaixo|no p[ée]|topo|em cima|no meio|centro|mais (alto|baixo)/i.test(t)) {
       e.dados.posicao = /rodap[ée]|embaixo|no p[ée]|mais baixo/i.test(t) ? 'rodape' : /topo|em cima|mais alto/i.test(t) ? 'topo' : 'meio';
       if (!e.ops) e.ops = {}; e.ops.letreiro = true; return gerar(e, msg.chatId, conta);
@@ -210,8 +220,9 @@ async function gerar(e, chatId, conta) {
   if (e.base === 'foto' && !e.foto) { e.passo = 'modelo'; return 'Perdi a foto (reinício do sistema). Manda ela de novo, por favor.'; }
   if (e.base === 'video') {
     if (!e.video) { e.passo = 'base'; return 'Perdi o vídeo (reinício do sistema). Manda ele de novo, por favor.'; }
-    const ops = { enquadrar: e.ops.enquadrar || null, cortar: e.ops.corte || null, letreiro: e.ops.letreiro ? { texto: d.texto, palavra_dourada: d.palavra_dourada, posicao: d.posicao || 'base' } : null, legendas: null };
-    if (e.ops.legenda) {
+    const ops = { sem_audio: !!e.semAudio, enquadrar: e.ops.enquadrar || null, cortar: e.ops.corte || null, letreiro: e.ops.letreiro ? { texto: d.texto, palavra_dourada: d.palavra_dourada, posicao: d.posicao || 'base' } : null, legendas: null };
+    if (e.ops.legenda && e.semAudio) d.aviso = 'legenda automática ignorada: você escolheu retirar o áudio';
+    if (e.ops.legenda && !e.semAudio) {
       try { const audio = await render.audioDoVideo(e.video); const dur = e.vinfo?.dur || 60; ops.legendas = await gemini.transcreverComTempos(audio, 'audio/mpeg', dur); if (ops.corte) ops.legendas = ops.legendas.map(x => ({ ...x, inicio: x.inicio - ops.corte.inicio, fim: x.fim - ops.corte.inicio })).filter(x => x.fim > 0); if (!ops.legendas.length) d.aviso = 'não detectei fala para legendar'; }
       catch (err) { d.aviso = `legenda automática falhou: ${err.message}`; }
     }
@@ -220,7 +231,7 @@ async function gerar(e, chatId, conta) {
     e.url = v.url; e.vinfoOut = r.info;
     db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem, descricao, largura, altura, duracao) VALUES (?,?,?,?,?,?,?,?,?)').run(conta.id, v.url, v.url, 'video', 'edicao:video', (d.texto || 'Vídeo editado').slice(0, 120), v.largura || null, v.altura || null, v.duracao || null);
     e.passo = 'previa';
-    return { video: e.url, texto: `Prévia · ${r.info.saida || ''} · logo ${r.info.logo}${r.info.legendas ? ` · ${r.info.legendas} legendas` : ''}${d.aviso ? `\n⚠️ ${d.aviso}` : ''}\n\nAprova? (sim · "troca o texto para …" · "no rodapé" / "no topo" / "no meio" · "cancela")` };
+    return { video: e.url, texto: `Prévia · ${r.info.saida || ''} · ${e.semAudio ? 'sem áudio' : 'com áudio'} · logo ${r.info.logo}${r.info.legendas ? ` · ${r.info.legendas} legendas` : ''}${d.aviso ? `\n⚠️ ${d.aviso}` : ''}\n\nAprova? (sim · "troca o texto para …" · "no rodapé" / "no topo" / "no meio" · "cancela")` };
   }
   if (e.modelo.id === 'so_marca') { out = await render.marcaDagua(e.foto); }
   else {
