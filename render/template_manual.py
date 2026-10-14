@@ -40,7 +40,7 @@ def wrap(draw, texto, font, max_w):
 
 def titulo_destacado(draw, texto, palavra, font, x, y, max_w, lh, cor=BRANCO):
     """Desenha título quebrando linhas; a palavra-chave (primeira ocorrência) sai em dourado."""
-    alvo = (palavra or "").strip().lower()
+    alvo = re.sub(r"[^\wÀ-ÿ]", "", (palavra or "")).strip().lower()
     feito = False
     for linha in wrap(draw, texto, font, max_w):
         cx = x

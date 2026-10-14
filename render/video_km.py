@@ -43,10 +43,11 @@ def _png_logo(variante, largura):
 
 def _png_faixa(texto, palavra, W, posicao="base", etiqueta=None):
     """Faixa #37414E translúcida com texto (padrão KM) como PNG RGBA de largura W."""
-    f = fonte("Bold", int(W * 0.05)); tmp = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
-    M = int(W * 0.067); linhas = wrap(tmp, texto, f, W - 2 * M - 20); lh = int(W * 0.061)
-    alt = 48 + (70 if etiqueta else 0) + len(linhas) * lh + 48
-    img = Image.new("RGBA", (W, alt), (*h2r(PRIM), 225)); dr = ImageDraw.Draw(img); y = 40
+    # Faixa enxuta: altura proporcional ao texto (padding ~0.6 linha), fonte 4.6% da largura
+    f = fonte("Bold", int(W * 0.046)); tmp = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
+    M = int(W * 0.067); linhas = wrap(tmp, texto, f, W - 2 * M - 20); lh = int(W * 0.056); pad = int(lh * 0.6)
+    alt = pad + (60 if etiqueta else 0) + len(linhas) * lh + pad
+    img = Image.new("RGBA", (W, alt), (*h2r(PRIM), 215)); dr = ImageDraw.Draw(img); y = pad
     if etiqueta:
         dr.text((M, y), etiqueta.upper(), fill=h2r(OURO), font=fonte("Bold", int(W * 0.026))); dr.rectangle([M, y + 40, M + 60, y + 43], fill=h2r(OURO)); y += 70
     titulo_destacado(dr, texto, palavra, f, M, y, W - 2 * M - 20, lh)
@@ -84,7 +85,7 @@ def editar(video_bytes, ops):
             if pos == "rodape": y = H - alt; logo_sobe = alt            # colado no rodapé; logo sobe para cima da faixa
             elif pos == "topo": y = int(H * 0.13)
             elif pos == "meio": y = (H - alt) // 2
-            else: y = H - int(H * 0.16) - alt                           # base (acima da zona da UI do Instagram)
+            else: y = H - int(H * 0.085) - alt; logo_sobe = alt + int(H * 0.085) - int(H * 0.03) + int(H * 0.012)  # base: baixo, acima da barra do Instagram; logo acima da faixa
             inputs += ["-i", fp]
             en = ""
             if lt.get("inicio") is not None or lt.get("fim") is not None:
