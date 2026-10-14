@@ -152,7 +152,7 @@ export async function tratarMensagem(msg, canal) {
   console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`);
   const prompt = montarPrompt({ modulo, conta, ativos, texto: msg.texto });
   // Pedidos pesados (carrossel, arte, imagem): avisa na hora e deixa demorar
-  if (modulo === 'social' && /\b(carrossel|est[áa]tico|frase|arte|imagem|gera)\b/i.test(msg.texto)) {
+  if (modulo === 'social' && msg.tipo === 'texto' && /\b(carrossel|est[áa]tico|frase|arte|imagem|gera)\b/i.test(msg.texto.replace(/\[[^\]]*\]/g, ''))) {
     await canal.enviar(msg.conta, msg.chatId, '🎨 Montando… isso leva de 20 a 40 segundos. Te mando a prévia assim que ficar pronta.');
   }
   let resposta = await responder({ prompt, conta, modulo, msg, ativos });

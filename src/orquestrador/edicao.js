@@ -7,8 +7,16 @@ import * as cdn from '../integracoes/cloudinary.js';
 import * as gemini from '../integracoes/gemini.js';
 import { gerarJSON } from '../integracoes/gemini.js';
 
-const sessoes = new Map(); // chatId → estado
+// Sessão persistida no SQLite (sobrevive a deploy/restart). A foto fica em memória; se o processo reiniciar, pede de novo.
+const fotos = new Map();
 const TTL = 30 * 60000;
+db.exec('CREATE TABLE IF NOT EXISTS edicao_sessoes (chat_id TEXT PRIMARY KEY, estado TEXT, t INTEGER)');
+const sessoes = {
+  get(chatId) { const r = db.prepare('SELECT estado, t FROM edicao_sessoes WHERE chat_id=?').get(chatId); if (!r) return undefined; const e = JSON.parse(r.estado); e.t = r.t; e.foto = fotos.get(chatId) || null; return e; },
+  set(chatId, e) { const { foto, ...resto } = e; if (foto) fotos.set(chatId, foto); db.prepare('INSERT INTO edicao_sessoes (chat_id, estado, t) VALUES (?,?,?) ON CONFLICT(chat_id) DO UPDATE SET estado=excluded.estado, t=excluded.t').run(chatId, JSON.stringify(resto), e.t || Date.now()); },
+  delete(chatId) { fotos.delete(chatId); db.prepare('DELETE FROM edicao_sessoes WHERE chat_id=?').run(chatId); },
+};
+const salvar = (chatId, e) => sessoes.set(chatId, e);
 export const GATILHO = /\b(quero|vamos|bora|preciso)\s+(editar|criar|montar|fazer)\s+(um|uma|o|a)?\s*(story|storie|stories|v[íi]deo para story|foto para story)\b|\beditar\s+(um|uma)?\s*(v[íi]deo|foto)\s+(para|pro|pra)\s+(story|storie|stories)\b|\bmodo edi[çc][ãa]o\b/i;
 const SAIR = /^(cancela|cancelar|sair|deixa|para|parar|esquece)\b/i;
 
@@ -46,6 +54,9 @@ function perguntaModelo(e) {
 /** Trata a mensagem do dono dentro do modo. Devolve string (continua), {foto, texto} (prévia) ou null (não é dele). */
 export async function tratar(msg, conta, canal) {
   const e = emEdicao(msg.chatId); if (!e) return null; e.t = Date.now();
+  try { return await _tratar(e, msg, conta, canal); } finally { if (emEdicao(msg.chatId)) salvar(msg.chatId, e); }
+}
+async function _tratar(e, msg, conta, canal) {
   const t = (msg.texto || '').trim();
   if (SAIR.test(t)) { encerrar(msg.chatId); return 'Saí do modo edição. Nada foi publicado.'; }
 
@@ -141,6 +152,7 @@ function extrairData(t) {
 
 async function gerar(e, chatId, conta) {
   const d = e.dados; let out;
+  if (e.base === 'foto' && !e.foto) { e.passo = 'modelo'; return 'Perdi a foto (reinício do sistema). Manda ela de novo, por favor.'; }
   if (e.modelo.id === 'so_marca') { out = await render.marcaDagua(e.foto); }
   else {
     let capa; if (d.capa_url) { try { capa = Buffer.from(await fetch(d.capa_url).then(r => r.arrayBuffer())); } catch {} }
