@@ -28,6 +28,6 @@ ls -1t "$DEST"/assessor-km-backup-*.tar.gz 2>/dev/null | tail -n +11 | xargs -r 
 # 7) opcional: envia ao Google Drive do dono (pasta Assessor KM/Backups) usando o token já autorizado do bot
 if [ "${BACKUP_DRIVE:-1}" = "1" ] && [ -f data/assessor.db ]; then
   # roda dentro do container (tem node_modules e o .env); o arquivo é montado em /tmp
-  docker run --rm --env-file .env -v "$PWD/data:/app/data" -v "$(realpath "$ARQ"):/tmp/backup.tar.gz:ro" assessor-assessor node scripts/backup-drive.js /tmp/backup.tar.gz \
+  docker run --rm --env-file .env -v "$PWD/data:/app/data" -v "$PWD/scripts:/app/scripts:ro" -v "$PWD/src:/app/src:ro" -v "$(realpath "$ARQ"):/tmp/backup.tar.gz:ro" assessor-assessor node scripts/backup-drive.js /tmp/backup.tar.gz \
     || echo "⚠️ não enviou ao Drive (segue local)"
 fi
