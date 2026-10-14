@@ -19,6 +19,7 @@ export function ferramentas(_conta) {
     { name: 'gerar_carrossel', description: 'Carrossel do manual KM (6–8 slides, 3:4): capa (etiqueta + título ≤8 palavras com UMA palavra dourada + subtítulo) → problema → 3–5 conteúdo → resumo → CTA. IA escreve, serviço renderiza em Poppins/fundo #37414E. Retorna URLs + textos. Depois criar_post(formato=carrossel, midias_urls). template=km usa o visual antigo.', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa' }, qtd_conteudo: { type: 'NUMBER', description: 'slides de conteúdo, 3 a 5 (padrão 3)' }, instrucoes: { type: 'STRING' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' } }, required: ['tema', 'pilar'] } },
     { name: 'aplicar_marca', description: 'Aplica o logo KM como marca d\'água numa imagem (URL) escolhendo automaticamente a cor pelo fundo (branco em fundo escuro, azul-cinza em fundo claro, com sombra se precisar). Use em toda foto enviada pelo dono antes de propor o post.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, posicao: { type: 'STRING', description: 'inferior-direito (padrão) | inferior-esquerdo | superior-direito | superior-esquerdo' }, assinatura: { type: 'BOOLEAN', description: 'escrever @kauemunchen sob o logo (padrão false — só se o dono pedir)' } }, required: ['url'] } },
     { name: 'listar_paletas', description: 'Paletas de cor disponíveis para artes KM', parameters: { type: 'OBJECT', properties: {} } },
+    { name: 'listar_biblioteca', description: 'Lista mídias guardadas do dono (fotos já com marca KM, vídeos hospedados, stories prontos) para montar um post depois. Devolve id, descrição e URL pronta para midia_url.', parameters: { type: 'OBJECT', properties: { tipo: { type: 'STRING', description: 'imagem|video|story|vazio=todas' }, max: { type: 'NUMBER' } } } },
     { name: 'criar_post', description: 'Salva post no calendário editorial com legenda/hashtags/mídia aprovados. formato: post (foto) | carrossel | reels (vídeo, com legenda) | story (foto ou vídeo ≤60 s, sem legenda). midia_url pode ser imagem ou vídeo (URL do Cloudinary vinda do upload). status: rascunho ou agendado (com data).', parameters: { type: 'OBJECT', properties: { formato: { type: 'STRING' }, tema: { type: 'STRING' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' }, description: 'slides do carrossel, em ordem' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM para agendar; vazio = rascunho' }, pilar: { type: 'STRING' } }, required: ['formato', 'legenda'] } },
     { name: 'agendar_post', description: 'Agenda um post salvo (rascunho) para uma data/hora; cria o evento no marcador Social Media da agenda. Use quando o dono aprovar e disser quando.', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM' } }, required: ['post_id', 'data'] } },
     { name: 'atualizar_post', description: 'Altera legenda, hashtags, mídia, tema, pilar ou formato de um post salvo', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' } }, tema: { type: 'STRING' }, pilar: { type: 'STRING' }, formato: { type: 'STRING' } }, required: ['post_id'] } },
@@ -100,8 +101,11 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo":
       const urls = await Promise.all(slides.map((b, i) => cdn.upload(b, { pasta: `assessor/${conta.id}/carrossel`, nome: `car_${base}_${i}` })));
       return { urls, textos: dados, template };
     }
+    case 'listar_biblioteca': return listarBiblioteca(conta.id, { tipo: a.tipo, max: a.max || 15 });
     case 'criar_post': {
       const status = a.data ? 'agendado' : 'rascunho';
+      if (a.midias_urls?.length) { const m = []; for (const u of a.midias_urls) m.push(await garantirMarca(conta.id, u)); a.midias_urls = m; }
+      if (a.midia_url) a.midia_url = await garantirMarca(conta.id, a.midia_url);
       const midiaUrl = a.midias_urls?.length ? JSON.stringify(a.midias_urls) : (a.midia_url || null);
       const r = db.prepare('INSERT INTO posts (conta_id, formato, pilar, tema, data, legenda, hashtags, midia_url, status) VALUES (?,?,?,?,?,?,?,?,?)').run(conta.id, a.formato, a.pilar || null, a.tema || null, a.data || null, a.legenda, a.hashtags || null, midiaUrl, status);
       const postId = r.lastInsertRowid; let agenda = null;
@@ -128,6 +132,8 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo":
     case 'atualizar_post': {
       const p = db.prepare('SELECT * FROM posts WHERE id=? AND conta_id=?').get(a.post_id, conta.id);
       if (!p) throw new Error(`Post #${a.post_id} não existe.`);
+      if (a.midias_urls?.length) { const m = []; for (const u of a.midias_urls) m.push(await garantirMarca(conta.id, u)); a.midias_urls = m; }
+      if (a.midia_url) a.midia_url = await garantirMarca(conta.id, a.midia_url);
       const campos = { legenda: a.legenda, hashtags: a.hashtags, tema: a.tema, pilar: a.pilar, formato: a.formato, midia_url: a.midias_urls?.length ? JSON.stringify(a.midias_urls) : a.midia_url };
       for (const [k, v] of Object.entries(campos)) if (v !== undefined && v !== null) db.prepare(`UPDATE posts SET ${k}=? WHERE id=?`).run(v, p.id);
       return { id: p.id, atualizado: Object.keys(campos).filter(k => campos[k] != null) };
@@ -145,12 +151,35 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo":
   }
 }
 
+/** REGRA DURA: nenhuma imagem vai para o Instagram sem o símbolo KM no canto padrão.
+ *  URL já registrada como marcada (biblioteca.marcada_url ou pastas /marcadas|/stories|/carrossel|/frase do render) passa;
+ *  qualquer outra é baixada, marcada e re-hospedada. Vídeo não passa por aqui (não há marca d'água em vídeo nesta etapa). */
+export async function garantirMarca(contaId, url) {
+  if (!url || ig.ehVideo(url)) return url;
+  const conhecida = db.prepare('SELECT 1 FROM biblioteca WHERE conta_id=? AND marcada_url=?').get(contaId, url) || /\/(marcadas|stories|carrossel|frase|artes)\//.test(url);
+  if (conhecida) return url;
+  const bytes = Buffer.from(await fetch(url).then(r => { if (!r.ok) throw new Error(`não consegui baixar a imagem (${r.status})`); return r.arrayBuffer(); }));
+  const r = await render.marcaDagua(bytes);
+  const nova = await cdn.upload(r.bytes, { pasta: `assessor/${contaId}/marcadas` });
+  db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem) VALUES (?,?,?,?,?)').run(contaId, url, nova, 'imagem', 'auto-marca');
+  console.log(`[marca] aplicada automaticamente em ${url.slice(-40)} → logo ${r.info.logo}`);
+  return nova;
+}
+async function garantirMarcaPost(contaId, p) {
+  if (!p.midia_url) return p;
+  let novo;
+  if (p.midia_url.startsWith('[')) { const urls = JSON.parse(p.midia_url); const m = []; for (const u of urls) m.push(await garantirMarca(contaId, u)); novo = JSON.stringify(m); }
+  else novo = await garantirMarca(contaId, p.midia_url);
+  if (novo !== p.midia_url) { db.prepare('UPDATE posts SET midia_url=? WHERE id=?').run(novo, p.id); p.midia_url = novo; }
+  return p;
+}
 export async function publicarPost(contaId, postId) {
   const cred = db.prepare('SELECT * FROM instagram_auth WHERE conta_id=?').get(contaId);
   if (!cred) throw new Error('Instagram não conectado. Diga "conectar instagram".');
   const p = db.prepare('SELECT * FROM posts WHERE id=? AND conta_id=?').get(postId, contaId);
   if (!p) throw new Error(`Post #${postId} não existe.`);
   if (!p.midia_url) throw new Error('Post sem mídia. Gere ou envie uma imagem/vídeo antes.');
+  await garantirMarcaPost(contaId, p); // regra dura: KM em toda imagem antes de sair
   const legenda = [p.legenda, p.hashtags].filter(Boolean).join('\n\n');
   let id;
   if (p.midia_url?.startsWith('[')) id = await ig.publicarCarrossel({ igUserId: cred.ig_user_id, token: cred.token, legenda, urls: JSON.parse(p.midia_url) });
@@ -160,10 +189,23 @@ export async function publicarPost(contaId, postId) {
   return { ig_media_id: id, post_id: p.id };
 }
 
+/** Story pronto (URL já marcada) → post; publica agora ou agenda. Usado pelo modo edição. */
+export async function criarStoryPost(contaId, { midia_url, tema, data, publicarAgora }) {
+  const r = db.prepare('INSERT INTO posts (conta_id, formato, tema, data, legenda, midia_url, status) VALUES (?,?,?,?,?,?,?)').run(contaId, 'story', (tema || 'Story').slice(0, 80), data || null, '', midia_url, data ? 'agendado' : 'rascunho');
+  const postId = r.lastInsertRowid;
+  db.prepare("UPDATE biblioteca SET usado_em=CURRENT_TIMESTAMP WHERE conta_id=? AND marcada_url=?").run(contaId, midia_url);
+  if (publicarAgora) { try { const p = await publicarPost(contaId, postId); return { post_id: postId, ...p }; } catch (e) { db.prepare("UPDATE posts SET status='erro' WHERE id=?").run(postId); return { post_id: postId, erro: e.message }; } }
+  if (data) { try { const ev = await gcal.criarEvento(contaId, { titulo: `📣 story: ${(tema || 'Story').slice(0, 40)}`, inicio: data, fim: new Date(new Date(data).getTime() + 15 * 60000).toISOString().slice(0, 16), descricao: `Post #${postId}`, categoria: MARCADOR, lembreteMin: 60 }); db.prepare('UPDATE posts SET gcal_event_id=? WHERE id=?').run(ev.id, postId); } catch {} }
+  return { post_id: postId, status: data ? 'agendado' : 'rascunho' };
+}
+export function listarBiblioteca(contaId, { tipo, max = 15 } = {}) {
+  return db.prepare(`SELECT id, tipo, origem, descricao, url, marcada_url, duracao, largura, altura, usado_em, criado_em FROM biblioteca WHERE conta_id=? ${tipo ? 'AND tipo=?' : ''} ORDER BY id DESC LIMIT ?`).all(contaId, ...(tipo ? [tipo] : []), max)
+    .map(b => ({ id: b.id, tipo: b.tipo, descricao: b.descricao, url: b.marcada_url || b.url, duracao: b.duracao, usada: !!b.usado_em, em: b.criado_em.slice(0, 16) }));
+}
 // Vídeo enviado pelo dono (Telegram ou Drive) → Cloudinary → URL pública para Reels/Story
 export async function guardarVideoEnviado(contaId, bytes) {
   const v = await cdn.uploadVideo(bytes, { pasta: `assessor/${contaId}/videos` });
-  db.prepare('INSERT INTO biblioteca (conta_id, url, tipo) VALUES (?,?,?)').run(contaId, v.url, 'video');
+  db.prepare('INSERT INTO biblioteca (conta_id, url, tipo, origem, largura, altura, duracao) VALUES (?,?,?,?,?,?,?)').run(contaId, v.url, 'video', 'telegram', v.largura || null, v.altura || null, v.duracao || null);
   const prop = v.largura && v.altura ? (v.largura / v.altura).toFixed(2) : null;
   const avisos = [];
   if (v.duracao > 60) avisos.push('acima de 60 s: serve para Reels, não para Story');
@@ -177,6 +219,6 @@ export async function guardarImagemEnviada(contaId, bytes) {
     cdn.upload(bytes, { pasta: `assessor/${contaId}` }),
     render.marcaDagua(Buffer.from(bytes)).then(async r => ({ marcada: await cdn.upload(r.bytes, { pasta: `assessor/${contaId}/marcadas` }), info: r.info })).catch(e => ({ marcada: null, info: { erro: e.message } })),
   ]);
-  db.prepare('INSERT INTO biblioteca (conta_id, url, tipo) VALUES (?,?,?)').run(contaId, original, 'imagem');
+  db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem) VALUES (?,?,?,?,?)').run(contaId, original, m.marcada || null, 'imagem', 'telegram');
   return { original, ...m };
 }

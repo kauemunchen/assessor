@@ -2,6 +2,7 @@ import { montarPrompt } from './montador-prompt.js';
 import { transcrever, classificar, responder } from './ia.js';
 import { obterConta, obterUsuario, modulosAtivos, configPersona } from '../db/contas.js';
 import { tentarEntrar, fluxoColaborador } from './equipe.js';
+import * as edicao from './edicao.js';
 import { executarFerramenta } from '../ferramentas/index.js';
 import * as memoria from './memoria.js';
 import { db } from '../db/index.js';
@@ -24,6 +25,14 @@ export async function tratarMensagem(msg, canal) {
     await canal.enviar(msg.conta, msg.chatId, `📝 "${msg.texto}"`);
   }
   const ativosAgora = modulosAtivos(conta.id);
+  // ----- Modo edição da MIA (só quando o dono pediu). Enquanto ativo, tudo passa por ele. -----
+  if (ativosAgora.includes('social')) {
+    if (edicao.emEdicao(msg.chatId)) { const r = await edicao.tratar(msg, conta, canal); if (r) return r; }
+    else if (msg.tipo !== 'audio' && edicao.GATILHO.test(msg.texto || '')) {
+      let fotoBytes = null; if (msg.tipo === 'imagem' && msg.midia) { try { fotoBytes = Buffer.from(await canal.baixarMidia(msg.midia.ref)); } catch {} }
+      return edicao.iniciar(msg.chatId, { fotoBytes });
+    }
+  }
   const DOC_RX = /\b(guarda|arquiva|arquivo|documento|contrato|nota|boleto|certid[ãa]o|alvar[áa]|ap[óo]lice|comprovante|recibo|cadastro|rg|cnh|cpf|cnpj|procura[çc][ãa]o|holerite|extrato)\b/i;
   const SOCIAL_RX = /\b(post|legenda|instagram|story|stories|reels?|carrossel|marca d.?[áa]gua|publica)\b/i;
   if (msg.tipo === 'video') {

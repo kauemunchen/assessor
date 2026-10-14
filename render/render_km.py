@@ -7,6 +7,7 @@ Endpoints: POST /frase {frase, paleta, autoria} -> JPEG
 import os, io, json, zipfile
 from flask import Flask, request, send_file, jsonify
 import template_manual as manual
+import template_story as story
 
 LOGO_PATH = os.environ.get("LOGO_PATH", os.path.join(os.path.dirname(__file__), "logo_km.png"))
 
@@ -289,6 +290,26 @@ def marca_ep():
 def letreiro_ep():
     j = request.get_json(force=True)
     return send_file(io.BytesIO(manual.letreiro(j["gancho"])), mimetype="image/png")
+
+@app.post("/story")
+def story_ep():
+    """multipart: campo 'json' com {modelo, ...} e opcional 'foto'/'capa' (bytes). Devolve JPEG 1080x1920 já com logo KM."""
+    if request.content_type and request.content_type.startswith("multipart/"):
+        j = json.loads(request.form.get("json", "{}")); foto = request.files.get("foto"); capa = request.files.get("capa")
+        foto = foto.read() if foto else None; capa = capa.read() if capa else None
+    else:
+        j = request.get_json(force=True); foto = capa = None
+    m = j.get("modelo")
+    if m == "foto_faixa":
+        if not foto: return jsonify(erro="foto obrigatória"), 400
+        out, info = story.foto_faixa(foto, j.get("texto", ""), j.get("palavra_dourada"), j.get("etiqueta"), j.get("posicao", "base"))
+    elif m == "frase": out, info = story.frase(j.get("texto", ""), j.get("palavra_dourada"), j.get("etiqueta"), j.get("autoria", "@kauemunchen"))
+    elif m == "chamada_feed": out, info = story.chamada_feed(j.get("titulo", ""), capa, j.get("palavra_dourada"), j.get("chamada", "Novo no feed"), j.get("formato", "carrossel"))
+    elif m == "passos": out, info = story.passos(j.get("titulo", ""), j.get("itens", []), j.get("palavra_dourada"), j.get("etiqueta"))
+    elif m == "pergunta": out, info = story.pergunta(j.get("texto", ""), j.get("palavra_dourada"), j.get("rodape", "Me responde aqui no direct"))
+    elif m == "data": out, info = story.data(j.get("titulo", ""), j.get("quando", ""), j.get("detalhe"), j.get("palavra_dourada"), j.get("etiqueta", "Em breve"))
+    else: return jsonify(erro=f"modelo desconhecido: {m}"), 400
+    resp = send_file(io.BytesIO(out), mimetype="image/jpeg"); resp.headers["X-Marca-Info"] = json.dumps(info, ensure_ascii=False); return resp
 
 @app.get("/health")
 def health(): return jsonify(ok=True)

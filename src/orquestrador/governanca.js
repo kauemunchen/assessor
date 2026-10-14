@@ -77,6 +77,13 @@ export async function governanca(msg, conta) {
     const off = Object.keys(MODS).filter(k => !ligados.includes(k));
     return `Equipe ativa: ${['diretor', ...ligados].map(nomeDe).join(', ')}.\nDesligados: ${off.map(k => MODS[k]).join(', ') || 'nenhum'}.`;
   }
+  if (/^(mia,?\s*)?biblioteca(\s+(v[íi]deos?|fotos?|stories))?$/.test(t)) {
+    const { listarBiblioteca } = await import('../ferramentas/social.js');
+    const tipo = /v[íi]deo/.test(t) ? 'video' : /foto/.test(t) ? 'imagem' : /stor/.test(t) ? 'story' : undefined;
+    const b = listarBiblioteca(conta.id, { tipo, max: 12 });
+    if (!b.length) return 'Biblioteca vazia. Fotos e vídeos que você manda para a MIA ficam guardados aqui.';
+    return `📚 Biblioteca (${b.length} últimas):\n` + b.map(x => `- #${x.id} ${x.tipo}${x.duracao ? ` ${Math.round(x.duracao)}s` : ''} · ${x.descricao || '(sem descrição)'}${x.usada ? ' · usada' : ''} · ${x.em.slice(5, 10).split('-').reverse().join('/')}`).join('\n') + '\n\nPara usar: "MIA, cria um post com a mídia #ID".';
+  }
   if ((m = msg.texto.trim().match(/^convidar?\s+(.+)$/i))) {
     const { criarConvite } = await import('./equipe.js'); const nome = caso(m[1].trim()); const codigo = criarConvite(conta.id, nome);
     return `Convite para ${nome} criado. Peça para a pessoa abrir @${process.env.TELEGRAM_BOT_USERNAME || 'AssessorKM_bot'} no Telegram e mandar:\n\nentrar ${codigo}\n\nQuando entrar, eu te aviso. Depois: "Olga, avisa ${nome.split(' ')[0]} que…" ou "Olga, repassa para ${nome.split(' ')[0]}: <tarefa> até sexta".`;

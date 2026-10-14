@@ -31,3 +31,14 @@ function extrairZip(buf) {
   }
   return out.sort((a, b) => a.nome.localeCompare(b.nome)).map(x => x.bytes);
 }
+
+/** Story 9:16 no padrão KM. dados = {modelo, ...}; foto/capa = Buffer opcional. Devolve {bytes, info}. */
+export async function story(dados, { foto, capa } = {}) {
+  const fd = new FormData(); fd.append('json', JSON.stringify(dados));
+  if (foto) fd.append('foto', new Blob([foto]), 'foto.jpg');
+  if (capa) fd.append('capa', new Blob([capa]), 'capa.jpg');
+  const r = await fetch(BASE + '/story', { method: 'POST', body: fd });
+  if (!r.ok) throw new Error(`render /story: ${r.status} ${await r.text()}`);
+  let info = {}; try { info = JSON.parse(r.headers.get('x-marca-info') || '{}'); } catch {}
+  return { bytes: Buffer.from(await r.arrayBuffer()), info };
+}
