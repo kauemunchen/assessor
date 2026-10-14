@@ -7,7 +7,8 @@ const arq = process.argv[2]; if (!arq || !fs.existsSync(arq)) { console.error('a
 const conta = db.prepare('SELECT id FROM contas ORDER BY id LIMIT 1').get(); if (!conta) process.exit(0);
 try {
   const raiz = await drive.pastaRaiz(conta.id); const pasta = await drive.obterOuCriarPasta(conta.id, 'Backups', raiz);
-  const r = await drive.upload(conta.id, { nome: arq.split('/').pop(), mime: 'application/gzip', bytes: fs.readFileSync(arq), pastaId: pasta, descricao: 'Backup automático Assessor KM' });
+  const nome = process.env.BACKUP_NOME || `assessor-km-backup-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '').replace(/(\d{8})(\d{4})/, '$1-$2')}.tar.gz`;
+  const r = await drive.upload(conta.id, { nome, mime: 'application/gzip', bytes: fs.readFileSync(arq), pastaId: pasta, descricao: 'Backup automático Assessor KM' });
   console.log('☁️ Drive:', r.link);
   // retenção no Drive
   const lista = await drive.buscarNoDrive(conta.id, 'assessor-km-backup', 50).catch(() => []);

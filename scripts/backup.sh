@@ -26,4 +26,8 @@ echo "✅ $ARQ ($(du -h "$ARQ" | cut -f1))"
 # 6) retenção local: mantém os 10 últimos
 ls -1t "$DEST"/assessor-km-backup-*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
 # 7) opcional: envia ao Google Drive do dono (pasta Assessor KM/Backups) usando o token já autorizado do bot
-if [ "${BACKUP_DRIVE:-1}" = "1" ] && [ -f data/assessor.db ]; then node scripts/backup-drive.js "$ARQ" || echo "⚠️ não enviou ao Drive (segue local)"; fi
+if [ "${BACKUP_DRIVE:-1}" = "1" ] && [ -f data/assessor.db ]; then
+  # roda dentro do container (tem node_modules e o .env); o arquivo é montado em /tmp
+  docker run --rm --env-file .env -v "$PWD/data:/app/data" -v "$(realpath "$ARQ"):/tmp/backup.tar.gz:ro" assessor-assessor node scripts/backup-drive.js /tmp/backup.tar.gz \
+    || echo "⚠️ não enviou ao Drive (segue local)"
+fi
