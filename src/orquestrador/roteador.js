@@ -29,8 +29,10 @@ export async function tratarMensagem(msg, canal) {
   if (ativosAgora.includes('social')) {
     if (edicao.emEdicao(msg.chatId)) { const r = await edicao.tratar(msg, conta, canal); if (r) return r; }
     else if (msg.tipo !== 'audio' && edicao.GATILHO.test(msg.texto || '')) {
-      let fotoBytes = null; if (msg.tipo === 'imagem' && msg.midia) { try { fotoBytes = Buffer.from(await canal.baixarMidia(msg.midia.ref)); } catch {} }
-      return edicao.iniciar(msg.chatId, { fotoBytes });
+      let fotoBytes = null, videoBytes = null;
+      if (msg.tipo === 'imagem' && msg.midia) { try { fotoBytes = Buffer.from(await canal.baixarMidia(msg.midia.ref)); } catch {} }
+      if (msg.tipo === 'video' && msg.midia && !(msg.midia.tamanho > 20 * 1024 * 1024 && !process.env.TELEGRAM_API_BASE)) { try { videoBytes = Buffer.from(await canal.baixarMidia(msg.midia.ref)); } catch {} }
+      return edicao.iniciar(msg.chatId, { fotoBytes, videoBytes });
     }
   }
   const DOC_RX = /\b(guarda|arquiva|arquivo|documento|contrato|nota|boleto|certid[ãa]o|alvar[áa]|ap[óo]lice|comprovante|recibo|cadastro|rg|cnh|cpf|cnpj|procura[çc][ãa]o|holerite|extrato)\b/i;

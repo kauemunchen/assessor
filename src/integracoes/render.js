@@ -42,3 +42,14 @@ export async function story(dados, { foto, capa } = {}) {
   let info = {}; try { info = JSON.parse(r.headers.get('x-marca-info') || '{}'); } catch {}
   return { bytes: Buffer.from(await r.arrayBuffer()), info };
 }
+
+/** Edição de vídeo (ffmpeg no render). ops: {enquadrar, cortar, letreiro, legendas}. Sempre sai com o logo KM. */
+export async function editarVideo(bytes, ops) {
+  const fd = new FormData(); fd.append('json', JSON.stringify(ops)); fd.append('video', new Blob([bytes]), 'in.mp4');
+  const r = await fetch(BASE + '/video/editar', { method: 'POST', body: fd });
+  if (!r.ok) { let e = ''; try { e = (await r.json()).erro; } catch { e = await r.text(); } throw new Error(`edição de vídeo: ${String(e).slice(0, 300)}`); }
+  let info = {}; try { info = JSON.parse(r.headers.get('x-video-info') || '{}'); } catch {}
+  return { bytes: Buffer.from(await r.arrayBuffer()), info };
+}
+export async function infoVideo(bytes) { const r = await fetch(BASE + '/video/info', { method: 'POST', body: bytes }); if (!r.ok) throw new Error('info do vídeo falhou'); return r.json(); }
+export async function audioDoVideo(bytes) { return post('/video/audio', bytes, false); }

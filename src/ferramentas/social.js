@@ -155,7 +155,18 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo":
  *  URL já registrada como marcada (biblioteca.marcada_url ou pastas /marcadas|/stories|/carrossel|/frase do render) passa;
  *  qualquer outra é baixada, marcada e re-hospedada. Vídeo não passa por aqui (não há marca d'água em vídeo nesta etapa). */
 export async function garantirMarca(contaId, url) {
-  if (!url || ig.ehVideo(url)) return url;
+  if (!url) return url;
+  if (ig.ehVideo(url)) {
+    const ok = db.prepare('SELECT 1 FROM biblioteca WHERE conta_id=? AND marcada_url=? AND tipo=?').get(contaId, url, 'video');
+    if (ok) return url;
+    const bytes = Buffer.from(await fetch(url).then(r => { if (!r.ok) throw new Error(`não consegui baixar o vídeo (${r.status})`); return r.arrayBuffer(); }));
+    if (bytes.byteLength > 200 * 1024 * 1024) throw new Error('vídeo acima de 200 MB — não consigo aplicar o logo KM; reduza o arquivo.');
+    const r = await render.editarVideo(bytes, {}); // só o logo
+    const v = await cdn.uploadVideo(r.bytes, { pasta: `assessor/${contaId}/videos` });
+    db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem, largura, altura, duracao) VALUES (?,?,?,?,?,?,?,?)').run(contaId, url, v.url, 'video', 'auto-logo', v.largura || null, v.altura || null, v.duracao || null);
+    console.log(`[marca] logo KM aplicado no vídeo → ${r.info.logo}`);
+    return v.url;
+  }
   const conhecida = db.prepare('SELECT 1 FROM biblioteca WHERE conta_id=? AND marcada_url=?').get(contaId, url) || /\/(marcadas|stories|carrossel|frase|artes)\//.test(url);
   if (conhecida) return url;
   const bytes = Buffer.from(await fetch(url).then(r => { if (!r.ok) throw new Error(`não consegui baixar a imagem (${r.status})`); return r.arrayBuffer(); }));

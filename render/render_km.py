@@ -8,6 +8,7 @@ import os, io, json, zipfile
 from flask import Flask, request, send_file, jsonify
 import template_manual as manual
 import template_story as story
+import video_km as video
 
 LOGO_PATH = os.environ.get("LOGO_PATH", os.path.join(os.path.dirname(__file__), "logo_km.png"))
 
@@ -310,6 +311,26 @@ def story_ep():
     elif m == "data": out, info = story.data(j.get("titulo", ""), j.get("quando", ""), j.get("detalhe"), j.get("palavra_dourada"), j.get("etiqueta", "Em breve"))
     else: return jsonify(erro=f"modelo desconhecido: {m}"), 400
     resp = send_file(io.BytesIO(out), mimetype="image/jpeg"); resp.headers["X-Marca-Info"] = json.dumps(info, ensure_ascii=False); return resp
+
+@app.post("/video/info")
+def video_info_ep():
+    import tempfile, os as _os
+    f = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4"); f.write(request.get_data()); f.close()
+    try: return jsonify(video.probe(f.name))
+    finally: _os.remove(f.name)
+
+@app.post("/video/editar")
+def video_editar_ep():
+    """multipart: 'video' (bytes) + 'json' (ops). Devolve MP4 já com o logo KM."""
+    ops = json.loads(request.form.get("json", "{}")); v = request.files.get("video")
+    if not v: return jsonify(erro="video obrigatório"), 400
+    try: out, info = video.editar(v.read(), ops)
+    except Exception as e: return jsonify(erro=str(e)[-600:]), 500
+    resp = send_file(io.BytesIO(out), mimetype="video/mp4"); resp.headers["X-Video-Info"] = json.dumps(info, ensure_ascii=False); return resp
+
+@app.post("/video/audio")
+def video_audio_ep():
+    return send_file(io.BytesIO(video.extrair_audio(request.get_data())), mimetype="audio/mpeg")
 
 @app.get("/health")
 def health(): return jsonify(ok=True)

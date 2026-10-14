@@ -8,13 +8,13 @@ import * as gemini from '../integracoes/gemini.js';
 import { gerarJSON } from '../integracoes/gemini.js';
 
 // Sessão persistida no SQLite (sobrevive a deploy/restart). A foto fica em memória; se o processo reiniciar, pede de novo.
-const fotos = new Map();
+const fotos = new Map(); const videos = new Map();
 const TTL = 30 * 60000;
 db.exec('CREATE TABLE IF NOT EXISTS edicao_sessoes (chat_id TEXT PRIMARY KEY, estado TEXT, t INTEGER)');
 const sessoes = {
-  get(chatId) { const r = db.prepare('SELECT estado, t FROM edicao_sessoes WHERE chat_id=?').get(chatId); if (!r) return undefined; const e = JSON.parse(r.estado); e.t = r.t; e.foto = fotos.get(chatId) || null; return e; },
-  set(chatId, e) { const { foto, ...resto } = e; if (foto) fotos.set(chatId, foto); db.prepare('INSERT INTO edicao_sessoes (chat_id, estado, t) VALUES (?,?,?) ON CONFLICT(chat_id) DO UPDATE SET estado=excluded.estado, t=excluded.t').run(chatId, JSON.stringify(resto), e.t || Date.now()); },
-  delete(chatId) { fotos.delete(chatId); db.prepare('DELETE FROM edicao_sessoes WHERE chat_id=?').run(chatId); },
+  get(chatId) { const r = db.prepare('SELECT estado, t FROM edicao_sessoes WHERE chat_id=?').get(chatId); if (!r) return undefined; const e = JSON.parse(r.estado); e.t = r.t; e.foto = fotos.get(chatId) || null; e.video = videos.get(chatId) || null; return e; },
+  set(chatId, e) { const { foto, video, ...resto } = e; if (foto) fotos.set(chatId, foto); if (video) videos.set(chatId, video); db.prepare('INSERT INTO edicao_sessoes (chat_id, estado, t) VALUES (?,?,?) ON CONFLICT(chat_id) DO UPDATE SET estado=excluded.estado, t=excluded.t').run(chatId, JSON.stringify(resto), e.t || Date.now()); },
+  delete(chatId) { fotos.delete(chatId); videos.delete(chatId); db.prepare('DELETE FROM edicao_sessoes WHERE chat_id=?').run(chatId); },
 };
 const salvar = (chatId, e) => sessoes.set(chatId, e);
 export const GATILHO = /\b(quero|vamos|bora|preciso)\s+(editar|criar|montar|fazer)\s+(um|uma|o|a)?\s*(story|storie|stories|v[íi]deo para story|foto para story)\b|\beditar\s+(um|uma)?\s*(v[íi]deo|foto)\s+(para|pro|pra)\s+(story|storie|stories)\b|\bmodo edi[çc][ãa]o\b/i;
@@ -23,6 +23,13 @@ const SAIR = /^(cancela|cancelar|sair|deixa|para|parar|esquece)\b/i;
 export const MODELOS_FOTO = [
   { n: 1, id: 'foto_faixa', nome: 'Foto + faixa de texto', pede: 'texto' },
   { n: 0, id: 'so_marca', nome: 'Sem render — só a marca KM na foto', pede: null },
+];
+export const MODELOS_VIDEO = [
+  { n: 1, id: 'v_legenda', nome: 'Legenda automática (transcrição queimada no vídeo)' },
+  { n: 2, id: 'v_letreiro', nome: 'Frase/letreiro na faixa KM (texto seu)' },
+  { n: 3, id: 'v_enquadrar', nome: 'Ajustar para 9:16 (1080x1920)' },
+  { n: 4, id: 'v_cortar', nome: 'Cortar duração (ex.: primeiros 60 s)' },
+  { n: 0, id: 'v_so_logo', nome: 'Sem edição — só o logo KM no canto' },
 ];
 export const MODELOS_TEXTO = [
   { n: 1, id: 'frase', nome: 'Frase do dia', pede: 'texto' },
@@ -37,10 +44,11 @@ export function emEdicao(chatId) { const e = sessoes.get(chatId); if (!e) return
 export function encerrar(chatId) { sessoes.delete(chatId); }
 
 /** Entrada do modo edição. Se já veio mídia junto, pula a pergunta de base. */
-export function iniciar(chatId, { fotoBytes, videoUrl } = {}) {
+export function iniciar(chatId, { fotoBytes, videoUrl, videoBytes } = {}) {
   const e = { t: Date.now(), passo: 'base', dados: {} };
   if (fotoBytes) { e.base = 'foto'; e.foto = fotoBytes; e.passo = 'modelo'; }
   else if (videoUrl) { e.base = 'video'; e.videoUrl = videoUrl; e.passo = 'modelo'; }
+  else if (videoBytes) { e.base = 'video'; e.video = videoBytes; e.passo = 'modelo'; }
   sessoes.set(chatId, e);
   if (e.passo === 'base') return '🎬 Modo edição de Story. Qual é a base?\n1️⃣ Foto\n2️⃣ Vídeo\n3️⃣ Só texto (fundo KM)\n\n(ou mande a foto/vídeo agora · "cancela" sai)';
   return perguntaModelo(e);
@@ -48,7 +56,7 @@ export function iniciar(chatId, { fotoBytes, videoUrl } = {}) {
 function perguntaModelo(e) {
   if (e.base === 'foto') return `Foto recebida. Modelo:\n${lista(MODELOS_FOTO)}\n\nResponda o número.`;
   if (e.base === 'texto') return `Modelo de story em texto:\n${lista(MODELOS_TEXTO)}\n\nResponda o número.`;
-  return 'Edição de vídeo (legenda automática, letreiro, logo, corte) entra na próxima etapa. Por enquanto posso publicar o vídeo como está, com a MIA. Diga "cancela" e mande "MIA, story com esse vídeo".';
+  return `Vídeo recebido${e.vinfo ? ` (${e.vinfo.w}x${e.vinfo.h}, ${Math.round(e.vinfo.dur)} s)` : ''}. O que aplicar? Pode combinar: "1 e 2", "2 3 4".\n${lista(MODELOS_VIDEO)}\n\nO logo KM entra sempre.`;
 }
 
 /** Trata a mensagem do dono dentro do modo. Devolve string (continua), {foto, texto} (prévia) ou null (não é dele). */
@@ -62,13 +70,46 @@ async function _tratar(e, msg, conta, canal) {
 
   // mídia chegando dentro do modo
   if (msg.tipo === 'imagem' && msg.midia) { e.base = 'foto'; e.foto = Buffer.from(await canal.baixarMidia(msg.midia.ref)); e.passo = 'modelo'; return perguntaModelo(e); }
-  if (msg.tipo === 'video') { e.base = 'video'; e.passo = 'modelo'; return perguntaModelo(e); }
+  if (msg.tipo === 'video' && msg.midia) {
+    if (msg.midia.tamanho > 20 * 1024 * 1024 && !process.env.TELEGRAM_API_BASE) return 'Vídeo acima de 20 MB: suba no Drive e cole o link aqui dentro do modo edição.';
+    e.base = 'video'; e.video = Buffer.from(await canal.baixarMidia(msg.midia.ref)); e.passo = 'modelo';
+    try { e.vinfo = await render.infoVideo(e.video); } catch {}
+    return perguntaModelo(e);
+  }
+  if (msg.tipo === 'texto' && /drive\.google\.com\/(file|open|uc)/.test(t) && (e.passo === 'base' || e.base === 'video')) {
+    const drive = await import('../integracoes/google-drive.js'); const id = drive.extrairId(t); const meta = await drive.metadados(conta.id, id);
+    if (!/^video\//.test(meta.mime)) return 'Esse link não é de vídeo.';
+    e.base = 'video'; e.video = Buffer.from(await drive.baixar(conta.id, id)); e.passo = 'modelo';
+    try { e.vinfo = await render.infoVideo(e.video); } catch {}
+    return perguntaModelo(e);
+  }
 
   if (e.passo === 'base') {
     if (/^1\b|foto/i.test(t)) return 'Manda a foto.';
     if (/^2\b|v[íi]deo/i.test(t)) return 'Manda o vídeo (ou o link do Drive).';
     if (/^3\b|texto/i.test(t)) { e.base = 'texto'; e.passo = 'modelo'; return perguntaModelo(e); }
     return 'Responda 1 (foto), 2 (vídeo) ou 3 (só texto).';
+  }
+  if (e.passo === 'modelo' && e.base === 'video') {
+    const ns = [...t.matchAll(/\d/g)].map(m => +m[0]); if (!ns.length) return `Responda com os números:\n${lista(MODELOS_VIDEO)}`;
+    e.ops = { enquadrar: ns.includes(3) ? '9:16' : null, legenda: ns.includes(1), letreiro: ns.includes(2), cortar: ns.includes(4) };
+    if (!e.ops.enquadrar && e.vinfo && Math.abs(e.vinfo.w / e.vinfo.h - 9 / 16) > 0.05) e.ops.enquadrar = '9:16';
+    e.modelo = { id: 'video', nome: 'Vídeo editado', pede: null };
+    e.passo = e.ops.letreiro ? 'v_texto' : e.ops.cortar ? 'v_corte' : 'render';
+    if (e.passo === 'v_texto') return 'Qual a frase da faixa? (curta; palavra dourada entre *asteriscos*)';
+    if (e.passo === 'v_corte') return `Cortar como? (ex.: "primeiros 60 s", "de 5 a 35", "até 15")${e.vinfo ? ` — o vídeo tem ${Math.round(e.vinfo.dur)} s` : ''}`;
+    return gerar(e, msg.chatId, conta);
+  }
+  if (e.passo === 'v_texto') {
+    e.dados.texto = limpo(t); e.dados.palavra_dourada = palavraDourada(t) || escolherDourada(e.dados.texto);
+    e.passo = e.ops.cortar ? 'v_corte' : 'render';
+    if (e.passo === 'v_corte') return `Cortar como? (ex.: "primeiros 60 s", "de 5 a 35")${e.vinfo ? ` — ${Math.round(e.vinfo.dur)} s no total` : ''}`;
+    return gerar(e, msg.chatId, conta);
+  }
+  if (e.passo === 'v_corte') {
+    const m1 = t.match(/de\s+(\d+)\s*(?:s)?\s*(?:a|até)\s*(\d+)/i), m2 = t.match(/(\d+)\s*s?\b/);
+    if (m1) e.ops.corte = { inicio: +m1[1], duracao: +m1[2] - +m1[1] }; else if (m2) e.ops.corte = { inicio: 0, duracao: +m2[1] }; else return 'Não entendi. Ex.: "primeiros 60 s" ou "de 5 a 35".';
+    e.passo = 'render'; return gerar(e, msg.chatId, conta);
   }
   if (e.passo === 'modelo') {
     const ms = e.base === 'foto' ? MODELOS_FOTO : MODELOS_TEXTO;
@@ -84,17 +125,25 @@ async function _tratar(e, msg, conta, canal) {
     absorverConteudo(e, t); e.passo = 'render'; return gerar(e, msg.chatId, conta);
   }
   if (e.passo === 'previa') {
-    if (/^(sim|aprov|ok|boa|fechou|perfeit)/i.test(t)) { e.passo = 'destino'; return 'Fechado. O que faço?\n1️⃣ Publicar agora\n2️⃣ Agendar (diga dia e hora)\n3️⃣ Guardar na biblioteca'; }
+    if (/^(sim|aprov|ok|boa|fechou|perfeit)/i.test(t)) { e.passo = 'destino'; return e.base === 'video' ? 'Fechado. Story ou Reels? E o que faço?\n1️⃣ Publicar agora\n2️⃣ Agendar (diga dia e hora)\n3️⃣ Guardar na biblioteca\n(ex.: "story 1", "reels 2 amanhã 19h")' : 'Fechado. O que faço?\n1️⃣ Publicar agora\n2️⃣ Agendar (diga dia e hora)\n3️⃣ Guardar na biblioteca'; }
     if (/^(troca|muda|ajusta|outra|refaz|dourad|palavra)/i.test(t)) { absorverConteudo(e, t.replace(/^(troca|muda|ajusta|refaz)\s*(o|a|para|pra)?\s*/i, '')); return gerar(e, msg.chatId, conta); }
     if (/^(outro modelo|modelo)/i.test(t)) { e.passo = 'modelo'; return perguntaModelo(e); }
     return 'Aprova a prévia? (sim · "troca o texto para …" · "outro modelo" · "cancela")';
   }
   if (e.passo === 'destino') {
     const { criarStoryPost } = await import('../ferramentas/social.js');
-    if (/^1\b|agora|publica/i.test(t)) { const r = await criarStoryPost(conta.id, { midia_url: e.url, tema: e.dados.texto || e.dados.titulo, publicarAgora: true }); encerrar(msg.chatId); return r.erro ? `❌ ${r.erro}` : `📣 Story publicado (${r.ig_media_id}).`; }
-    if (/^3\b|biblioteca|guarda/i.test(t)) { db.prepare("UPDATE biblioteca SET descricao=COALESCE(descricao, ?) WHERE url=? AND conta_id=?").run(e.dados.texto || e.dados.titulo || e.modelo.nome, e.url, conta.id); encerrar(msg.chatId); return `📚 Guardado na biblioteca: "${(e.dados.texto || e.dados.titulo || e.modelo.nome).slice(0, 60)}". Para usar depois: "MIA, biblioteca".`; }
+    if (e.base === 'video' && !e.formatoVideo) { if (/reels?/i.test(t)) e.formatoVideo = 'reels'; else if (/story|stories/i.test(t)) e.formatoVideo = 'story'; else return 'Publicar como Story (sem legenda, ≤60 s) ou Reels (com legenda)? Responda "story" ou "reels" junto com a opção (ex.: "story 1", "reels agenda amanhã 19h").'; }
+    if (e.base === 'video' && e.formatoVideo === 'reels') {
+      const soc = await import('../ferramentas/social.js');
+      if (/\b1\b|agora|publica/i.test(t)) { const r = await soc.executar('criar_post', { formato: 'reels', tema: e.dados.texto || 'Reels', legenda: e.dados.texto || '', midia_url: e.url }, conta, {}); try { const p = await soc.publicarPost(conta.id, r.id); encerrar(msg.chatId); return `📣 Reels publicado (${p.ig_media_id}). Legenda: "${e.dados.texto || ''}" — peça à MIA para ajustar a legenda no feed se quiser.`; } catch (err) { encerrar(msg.chatId); return `❌ ${err.message}`; } }
+      const dt = extrairData(t); if (dt) { const r = await soc.executar('criar_post', { formato: 'reels', tema: e.dados.texto || 'Reels', legenda: e.dados.texto || '', midia_url: e.url, data: dt }, conta, {}); encerrar(msg.chatId); return `📅 Reels #${r.id} agendado para ${dt.replace('T', ' às ')}. Diga "MIA, ajusta a legenda do post #${r.id}" para a legenda do manual.`; }
+      if (/\b3\b|biblioteca|guarda/i.test(t)) { encerrar(msg.chatId); return '📚 Vídeo editado já está na biblioteca. Para usar: "MIA, biblioteca vídeos".'; }
+      return 'Responda 1 (publicar agora), 2 + dia/hora (agendar) ou 3 (guardar).';
+    }
+    if (/\b1\b|agora|publica/i.test(t)) { const r = await criarStoryPost(conta.id, { midia_url: e.url, tema: e.dados.texto || e.dados.titulo, publicarAgora: true }); encerrar(msg.chatId); return r.erro ? `❌ ${r.erro}` : `📣 Story publicado (${r.ig_media_id}).`; }
+    if (/\b3\b|biblioteca|guarda/i.test(t)) { db.prepare("UPDATE biblioteca SET descricao=COALESCE(descricao, ?) WHERE url=? AND conta_id=?").run(e.dados.texto || e.dados.titulo || e.modelo.nome, e.url, conta.id); encerrar(msg.chatId); return `📚 Guardado na biblioteca: "${(e.dados.texto || e.dados.titulo || e.modelo.nome).slice(0, 60)}". Para usar depois: "MIA, biblioteca".`; }
     const dt = extrairData(t);
-    if (/^2\b|agenda/i.test(t) && !dt) return 'Qual dia e hora? (ex.: "amanhã 12:00", "16/10 18:30")';
+    if (/\b2\b|agenda/i.test(t) && !dt) return 'Qual dia e hora? (ex.: "amanhã 12:00", "16/10 18:30")';
     if (dt) { const r = await criarStoryPost(conta.id, { midia_url: e.url, tema: e.dados.texto || e.dados.titulo, data: dt }); encerrar(msg.chatId); return `📅 Story #${r.post_id} agendado para ${dt.replace('T', ' às ')} (entrou na agenda, marcador Social Media).`; }
     return 'Responda 1 (publicar agora), 2 + dia/hora (agendar) ou 3 (guardar).';
   }
@@ -153,6 +202,20 @@ function extrairData(t) {
 async function gerar(e, chatId, conta) {
   const d = e.dados; let out;
   if (e.base === 'foto' && !e.foto) { e.passo = 'modelo'; return 'Perdi a foto (reinício do sistema). Manda ela de novo, por favor.'; }
+  if (e.base === 'video') {
+    if (!e.video) { e.passo = 'base'; return 'Perdi o vídeo (reinício do sistema). Manda ele de novo, por favor.'; }
+    const ops = { enquadrar: e.ops.enquadrar || null, cortar: e.ops.corte || null, letreiro: e.ops.letreiro ? { texto: d.texto, palavra_dourada: d.palavra_dourada, posicao: 'base' } : null, legendas: null };
+    if (e.ops.legenda) {
+      try { const audio = await render.audioDoVideo(e.video); const dur = e.vinfo?.dur || 60; ops.legendas = await gemini.transcreverComTempos(audio, 'audio/mpeg', dur); if (ops.corte) ops.legendas = ops.legendas.map(x => ({ ...x, inicio: x.inicio - ops.corte.inicio, fim: x.fim - ops.corte.inicio })).filter(x => x.fim > 0); if (!ops.legendas.length) d.aviso = 'não detectei fala para legendar'; }
+      catch (err) { d.aviso = `legenda automática falhou: ${err.message}`; }
+    }
+    const r = await render.editarVideo(e.video, ops);
+    const v = await cdn.uploadVideo(r.bytes, { pasta: `assessor/${conta.id}/videos` });
+    e.url = v.url; e.vinfoOut = r.info;
+    db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem, descricao, largura, altura, duracao) VALUES (?,?,?,?,?,?,?,?,?)').run(conta.id, v.url, v.url, 'video', 'edicao:video', (d.texto || 'Vídeo editado').slice(0, 120), v.largura || null, v.altura || null, v.duracao || null);
+    e.passo = 'previa';
+    return { video: e.url, texto: `Prévia · ${r.info.saida || ''} · logo ${r.info.logo}${r.info.legendas ? ` · ${r.info.legendas} legendas` : ''}${d.aviso ? `\n⚠️ ${d.aviso}` : ''}\n\nAprova? (sim · "troca o texto para …" · "cancela")` };
+  }
   if (e.modelo.id === 'so_marca') { out = await render.marcaDagua(e.foto); }
   else {
     let capa; if (d.capa_url) { try { capa = Buffer.from(await fetch(d.capa_url).then(r => r.arrayBuffer())); } catch {} }

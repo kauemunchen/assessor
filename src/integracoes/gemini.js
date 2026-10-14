@@ -57,3 +57,12 @@ export async function lerArquivoJSON(bytes, mime, instrucao) {
   const r = await modelo({ generationConfig: { responseMimeType: 'application/json' } }).generateContent([{ inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: mime } }, instrucao]);
   try { return JSON.parse(r.response.text()); } catch { return {}; }
 }
+
+/** Transcrição com tempos (para legendas). Devolve [{inicio, fim, texto}] em segundos; frases curtas (≤ 7 palavras). */
+export async function transcreverComTempos(bytes, mime = 'audio/mpeg', duracao = 60) {
+  const r = await modelo({ generationConfig: { responseMimeType: 'application/json' } }).generateContent([
+    { inlineData: { data: Buffer.from(bytes).toString('base64'), mimeType: mime } },
+    `Transcreva este áudio em português do Brasil e divida em legendas curtas (máx. 7 palavras cada, cortes naturais). O áudio tem ${Math.round(duracao)} segundos. Devolva JSON: {"segmentos":[{"inicio": segundos, "fim": segundos, "texto": "..."}]} com tempos crescentes, sem sobreposição, cobrindo só onde há fala. Sem comentários.`,
+  ]);
+  try { const j = JSON.parse(r.response.text()); return (j.segmentos || []).filter(s => s.texto && s.fim > s.inicio).map(s => ({ inicio: Math.max(0, +s.inicio), fim: Math.min(duracao, +s.fim), texto: String(s.texto).trim() })); } catch { return []; }
+}
