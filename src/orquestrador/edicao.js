@@ -17,7 +17,8 @@ const sessoes = {
   delete(chatId) { fotos.delete(chatId); videos.delete(chatId); db.prepare('DELETE FROM edicao_sessoes WHERE chat_id=?').run(chatId); },
 };
 const salvar = (chatId, e) => sessoes.set(chatId, e);
-export const GATILHO = /\b(quero|vamos|bora|preciso)\s+(editar|criar|montar|fazer)\s+(um|uma|o|a)?\s*(story|storie|stories|v[íi]deo para story|foto para story)\b|\beditar\s+(um|uma)?\s*(v[íi]deo|foto)\s+(para|pro|pra)\s+(story|storie|stories)\b|\bmodo edi[çc][ãa]o\b/i;
+// Gatilho tolerante a transcrição de áudio ("Mia, eu quero editar um vídeo para story.") e a variações
+export const GATILHO = /\b(editar|edi[çc][ãa]o|criar|montar|fazer)\b[^.!?\n]{0,40}\b(story|storie|stories|est[óo]ria|hist[óo]ria)\b|\b(editar|edita|edite)\b[^.!?\n]{0,20}\b(v[íi]deo|foto)\b|\bmodo edi[çc][ãa]o\b|\b(colocar|p[ôo]r|incluir|adicionar|colocando|pondo)\s+(texto|frase|legenda)\b/i;
 const SAIR = /^(cancela|cancelar|sair|deixa|para|parar|esquece)\b/i;
 
 export const MODELOS_FOTO = [
@@ -44,12 +45,20 @@ export function emEdicao(chatId) { const e = sessoes.get(chatId); if (!e) return
 export function encerrar(chatId) { sessoes.delete(chatId); }
 
 /** Entrada do modo edição. Se já veio mídia junto, pula a pergunta de base. */
-export function iniciar(chatId, { fotoBytes, videoUrl, videoBytes, texto = '' } = {}) {
+let contaIdAtual = null;
+export function iniciar(chatId, { fotoBytes, videoUrl, videoBytes, texto = '', contaId = null } = {}) {
+  contaIdAtual = contaId;
   const e = { t: Date.now(), passo: 'base', dados: {}, baseEsperada: /v[íi]deo/i.test(texto) ? 'video' : /foto/i.test(texto) ? 'foto' : null };
   if (fotoBytes) { e.base = 'foto'; e.foto = fotoBytes; e.passo = 'modelo'; }
   else if (videoUrl) { e.base = 'video'; e.videoUrl = videoUrl; e.passo = 'modelo'; }
   else if (videoBytes) { e.base = 'video'; e.video = videoBytes; e.passo = 'audio'; }
+  if (e.passo === 'base' && /\b(esse|este|aquele|[úu]ltimo|o)\s+v[íi]deo\b/i.test(texto)) {
+    // "editar esse vídeo" → pega o último vídeo da biblioteca desta conta
+    const ult = contaIdAtual && db.prepare("SELECT url FROM biblioteca WHERE conta_id=? AND tipo='video' ORDER BY id DESC LIMIT 1").get(contaIdAtual);
+    if (ult) { e.base = 'video'; e.videoUrlPendente = ult.url; e.passo = 'audio'; }
+  }
   sessoes.set(chatId, e);
+  if (e.passo === 'audio' && e.videoUrlPendente) return `Vou usar o último vídeo que você mandou. Manter o som?\n1️⃣ Manter áudio\n2️⃣ Retirar áudio`;
   if (e.passo === 'audio') return perguntaAudio(e);
   if (e.passo === 'base' && e.baseEsperada === 'video') return '🎬 Modo edição de vídeo para Story. Manda o vídeo (até 20 MB) ou o link dele no Drive.';
   if (e.passo === 'base' && e.baseEsperada === 'foto') return '🎬 Modo edição de foto para Story. Manda a foto.';
@@ -219,6 +228,7 @@ async function gerar(e, chatId, conta) {
   const d = e.dados; let out;
   if (e.base === 'foto' && !e.foto) { e.passo = 'modelo'; return 'Perdi a foto (reinício do sistema). Manda ela de novo, por favor.'; }
   if (e.base === 'video') {
+    if (!e.video && e.videoUrlPendente) { try { e.video = Buffer.from(await fetch(e.videoUrlPendente).then(r => r.arrayBuffer())); videos.set(chatId, e.video); try { e.vinfo = await render.infoVideo(e.video); } catch {} } catch {} }
     if (!e.video) { e.passo = 'base'; return 'Perdi o vídeo (reinício do sistema). Manda ele de novo, por favor.'; }
     const ops = { sem_audio: !!e.semAudio, enquadrar: e.ops.enquadrar || null, cortar: e.ops.corte || null, letreiro: e.ops.letreiro ? { texto: d.texto, palavra_dourada: d.palavra_dourada, posicao: d.posicao || 'base' } : null, legendas: null };
     if (e.ops.legenda && e.semAudio) d.aviso = 'legenda automática ignorada: você escolheu retirar o áudio';
