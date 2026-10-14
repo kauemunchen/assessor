@@ -5,6 +5,16 @@ export class TelegramCanal {
   aoReceber(fn) {
     this.app.post('/webhook/telegram', async (req, res) => {
       res.sendStatus(200);
+      // Botão inline tocado → vira mensagem de texto do dono (mesmo fluxo), e o botão some da mensagem original
+      const cq = req.body.callback_query;
+      if (cq) {
+        fetch(`${API}/bot${this.token}/answerCallbackQuery`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ callback_query_id: cq.id }) }).catch(() => {});
+        if (cq.message) fetch(`${API}/bot${this.token}/editMessageReplyMarkup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } }) }).catch(() => {});
+        const texto = String(cq.data || '');
+        console.log(`[telegram] ${cq.message?.chat?.id} botão: ${texto}`);
+        await fn({ conta: null, chatId: String(cq.message?.chat?.id || cq.from.id), remetente: String(cq.from.id), tipo: 'texto', texto, midia: null, recebidoEm: new Date(), botao: true });
+        return;
+      }
       const m = req.body.message; if (!m) return;
       const vid = m.video || m.video_note || m.animation || (m.document && /^video\//.test(m.document.mime_type || '') ? m.document : null);
       console.log(`[telegram] ${m.chat.id} ${m.voice ? 'voice' : m.audio ? 'audio' : vid ? 'video' : m.photo ? 'photo' : m.document ? 'doc' : 'text'}`);
@@ -29,17 +39,17 @@ export class TelegramCanal {
       return;
     }
     if (resposta && typeof resposta === 'object' && resposta.video) {
-      const r = await fetch(`${API}/bot${this.token}/sendVideo`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, video: resposta.video, caption: semMarkdown(resposta.texto || '').slice(0, 1000), supports_streaming: true }) }).then(r => r.json());
+      const r = await fetch(`${API}/bot${this.token}/sendVideo`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, video: resposta.video, caption: semMarkdown(resposta.texto || '').slice(0, 1000), supports_streaming: true, reply_markup: teclado(resposta.botoes) }) }).then(r => r.json());
       if (!r.ok) { console.error('[telegram] sendVideo falhou:', r.description); await this._post({ chat_id: chatId, text: semMarkdown((resposta.texto || '') + '\n' + resposta.video) }); }
       return;
     }
     if (resposta && typeof resposta === 'object' && resposta.foto) {
-      const r = await fetch(`${API}/bot${this.token}/sendPhoto`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: resposta.foto, caption: semMarkdown(resposta.texto || '').slice(0, 1000) }) }).then(r => r.json());
+      const r = await fetch(`${API}/bot${this.token}/sendPhoto`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: resposta.foto, caption: semMarkdown(resposta.texto || '').slice(0, 1000), reply_markup: teclado(resposta.botoes) }) }).then(r => r.json());
       if (!r.ok) console.error('[telegram] sendPhoto falhou:', r.description);
       return;
     }
     const texto = typeof resposta === 'string' ? resposta : resposta.texto;
-    const base = { chat_id: chatId, reply_markup: resposta?.botoes };
+    const base = { chat_id: chatId, reply_markup: teclado(resposta?.botoes) };
     const html = paraHTML(texto);
     let r = await this._post({ ...base, text: html, parse_mode: 'HTML' });
     if (!r.ok) r = await this._post({ ...base, text: semMarkdown(texto) });
@@ -59,6 +69,11 @@ export class TelegramCanal {
   }
 }
 
+/** botoes: [[{t:'Publicar', d:'story 1'}, …], …] ou já um reply_markup pronto. callback_data ≤ 64 bytes. */
+function teclado(b) {
+  if (!b) return undefined; if (b.inline_keyboard || b.keyboard) return b;
+  return { inline_keyboard: b.map(linha => linha.map(x => ({ text: x.t, callback_data: String(x.d ?? x.t).slice(0, 64) }))) };
+}
 const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 function paraHTML(t) {
   let s = esc(t);

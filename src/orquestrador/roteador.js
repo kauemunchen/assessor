@@ -158,6 +158,7 @@ export async function tratarMensagem(msg, canal) {
     await canal.enviar(msg.conta, msg.chatId, '🎨 Montando… isso leva de 20 a 40 segundos. Te mando a prévia assim que ficar pronta.');
   }
   let resposta = await responder({ prompt, conta, modulo, msg, ativos });
+  if (resposta && typeof resposta === 'object' && resposta.botoes && !resposta.foto && !resposta.video && !resposta.fotos) { /* confirmação com botões: passa direto */ await memoria.registrarInteracao(conta.id, modulo, msg, resposta.texto); return resposta; }
   await memoria.registrarInteracao(conta.id, modulo, msg, resposta);
   // Social: se a resposta contém URL de imagem (fal/cloudinary), manda como foto com a legenda
   if (modulo === 'social' && typeof resposta === 'string') {

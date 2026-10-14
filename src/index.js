@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { criarCanal } from './canal/index.js';
 import { tratarMensagem } from './orquestrador/roteador.js';
+import { comBotoes } from './orquestrador/botoes.js';
 import { iniciarRotinas } from './rotinas/scheduler.js';
 import { migrar } from './db/migrate.js';
 import { setCanal } from './canal/atual.js';
@@ -17,7 +18,7 @@ canal.aoReceber(async (msg) => {
   try {
     const resposta = await tratarMensagem(msg, canal);
     clearInterval(tick); console.log(`[tempo] ${msg.chatId} ${Date.now() - t0}ms`);
-    if (resposta) await canal.enviar(msg.conta, msg.chatId, resposta);
+    if (resposta) await canal.enviar(msg.conta, msg.chatId, comBotoes(resposta));
   } catch (e) {
     clearInterval(tick); console.error('[erro]', msg.chatId, e?.stack || e);
     await canal.enviar(msg.conta, msg.chatId, `⚠️ Deu erro aqui: ${String(e?.message || e).slice(0, 300)}`).catch(() => {});

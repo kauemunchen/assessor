@@ -80,10 +80,10 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
       const email = calls.find(c => c.name === 'enviar_email');
       if (email && calls.length === 1) {
         const links = (email.args.texto.match(/https?:\/\/(?:drive|docs)\.google\.com\/[^\s)>\]]+/g) || []).length; const n = (email.args.anexos_drive_ids || []).length + links;
-        return `✉️ Vou enviar este e-mail${email.args.respondendo_id ? ' (em resposta)' : ''}:\n\nPara: ${email.args.para || '(remetente do e-mail original)'}\nAssunto: ${email.args.assunto || '(Re: do original)'}\n\n${email.args.texto}${n ? `\n\n📎 ${n} arquivo(s) do Drive vão como ANEXO e com leitura liberada para o destinatário.` : ''}\n\nConfirma o envio? (sim/não)`;
+        return { texto: `✉️ Vou enviar este e-mail${email.args.respondendo_id ? ' (em resposta)' : ''}:\n\nPara: ${email.args.para || '(remetente do e-mail original)'}\nAssunto: ${email.args.assunto || '(Re: do original)'}\n\n${email.args.texto}${n ? `\n\n📎 ${n} arquivo(s) do Drive vão como ANEXO e com leitura liberada para o destinatário.` : ''}\n\nConfirma o envio?`, botoes: BOTOES_SIM_NAO };
       }
       const linhas = calls.map(c => `- ${descreverAcao(c)}`);
-      return `Vou fazer o seguinte:\n${linhas.join('\n')}\n\nConfirma? (sim/não)`;
+      return { texto: `Vou fazer o seguinte:\n${linhas.join('\n')}\n\nConfirma?`, botoes: BOTOES_SIM_NAO };
     }
     for (const c of calls) {
       let result;
@@ -91,7 +91,7 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
         const alvo = String(c.args.modulo || '').toLowerCase();
         if (!ativos.includes(alvo) || profundidade > 0) result = { erro: `módulo ${alvo} não está ativo` };
         else if (consultados.has(alvo)) result = { erro: `Você já consultou ${alvo} nesta conversa e recebeu a resposta. Não consulte de novo: use suas próprias ferramentas (ex.: buscar_evento/mover_evento para agenda) ou responda ao dono com o que tem.` };
-        else { consultados.add(alvo); try { const { montarPrompt } = await import('./montador-prompt.js'); const txt = await responder({ prompt: montarPrompt({ modulo: alvo, conta, ativos }), conta, modulo: alvo, msg: { ...msg, texto: c.args.pedido }, ativos, profundidade: 1 }); result = { result: { resposta_do_assessor: txt } }; } catch (e) { result = { erro: e.message }; } }
+        else { consultados.add(alvo); try { const { montarPrompt } = await import('./montador-prompt.js'); const txt = await responder({ prompt: montarPrompt({ modulo: alvo, conta, ativos }), conta, modulo: alvo, msg: { ...msg, texto: c.args.pedido }, ativos, profundidade: 1 }); result = { result: { resposta_do_assessor: typeof txt === 'string' ? txt : txt?.texto || '' } }; } catch (e) { result = { erro: e.message }; } }
         ultimoResultado = result;
         respostas.push({ functionResponse: { name: c.name, response: result } }); continue;
       }
@@ -111,6 +111,7 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
   return ultimoErro ? `Não consegui: ${ultimoErro}` : `Não consegui fechar isso${ultimoResultado ? ` — último retorno: ${JSON.stringify(ultimoResultado).slice(0, 200)}` : ''}. Me diga mais um detalhe — nome exato ou data — e eu refaço.`;
 }
 
+export const BOTOES_SIM_NAO = [[{ t: '✅ Sim', d: 'sim' }, { t: '❌ Não', d: 'não' }]];
 /** Descrição humana de uma chamada de ferramenta, para o pedido de confirmação. */
 export function descreverAcao(c) {
   const a = c.args || {};

@@ -58,18 +58,19 @@ export function iniciar(chatId, { fotoBytes, videoUrl, videoBytes, texto = '', c
     if (ult) { e.base = 'video'; e.videoUrlPendente = ult.url; e.passo = 'audio'; }
   }
   sessoes.set(chatId, e);
-  if (e.passo === 'audio' && e.videoUrlPendente) return `Vou usar o último vídeo que você mandou. Manter o som?\n1️⃣ Manter áudio\n2️⃣ Retirar áudio`;
+  if (e.passo === 'audio' && e.videoUrlPendente) return { texto: 'Vou usar o último vídeo que você mandou. Manter o som?', botoes: [[{ t: '🔊 Manter', d: '1' }, { t: '🔇 Retirar', d: '2' }], [{ t: '✖ Cancelar', d: 'cancela' }]] };
   if (e.passo === 'audio') return perguntaAudio(e);
   if (e.passo === 'base' && e.baseEsperada === 'video') return '🎬 Modo edição de vídeo para Story. Manda o vídeo (até 20 MB) ou o link dele no Drive.';
   if (e.passo === 'base' && e.baseEsperada === 'foto') return '🎬 Modo edição de foto para Story. Manda a foto.';
-  if (e.passo === 'base') return '🎬 Modo edição de Story. Qual é a base?\n1️⃣ Foto\n2️⃣ Vídeo\n3️⃣ Só texto (fundo KM)\n\n(ou mande a foto/vídeo agora · "cancela" sai)';
+  if (e.passo === 'base') return { texto: '🎬 Modo edição de Story. Qual é a base? (ou mande a foto/vídeo agora)', botoes: [[{ t: '📷 Foto', d: '1' }, { t: '🎬 Vídeo', d: '2' }, { t: '🔤 Só texto', d: '3' }], [{ t: '✖ Cancelar', d: 'cancela' }]] };
   return perguntaModelo(e);
 }
-const perguntaAudio = (e) => `Vídeo recebido${e.vinfo ? ` (${e.vinfo.w}x${e.vinfo.h}, ${Math.round(e.vinfo.dur)} s${e.vinfo.audio === false ? ', sem áudio' : ''})` : ''}. Manter o som?\n1️⃣ Manter áudio\n2️⃣ Retirar áudio`;
+const perguntaAudio = (e) => ({ texto: `Vídeo recebido${e.vinfo ? ` (${e.vinfo.w}x${e.vinfo.h}, ${Math.round(e.vinfo.dur)} s${e.vinfo.audio === false ? ', sem áudio' : ''})` : ''}. Manter o som?`, botoes: [[{ t: '🔊 Manter áudio', d: '1' }, { t: '🔇 Retirar áudio', d: '2' }], [{ t: '✖ Cancelar', d: 'cancela' }]] });
+const botoesDe = (ms, porLinha = 2) => { const out = []; for (let i = 0; i < ms.length; i += porLinha) out.push(ms.slice(i, i + porLinha).map(m => ({ t: m.nome.length > 28 ? m.nome.slice(0, 27) + '…' : m.nome, d: String(m.n) }))); out.push([{ t: '✖ Cancelar', d: 'cancela' }]); return out; };
 function perguntaModelo(e) {
-  if (e.base === 'foto') return `Foto recebida. Modelo:\n${lista(MODELOS_FOTO)}\n\nResponda o número.`;
-  if (e.base === 'texto') return `Modelo de story em texto:\n${lista(MODELOS_TEXTO)}\n\nResponda o número.`;
-  return `Vídeo recebido${e.vinfo ? ` (${e.vinfo.w}x${e.vinfo.h}, ${Math.round(e.vinfo.dur)} s)` : ''}. O que aplicar? Pode combinar: "1 e 2", "2 3 4".\n${lista(MODELOS_VIDEO)}\n\nO logo KM entra sempre.`;
+  if (e.base === 'foto') return { texto: 'Foto recebida. Modelo:', botoes: botoesDe(MODELOS_FOTO, 1) };
+  if (e.base === 'texto') return { texto: 'Modelo de story em texto:', botoes: botoesDe(MODELOS_TEXTO, 1) };
+  return { texto: `Vídeo recebido${e.vinfo ? ` (${e.vinfo.w}x${e.vinfo.h}, ${Math.round(e.vinfo.dur)} s)` : ''}. O que aplicar? (toque em um, ou escreva "1 e 2" para combinar). O logo KM entra sempre.`, botoes: [[{ t: '💬 Legenda automática', d: '1' }, { t: '🏷 Frase na faixa KM', d: '2' }], [{ t: '📐 Ajustar 9:16', d: '3' }, { t: '✂️ Cortar', d: '4' }], [{ t: '🏷+💬 Frase + legenda', d: '1 e 2' }, { t: 'Só o logo', d: '0' }], [{ t: '✖ Cancelar', d: 'cancela' }]] };
 }
 
 /** Trata a mensagem do dono dentro do modo. Devolve string (continua), {foto, texto} (prévia) ou null (não é dele). */
@@ -144,7 +145,11 @@ async function _tratar(e, msg, conta, canal) {
     absorverConteudo(e, t); e.passo = 'render'; return gerar(e, msg.chatId, conta);
   }
   if (e.passo === 'previa') {
-    if (/^(sim|aprov|ok|boa|fechou|perfeit)/i.test(t)) { e.passo = 'destino'; return e.base === 'video' ? 'Fechado. Story ou Reels? E o que faço?\n1️⃣ Publicar agora\n2️⃣ Agendar (diga dia e hora)\n3️⃣ Guardar na biblioteca\n(ex.: "story 1", "reels 2 amanhã 19h")' : 'Fechado. O que faço?\n1️⃣ Publicar agora\n2️⃣ Agendar (diga dia e hora)\n3️⃣ Guardar na biblioteca'; }
+    if (/^(sim|aprov|ok|boa|fechou|perfeit)/i.test(t)) {
+      e.passo = 'destino'; const h = proximosHorarios();
+      if (e.base === 'video') return { texto: 'Fechado. Como publicar?', botoes: [[{ t: '📣 Story agora', d: 'story 1' }, { t: '🎞 Reels agora', d: 'reels 1' }], [{ t: `Story ${h[0].rotulo}`, d: `story 2 ${h[0].cmd}` }, { t: `Story ${h[1].rotulo}`, d: `story 2 ${h[1].cmd}` }], [{ t: `Reels ${h[0].rotulo}`, d: `reels 2 ${h[0].cmd}` }, { t: '📚 Guardar', d: 'story 3' }], [{ t: '✖ Cancelar', d: 'cancela' }]] };
+      return { texto: 'Fechado. Como publicar?', botoes: [[{ t: '📣 Publicar agora', d: '1' }], [{ t: h[0].rotulo, d: `2 ${h[0].cmd}` }, { t: h[1].rotulo, d: `2 ${h[1].cmd}` }], [{ t: '📚 Guardar na biblioteca', d: '3' }, { t: '✖ Cancelar', d: 'cancela' }]] };
+    }
     if (e.base === 'video' && /\b(sem|tira|retira|remove)\b.*\b(som|[áa]udio)\b|\bmudo\b/i.test(t)) { e.semAudio = true; return gerar(e, msg.chatId, conta); }
     if (e.base === 'video' && /\b(com|mant[eé]m|manter|volta)\b.*\b(som|[áa]udio)\b/i.test(t)) { e.semAudio = false; return gerar(e, msg.chatId, conta); }
     if (e.base === 'video' && /rodap[ée]|embaixo|no p[ée]|topo|em cima|no meio|centro|mais (alto|baixo)/i.test(t)) {
@@ -211,6 +216,15 @@ Responda JSON: {"texto": "frase/pergunta curta (máx 12 palavras)", "titulo": "t
   }
   if (!e.dados.palavra_dourada) e.dados.palavra_dourada = escolherDourada(e.dados.texto || e.dados.titulo || '');
 }
+const GRADE = ['12:00', '19:00'];
+function proximosHorarios() {
+  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })); const out = [];
+  for (let d = 0; d < 3 && out.length < 2; d++) for (const h of GRADE) {
+    const [hh, mm] = h.split(':').map(Number); const c = new Date(agora); c.setDate(c.getDate() + d); c.setHours(hh, mm, 0, 0);
+    if (c > agora && out.length < 2) out.push({ rotulo: `${d === 0 ? 'hoje' : d === 1 ? 'amanhã' : c.toLocaleDateString('pt-BR', { weekday: 'short' })} ${h.replace(':00', 'h')}`, cmd: `${d === 0 ? 'hoje' : d === 1 ? 'amanhã' : String(c.getDate()).padStart(2, '0') + '/' + String(c.getMonth() + 1).padStart(2, '0')} ${h}` });
+  }
+  return out;
+}
 function extrairData(t) {
   const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   const hm = t.match(/(\d{1,2})[:h](\d{2})?/); if (!hm) return null;
@@ -218,8 +232,8 @@ function extrairData(t) {
   let d = new Date(agora);
   const dm = t.match(/(\d{1,2})\/(\d{1,2})/);
   if (dm) d = new Date(agora.getFullYear(), +dm[2] - 1, +dm[1]);
-  else if (/amanh/i.test(t)) d.setDate(d.getDate() + 1);
   else if (/depois de amanh/i.test(t)) d.setDate(d.getDate() + 2);
+  else if (/amanh/i.test(t)) d.setDate(d.getDate() + 1);
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${hh}:${mm}`;
 }
@@ -241,7 +255,7 @@ async function gerar(e, chatId, conta) {
     e.url = v.url; e.vinfoOut = r.info;
     db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem, descricao, largura, altura, duracao) VALUES (?,?,?,?,?,?,?,?,?)').run(conta.id, v.url, v.url, 'video', 'edicao:video', (d.texto || 'Vídeo editado').slice(0, 120), v.largura || null, v.altura || null, v.duracao || null);
     e.passo = 'previa';
-    return { video: e.url, texto: `Prévia · ${r.info.saida || ''} · ${e.semAudio ? 'sem áudio' : 'com áudio'} · logo ${r.info.logo}${r.info.legendas ? ` · ${r.info.legendas} legendas` : ''}${d.aviso ? `\n⚠️ ${d.aviso}` : ''}\n\nAprova? (sim · "troca o texto para …" · "no rodapé" / "no topo" / "no meio" · "cancela")` };
+    return { video: e.url, texto: `Prévia · ${r.info.saida || ''} · ${e.semAudio ? 'sem áudio' : 'com áudio'} · logo ${r.info.logo}${r.info.legendas ? ` · ${r.info.legendas} legendas` : ''}${d.aviso ? `\n⚠️ ${d.aviso}` : ''}\n\n`, botoes: [[{ t: '✅ Aprovar', d: 'sim' }], [{ t: '⬇ Rodapé', d: 'no rodapé' }, { t: '⬆ Topo', d: 'no topo' }, { t: '↕ Meio', d: 'no meio' }], [{ t: e.semAudio ? '🔊 Com som' : '🔇 Sem som', d: e.semAudio ? 'com som' : 'sem som' }, { t: '✖ Cancelar', d: 'cancela' }]] };
   }
   if (e.modelo.id === 'so_marca') { out = await render.marcaDagua(e.foto); }
   else {
@@ -251,5 +265,5 @@ async function gerar(e, chatId, conta) {
   e.url = await cdn.upload(out.bytes, { pasta: `assessor/${conta.id}/stories` });
   db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem, descricao) VALUES (?,?,?,?,?,?)').run(conta.id, e.url, e.url, 'story', `edicao:${e.modelo.id}`, (d.texto || d.titulo || e.modelo.nome).slice(0, 120));
   e.passo = 'previa';
-  return { foto: e.url, texto: `Prévia · ${e.modelo.nome}${out.info?.logo ? ` · logo ${out.info.logo}` : ''}\n\nAprova? (sim · "troca o texto para …" · "outro modelo" · "cancela")` };
+  return { foto: e.url, texto: `Prévia · ${e.modelo.nome}${out.info?.logo ? ` · logo ${out.info.logo}` : ''}`, botoes: [[{ t: '✅ Aprovar', d: 'sim' }, { t: '🔁 Outro modelo', d: 'outro modelo' }], [{ t: '✖ Cancelar', d: 'cancela' }]] };
 }
