@@ -14,5 +14,6 @@ export function migrar() {
   add('usuarios', 'ultimo_login', 'TEXT');
   try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ix_usuarios_email ON usuarios(email) WHERE email IS NOT NULL') } catch {}
   prepararCreditos();
+  try { import('../custos.js').then(c => c.prepararCustos()) } catch {}
 }
 if (process.argv[1]?.endsWith('migrate.js')) { migrar(); console.log('migrado'); }

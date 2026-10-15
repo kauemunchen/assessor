@@ -124,6 +124,10 @@ export function rotasAdmin(app) {
     let enviados = 0; for (const d of donos) { try { await canal.enviar(null, d.chat_id, `📣 *KM APP* — ${texto}`); enviados++; } catch {} }
     res.json({ ok: true, enviados, total: donos.length });
   });
+  // ---------- Custos: quanto você paga de IA + MP + VPS, e qual sua margem ----------
+  app.get('/api/admin/custos', auth, async (req, res) => { const { resumo } = await import('../custos.js'); const geral = resumo({ dias: Number(req.query.dias || 30) }); const admin = resumo({ contaId: req.contaId, dias: Number(req.query.dias || 30) }); res.json({ geral, admin, admin_conta: db.prepare('SELECT nome_dono, plano, admin FROM contas WHERE id=?').get(req.contaId) }); });
+  app.post('/api/admin/custos/preco', auth, async (req, res) => { const { definirPreco } = await import('../custos.js'); const b = req.body || {}; if (!b.chave) return res.status(400).json({ erro: 'chave?' }); definirPreco(b.chave, b.valor); logAdmin(req.contaId, 'custos.preco', b.chave, { valor: b.valor }); res.json({ ok: true }); });
+
   // ---------- Operação (etapa E): logs, exportação, backup, limpeza, métricas ----------
   app.get('/api/admin/logs', auth, (req, res) => res.json(db.prepare('SELECT l.*, c.nome_dono admin_nome FROM logs_admin l LEFT JOIN contas c ON c.id=l.admin_id ORDER BY l.id DESC LIMIT 200').all()));
 

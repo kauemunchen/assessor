@@ -159,3 +159,43 @@ telas.operacao = async () => {
     $('#btSusp').onclick = async () => { const ids = [...document.querySelectorAll('.sel:checked')].map(x => Number(x.value)); if (!ids.length) return toast('Selecione pelo menos uma conta.'); if (!confirm(`Suspender ${ids.length} conta(s)? Elas param de usar o KM APP até você reativar.`)) return; await api('/api/admin/limpeza/marcar', { method: 'POST', body: JSON.stringify({ ids }) }); toast(`${ids.length} suspensa(s)`); $('#btPrev').onclick(); };
   } };
 };
+
+telas.custos = async () => {
+  const d = await api('/api/admin/custos'); const p = d.geral.precos;
+  const inp = (k, step, w) => `<input class="pr" data-k="${k}" type="number" step="${step}" value="${p[k]}" style="width:${w || 90}px">`;
+  const corpo = `<div class="kpis">
+    <div class="kpi"><div class="r">Receita (30d)</div><div class="v">${fmtR(d.geral.receita_brl)}</div><div class="s">bruto · ${fmtR(d.geral.mp.total_liquido)} líquido depois do MP</div></div>
+    <div class="kpi"><div class="r">Custo IA (30d)</div><div class="v">${fmtR(d.geral.ia.total_brl)}</div><div class="s">US$ ${d.geral.ia.total_usd.toFixed(4)} · câmbio R$ ${p.usd_brl}</div></div>
+    <div class="kpi"><div class="r">Taxas Mercado Pago (30d)</div><div class="v">${fmtR(d.geral.mp.total_taxa)}</div><div class="s">${d.geral.mp.por_forma.length} tipos de cobrança</div></div>
+    <div class="kpi"><div class="r">Infra fixa (30d)</div><div class="v">${fmtR(d.geral.infra_brl)}</div><div class="s">VPS + domínio + backups</div></div>
+    <div class="kpi" style="border:1px solid ${d.geral.margem_brl >= 0 ? '#4CAF7A' : '#E25D5D'}"><div class="r">Margem líquida (30d)</div><div class="v" style="color:${d.geral.margem_brl >= 0 ? '#1E7A45' : '#B4232A'}">${fmtR(d.geral.margem_brl)}</div><div class="s">receita − IA − taxas MP − infra</div></div>
+  </div>
+  <div class="grade">
+    <div class="cartao"><h3>Seu consumo (admin · ${esc(d.admin_conta?.nome_dono || '')})</h3><p class="d">Você usa o KM APP como admin ilimitado — nenhum crédito é descontado, mas o custo real existe. Aqui está o que gastou com IA nos últimos 30 dias.</p>
+      <ul class="lista-s"><li><span>Total gasto em IA</span><b>${fmtR(d.admin.ia.total_brl)} <small style="color:var(--mudo)">(US$ ${d.admin.ia.total_usd.toFixed(4)})</small></b></li></ul>
+      <p class="d" style="margin-top:10px">Por modelo</p><ul class="lista-s">${d.admin.ia.por_modelo.map(m => `<li><span>${esc(m.modelo_norm)}</span><span>${fmtN(m.tokens_in + m.tokens_out)} tokens · ${fmtR(m.custo_brl)}</span></li>`).join('') || '<li>Sem uso ainda.</li>'}</ul>
+    </div>
+    <div class="cartao"><h3>Taxas MP por forma de pagamento (30d)</h3>
+      <div class="tabela compacta"><table><thead><tr><th>Forma</th><th>Cobranças</th><th style="text-align:right">Bruto</th><th style="text-align:right">Taxa</th><th style="text-align:right">Líquido</th></tr></thead><tbody>${d.geral.mp.por_forma.map(x => `<tr><td>${esc(x.forma)}</td><td>${x.cobrancas}</td><td style="text-align:right">${fmtR(x.bruto)}</td><td style="text-align:right">${fmtR(x.taxa)}</td><td style="text-align:right">${fmtR(x.liquido)}</td></tr>`).join('') || '<tr><td colspan="5">Sem cobranças pagas.</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="cartao" style="grid-column:1/-1"><h3>Preços (editáveis)</h3><p class="d">Ajuste conforme as condições reais do seu plano no Google (Gemini), Mercado Pago e no seu VPS. Preços de IA em <b>US$ por 1M de tokens</b>; MP em fração (0.0099 = 0,99%).</p>
+      <div class="tabela compacta"><table><tbody>
+        <tr><th>IA — Gemini 2.5 Flash</th><td>in ${inp('gemini-2.5-flash_in',0.01)} / out ${inp('gemini-2.5-flash_out',0.01)}</td></tr>
+        <tr><th>IA — Gemini 2.5 Pro</th><td>in ${inp('gemini-2.5-pro_in',0.01)} / out ${inp('gemini-2.5-pro_out',0.01)}</td></tr>
+        <tr><th>IA — Gemini 2.0 Flash</th><td>in ${inp('gemini-2.0-flash_in',0.001)} / out ${inp('gemini-2.0-flash_out',0.001)}</td></tr>
+        <tr><th>IA — Gemini Flash Lite</th><td>in ${inp('gemini-flash-lite_in',0.001)} / out ${inp('gemini-flash-lite_out',0.001)}</td></tr>
+        <tr><th>IA — Gemini 1.5 Flash / Pro</th><td>Flash: in ${inp('gemini-1.5-flash_in',0.001)} / out ${inp('gemini-1.5-flash_out',0.001)} · Pro: in ${inp('gemini-1.5-pro_in',0.01)} / out ${inp('gemini-1.5-pro_out',0.01)}</td></tr>
+        <tr><th>Fal.ai (US$ por imagem)</th><td>${inp('fal_imagem_usd',0.001)}</td></tr>
+        <tr><th>MP · Pix</th><td>% ${inp('mp_pix_pct',0.0001,100)} + R$ ${inp('mp_pix_fixo',0.01)}</td></tr>
+        <tr><th>MP · Cartão</th><td>% ${inp('mp_cartao_pct',0.0001,100)} + R$ ${inp('mp_cartao_fixo',0.01)}</td></tr>
+        <tr><th>MP · Boleto</th><td>% ${inp('mp_boleto_pct',0.0001,100)} + R$ ${inp('mp_boleto_fixo',0.01)}</td></tr>
+        <tr><th>Infra fixa mensal (R$)</th><td>${inp('infra_mensal_brl',1)}</td></tr>
+        <tr><th>Câmbio USD → BRL</th><td>${inp('usd_brl',0.01)}</td></tr>
+      </tbody></table></div>
+      <p class="d" style="margin-top:8px"><button class="btn prim" id="btSalvarPrecos">Salvar preços</button> <span class="salvo" id="prMsg"></span></p>
+    </div>
+  </div>`;
+  return { titulo: '💰 Custos & margem', sub: 'Quanto você paga de IA, taxas de pagamento e infra — e sua margem real.', corpo, depois() {
+    $('#btSalvarPrecos').onclick = async () => { $('#prMsg').textContent = 'salvando…'; const inputs = document.querySelectorAll('input.pr'); for (const el of inputs) { try { await post('/api/admin/custos/preco', { chave: el.dataset.k, valor: Number(el.value) }); } catch {} } $('#prMsg').textContent = '✅ salvo'; setTimeout(() => montarTela('custos'), 1200); };
+  } };
+};
