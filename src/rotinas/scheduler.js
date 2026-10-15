@@ -89,7 +89,13 @@ async function avisarVencimentos(canal) {
 
 async function publicarAgendados(canal) {
   const agora = agoraISO();
-  for (const p of db.prepare("SELECT p.*, u.chat_id FROM posts p JOIN usuarios u ON u.conta_id=p.conta_id AND u.papel='dono' WHERE p.status='agendado' AND p.data<=?").all(agora)) {
+  const candidatos = db.prepare("SELECT p.*, u.chat_id FROM posts p JOIN usuarios u ON u.conta_id=p.conta_id AND u.papel='dono' WHERE p.status='agendado' AND p.data<=?").all(agora);
+  for (const p of candidatos) {
+    // LOCK ATÔMICO: só segue se conseguir mudar 'agendado' → 'publicando' nesta linha.
+    // O cron roda a cada 1 min; sem este lock, se publicarPost demora >60s (upload de vídeo
+    // pro Instagram leva fácil 30-90s), o próximo tick pega o mesmo post e publica DUPLICADO.
+    const lock = db.prepare("UPDATE posts SET status='publicando' WHERE id=? AND status='agendado'").run(p.id);
+    if (lock.changes === 0) continue; // outro worker/tick já pegou este post
     try { const r = await publicarPost(p.conta_id, p.id); await canal.enviar(p.conta_id, p.chat_id, `📣 Post #${p.id} publicado no Instagram (${r.ig_media_id}).`); }
     catch (e) {
       const m = String(e.message || e); const token = /code":190|access token|OAuthException|invalidated|expired/i.test(m);
@@ -101,7 +107,15 @@ async function publicarAgendados(canal) {
   }
 }
 
+// Recuperação na partida: posts travados em 'publicando' (processo caiu no meio) viram 'erro'
+// para o admin reavaliar — NÃO voltam a 'agendado' automaticamente porque podem já ter ido pro Instagram.
+function destravarPublicando() {
+  const r = db.prepare("UPDATE posts SET status='erro' WHERE status='publicando'").run();
+  if (r.changes) console.log(`[scheduler] ${r.changes} post(s) travado(s) em 'publicando' marcado(s) como 'erro' — verifique no Instagram se saíram antes de reagendar.`);
+}
+
 export function iniciarRotinas(canal) {
+  destravarPublicando(); // posts travados em 'publicando' do deploy anterior → 'erro' (admin reavalia)
   cron.schedule('* * * * *', async () => {
     await dispararLembretes(canal);
     await publicarAgendados(canal).catch(e => console.error('publicarAgendados', e.message));
