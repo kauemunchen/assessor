@@ -115,7 +115,7 @@ export function iniciarRotinas(canal) {
   cron.schedule('5 8 * * *', () => avisarTokenInstagram(canal), { timezone: TZ });
   cron.schedule('0 3 * * *', () => limparBiblioteca(canal).catch(e => console.error('limparBiblioteca', e.message)), { timezone: TZ });
   cron.schedule('0 9 * * 1', () => avisarAdminsInativas().catch(e => console.error('inativas', e.message)), { timezone: TZ });
-  cron.schedule('*/5 * * * *', () => import('../integracoes/asaas.js').then(a => a.conferirPendentes()).catch(e => console.error('asaas', e.message)), { timezone: TZ });
+  cron.schedule('*/5 * * * *', () => import('../integracoes/pagamento.js').then(a => a.conferirPendentes()).catch(e => console.error('asaas', e.message)), { timezone: TZ });
   cron.schedule('30 8 * * 1-6', () => cobrarDelegadas().catch(e => console.error('cobrarDelegadas', e.message)), { timezone: TZ });
 }
 

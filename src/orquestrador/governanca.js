@@ -159,7 +159,7 @@ const compraPendente = new Map(); // chatId → { pacote, forma, passo: 'forma'|
 const PAC_RX = /(mensal[_ ]?pro|mensal[_ ]?max|plano pro|plano max|start|pro|max)\b/;
 const normPac = (x) => { x = x.replace(/[_ ]/g, ' '); if (/plano pro|mensal pro/.test(x)) return 'mensal_pro'; if (/plano max|mensal max/.test(x)) return 'mensal_max'; return x; };
 async function fluxoCompra(msg, conta, t, orig) {
-  const c = await import('../creditos/index.js'); const as = await import('../integracoes/asaas.js');
+  const c = await import('../creditos/index.js'); const as = await import('../integracoes/pagamento.js');
   const est = compraPendente.get(msg.chatId); if (est && Date.now() - est.em > 15 * 60000) compraPendente.delete(msg.chatId);
   const e = compraPendente.get(msg.chatId);
   const nomePac = (id) => c.PACOTES.find(p => p.id === id)?.nome || id;
