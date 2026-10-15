@@ -22,8 +22,9 @@ async function api(caminho, { metodo = 'GET', corpo } = {}) {
   return j;
 }
 const hoje = (mais = 0) => new Date(Date.now() + mais * 864e5).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-export const limparDoc = (s) => String(s || '').replace(/\D/g, '');
-export const docValido = (s) => { const d = limparDoc(s); return d.length === 11 || d.length === 14; };
+import { docValido as docValidoReal, limparDoc as limparDocReal } from '../utils/doc.js';
+export const limparDoc = limparDocReal;
+export const docValido = docValidoReal;
 
 /** Garante o cliente no Asaas (um por conta). Atualiza CPF/CNPJ e e-mail da conta. */
 export async function garantirCliente(contaId, { nome, cpfCnpj, email } = {}) {

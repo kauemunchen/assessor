@@ -58,13 +58,18 @@ export class WebCanal {
     const verifica = (senha, armazenado) => { try { const [v, saltHex, dHex] = String(armazenado).split('$'); if (v !== 's1') return false; const d = crypto.scryptSync(senha, Buffer.from(saltHex, 'hex'), 64); return crypto.timingSafeEqual(d, Buffer.from(dHex, 'hex')); } catch { return false; } };
     const setCookie = (res, tok) => res.setHeader('Set-Cookie', `akm=${tok}; Path=/; Max-Age=${180 * 86400}; SameSite=Lax; HttpOnly${process.env.PUBLIC_URL?.startsWith('https') || process.env.WEBAPP_URL?.startsWith('https') ? '; Secure' : ''}`);
 
+    const _norm = (s) => String(s || '').replace(/\D/g, '');
+    let _doc = null; import('../utils/doc.js').then(m => { _doc = m; });
+    const _val = (s) => _doc ? _doc.docValido(s) : (_norm(s).length === 11 || _norm(s).length === 14);
     app.post('/api/cadastro', async (req, res) => {
       const b = req.body || {}; const nome = limpar(b.nome), empresa = limpar(b.empresa) || nome, email = limpar(b.email).toLowerCase(), senha = String(b.senha || ''), cpfCnpj = limpar(b.cpf_cnpj).replace(/\D/g, '');
       if (!nome || nome.length < 2) return res.status(400).json({ erro: 'informe seu nome' });
       if (!emailOk(email)) return res.status(400).json({ erro: 'e-mail inválido' });
+      if (!_val(cpfCnpj)) return res.status(400).json({ erro: 'CPF ou CNPJ inválido — confira os números' });
       if (senha.length < 8) return res.status(400).json({ erro: 'senha precisa ter pelo menos 8 caracteres' });
-      if (db.prepare('SELECT id FROM usuarios WHERE email=?').get(email)) return res.status(400).json({ erro: 'já existe conta com esse e-mail' });
-      const r = db.prepare('INSERT INTO contas (nome_dono, empresa, cpf_cnpj, email) VALUES (?,?,?,?)').run(nome, empresa, cpfCnpj || null, email);
+      if (db.prepare('SELECT id FROM usuarios WHERE email=?').get(email) || db.prepare('SELECT id FROM contas WHERE email=?').get(email)) return res.status(400).json({ erro: 'Esse e-mail já está em uso. Clique em “Entrar” ou use outro e-mail.' });
+      if (db.prepare('SELECT id FROM contas WHERE cpf_cnpj=?').get(_norm(cpfCnpj))) return res.status(400).json({ erro: 'Esse CPF/CNPJ já está cadastrado em outra conta.' });
+      const r = db.prepare('INSERT INTO contas (nome_dono, empresa, cpf_cnpj, email) VALUES (?,?,?,?)').run(nome, empresa, _norm(cpfCnpj), email);
       const contaId = Number(r.lastInsertRowid);
       // Primeira conta do banco vira admin ilimitado automaticamente
       if (!db.prepare('SELECT id FROM contas WHERE admin=1 AND id<>?').get(contaId)) db.prepare("UPDATE contas SET admin=1, plano='ilimitado' WHERE id=?").run(contaId);

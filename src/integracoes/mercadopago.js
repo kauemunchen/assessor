@@ -27,8 +27,9 @@ async function api(caminho, { metodo = 'GET', corpo, extra } = {}) {
   if (!r.ok) throw new Error(j?.message || j?.error || `Mercado Pago ${r.status}`);
   return j;
 }
-export const limparDoc = (s) => String(s || '').replace(/\D/g, '');
-export const docValido = (s) => { const d = limparDoc(s); return d.length === 11 || d.length === 14; };
+import { docValido as docValidoReal, limparDoc as limparDocReal } from '../utils/doc.js';
+export const limparDoc = limparDocReal;
+export const docValido = docValidoReal;
 const hoje = (mais = 0) => new Date(Date.now() + mais * 864e5).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 const expira = (minutos) => new Date(Date.now() + minutos * 60000).toISOString().replace('Z', '-03:00');
 
