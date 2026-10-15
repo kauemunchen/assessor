@@ -3,7 +3,7 @@
 etiqueta do pilar (Bold 30 caixa alta) · rodapé: logo KM branco + KAUÊ MÜNCHEN (Medium 22 caixa alta), margem 64.
 """
 import io, os, re
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.environ.get("LOGO_PATH", os.path.join(AQUI, "logo_km.png"))
@@ -156,7 +156,7 @@ def logo_colorido(cor_hex):
 def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatura=False):
     """Aplica o logo KM com cor decidida pela luminosidade do canto: branco em fundo escuro, #37414E em fundo claro.
     Em fundo médio/ruidoso adiciona sombra suave para legibilidade. Retorna (jpeg_bytes, info)."""
-    img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+    img = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGBA")
     Wf, Hf = img.size
     lw = int(Wf * proporcao); margem = int(Wf * 0.045)
     lg0 = logo("claro")

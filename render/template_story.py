@@ -3,8 +3,19 @@ Fundo #37414E · Poppins · título branco com UMA palavra dourada #B9964B · ap
 Modelos: foto_faixa, frase, chamada_feed, passos, pergunta, data. Toda saída passa por marca_dagua() no fim — regra dura.
 """
 import io
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageEnhance
 from template_manual import fonte, h2r, wrap, titulo_destacado, logo, marca_dagua, PRIM, SEC, BRANCO, OURO
+
+def _abrir_foto(foto_bytes):
+    """Abre a foto respeitando o EXIF orientation (celulares salvam retrato como landscape+rotação) e aplica tratamento leve de iluminação profissional (contraste, nitidez, cor) SEM mexer na composição."""
+    f = Image.open(io.BytesIO(foto_bytes))
+    f = ImageOps.exif_transpose(f).convert("RGB")
+    # Tratamento profissional sutil — só ilumina/realça, não recorta nem redesenha
+    f = ImageEnhance.Brightness(f).enhance(1.04)
+    f = ImageEnhance.Contrast(f).enhance(1.08)
+    f = ImageEnhance.Color(f).enhance(1.06)
+    f = ImageEnhance.Sharpness(f).enhance(1.15)
+    return f
 
 W, H, M = 1080, 1920, 72
 ZONA_TOPO, ZONA_BASE = 250, 300  # áreas que a UI do Instagram cobre — não pôr texto importante lá
@@ -27,8 +38,8 @@ def _etiqueta(dr, texto, y=ZONA_TOPO):
     return y + 90
 
 def _cover(foto_bytes):
-    """Foto preenchendo 1080×1920 (crop central)."""
-    f = Image.open(io.BytesIO(foto_bytes)).convert("RGB")
+    """Foto preenchendo 1080×1920 (crop central), respeitando EXIF e com ajuste leve de iluminação (fica como foto profissional, sem redesenhar o conteúdo)."""
+    f = _abrir_foto(foto_bytes)
     r = max(W / f.width, H / f.height)
     f = f.resize((int(f.width * r) + 1, int(f.height * r) + 1), Image.LANCZOS)
     x = (f.width - W) // 2; y = (f.height - H) // 2
