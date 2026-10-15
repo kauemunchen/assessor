@@ -7,6 +7,10 @@ export function migrar() {
   add('posts', 'tema', 'TEXT'); add('posts', 'publicado_em', 'TEXT'); add('posts', 'gcal_event_id', 'TEXT');
   add('contas', 'drive_pasta_id', 'TEXT'); add('contas', 'empresas', 'TEXT');
   add('instagram_auth', 'expira_em', 'TEXT'); add('biblioteca', 'marcada_url', 'TEXT'); add('biblioteca', 'protegida', 'INTEGER DEFAULT 0'); add('biblioteca', 'descricao', 'TEXT'); add('biblioteca', 'usado_em', 'TEXT'); add('biblioteca', 'origem', 'TEXT'); add('biblioteca', 'largura', 'INTEGER'); add('biblioteca', 'altura', 'INTEGER'); add('biblioteca', 'duracao', 'REAL'); add('tarefas', 'usuario_id', 'INTEGER'); add('tarefas', 'descricao', 'TEXT'); add('tarefas', 'concluida_em', 'TEXT');
+  add('usuarios', 'email', 'TEXT');
+  add('usuarios', 'senha_hash', 'TEXT');
+  add('usuarios', 'ultimo_login', 'TEXT');
+  try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ix_usuarios_email ON usuarios(email) WHERE email IS NOT NULL') } catch {}
   prepararCreditos();
 }
 if (process.argv[1]?.endsWith('migrate.js')) { migrar(); console.log('migrado'); }

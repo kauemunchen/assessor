@@ -8,19 +8,36 @@ let me = null, ws = null, filtro = null, maisAntigo = null, anexo = null, rec = 
 // ---------- login ----------
 async function mostrarLogin() {
   $('#app').classList.add('oculto'); $('#login').classList.remove('oculto');
+  // abas
+  document.querySelectorAll('.abas-login .aba').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.abas-login .aba').forEach(x => x.classList.toggle('on', x === b));
+    for (const id of ['formEntrar', 'formCadastro', 'formTelegram']) document.getElementById(id).classList.toggle('oculto', id !== 'form' + (b.dataset.aba[0].toUpperCase() + b.dataset.aba.slice(1)));
+    if (b.dataset.aba === 'telegram') carregarTelegram();
+  });
+  // formulários
+  $('#formEntrar').onsubmit = async (e) => { e.preventDefault(); $('#erroEntrar').textContent = ''; const f = Object.fromEntries(new FormData(e.target));
+    const r = await (await fetch('/api/login/senha', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(f) })).json();
+    if (r.ok) { localStorage.setItem('akm', r.token); iniciar(); } else $('#erroEntrar').textContent = r.erro || 'não foi possível entrar'; };
+  $('#formCadastro').onsubmit = async (e) => { e.preventDefault(); $('#erroCadastro').textContent = ''; const f = Object.fromEntries(new FormData(e.target));
+    const r = await (await fetch('/api/cadastro', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(f) })).json();
+    if (r.ok) { localStorage.setItem('akm', r.token); iniciar(); } else $('#erroCadastro').textContent = r.erro || 'não foi possível criar'; };
+}
+async function carregarTelegram() {
+  if ($('#codigo').textContent.length > 6) return; // já carregado
   const { codigo, token, bot } = await (await fetch('/api/login/iniciar', { method: 'POST' })).json();
   $('#codigo').textContent = `web ${codigo}`; $('#botNome').textContent = '@' + bot;
   $('#abrirBot').href = `https://t.me/${bot}?text=${encodeURIComponent('web ' + codigo)}`;
   const timer = setInterval(async () => {
     const r = await (await fetch(`/api/login/status?token=${token}`)).json();
     if (r.ok) { clearInterval(timer); localStorage.setItem('akm', token); iniciar(); }
-    if (!r.ok && !r.aguardando) { clearInterval(timer); mostrarLogin(); }
+    if (!r.ok && !r.aguardando) { clearInterval(timer); $('#codigo').textContent = '······'; carregarTelegram(); }
   }, 2000);
 }
 async function iniciar() {
   try { me = await api('/api/me'); } catch { return; }
   $('#login').classList.add('oculto'); $('#app').classList.remove('oculto');
   $('#donoNome').textContent = me.conta.nome_dono;
+  if (me.conta.admin === 1) $('#btAdmin').classList.remove('oculto');
   if (me.creditos) { const c = me.creditos; const pct = c.ilimitada ? 100 : Math.max(0, Math.min(100, c.saldo / (c.base || 1) * 100)); $('#saldoBloco').classList.remove('oculto'); $('#saldoNum').textContent = c.ilimitada ? '∞' : Number(c.saldo).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); $('#saldoSub').textContent = c.ilimitada ? 'ilimitado' : pct <= 5 ? 'recarregue' : pct <= 20 ? 'acabando' : 'créditos'; const b = $('#saldoBarra'); b.style.width = pct + '%'; b.style.background = c.ilimitada ? '#4CAF7A' : pct <= 5 ? '#E25D5D' : pct <= 20 ? '#E0A030' : 'var(--ouro)'; $('#saldoBloco').onclick = () => { mostrarTela('creditos'); $('#lateral').classList.remove('aberta'); }; }
   const nome = (m) => me.personas.find(p => p.modulo === m)?.nome || NOMES[m];
   $('#equipeAtiva').innerHTML = `<div class="titulo">Equipe ativa</div>` + me.modulos.map(m => `<div class="equipe-item"><span class="dot"></span>${nome(m)} <span style="opacity:.6;font-size:12px">· ${NOMES[m]}</span></div>`).join('');

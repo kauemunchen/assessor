@@ -51,9 +51,50 @@ export class WebCanal {
     app.post('/api/login/iniciar', (req, res) => { const codigo = String(Math.floor(100000 + Math.random() * 900000)); const token = crypto.randomBytes(24).toString('hex'); db.prepare('INSERT INTO web_codigos (codigo, token) VALUES (?,?)').run(codigo, token); res.json({ codigo, token, bot: process.env.TELEGRAM_BOT_USERNAME || 'AssessorKM_bot' }); });
     app.get('/api/login/status', (req, res) => { const c = db.prepare('SELECT * FROM web_codigos WHERE token=?').get(req.query.token || ''); if (!c) return res.status(404).json({ ok: false }); if (!c.usado) return res.json({ ok: false, aguardando: true }); res.setHeader('Set-Cookie', `akm=${c.token}; Path=/; Max-Age=${180 * 86400}; SameSite=Lax; HttpOnly${process.env.PUBLIC_URL?.startsWith('https') ? '; Secure' : ''}`); res.json({ ok: true, token: c.token }); });
     app.post('/api/logout', (req, res) => { const s = sessao(req); if (s) db.prepare('DELETE FROM web_sessoes WHERE token=?').run(s.token); res.setHeader('Set-Cookie', 'akm=; Path=/; Max-Age=0'); res.json({ ok: true }); });
+
+    // ---------- Cadastro público e login por e-mail+senha ----------
+    const limpar = (s) => String(s || '').trim(); const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+    const hash = (senha) => { const salt = crypto.randomBytes(16); const d = crypto.scryptSync(senha, salt, 64); return 's1$' + salt.toString('hex') + '$' + d.toString('hex'); };
+    const verifica = (senha, armazenado) => { try { const [v, saltHex, dHex] = String(armazenado).split('$'); if (v !== 's1') return false; const d = crypto.scryptSync(senha, Buffer.from(saltHex, 'hex'), 64); return crypto.timingSafeEqual(d, Buffer.from(dHex, 'hex')); } catch { return false; } };
+    const setCookie = (res, tok) => res.setHeader('Set-Cookie', `akm=${tok}; Path=/; Max-Age=${180 * 86400}; SameSite=Lax; HttpOnly${process.env.PUBLIC_URL?.startsWith('https') || process.env.WEBAPP_URL?.startsWith('https') ? '; Secure' : ''}`);
+
+    app.post('/api/cadastro', async (req, res) => {
+      const b = req.body || {}; const nome = limpar(b.nome), empresa = limpar(b.empresa) || nome, email = limpar(b.email).toLowerCase(), senha = String(b.senha || ''), cpfCnpj = limpar(b.cpf_cnpj).replace(/\D/g, '');
+      if (!nome || nome.length < 2) return res.status(400).json({ erro: 'informe seu nome' });
+      if (!emailOk(email)) return res.status(400).json({ erro: 'e-mail inválido' });
+      if (senha.length < 8) return res.status(400).json({ erro: 'senha precisa ter pelo menos 8 caracteres' });
+      if (db.prepare('SELECT id FROM usuarios WHERE email=?').get(email)) return res.status(400).json({ erro: 'já existe conta com esse e-mail' });
+      const r = db.prepare('INSERT INTO contas (nome_dono, empresa, cpf_cnpj, email) VALUES (?,?,?,?)').run(nome, empresa, cpfCnpj || null, email);
+      const contaId = Number(r.lastInsertRowid);
+      // Primeira conta do banco vira admin ilimitado automaticamente
+      if (!db.prepare('SELECT id FROM contas WHERE admin=1 AND id<>?').get(contaId)) db.prepare("UPDATE contas SET admin=1, plano='ilimitado' WHERE id=?").run(contaId);
+      const chatSinteico = `web:${contaId}`; db.prepare('INSERT INTO usuarios (conta_id, canal, chat_id, nome, papel, email, senha_hash) VALUES (?,?,?,?,?,?,?)').run(contaId, 'web', chatSinteico, nome, 'dono', email, hash(senha));
+      for (const m of ['secretaria', 'social']) db.prepare('INSERT INTO modulos (conta_id, modulo, ligado) VALUES (?,?,1)').run(contaId, m);
+      try { const c = await import('../creditos/index.js'); c.concederTrial(contaId); } catch {}
+      const tok = crypto.randomBytes(24).toString('hex'); db.prepare('INSERT INTO web_sessoes (token, conta_id, chat_id) VALUES (?,?,?)').run(tok, contaId, chatSinteico);
+      setCookie(res, tok); res.json({ ok: true, token: tok });
+    });
+
+    app.post('/api/login/senha', (req, res) => {
+      const email = limpar(req.body?.email).toLowerCase(); const senha = String(req.body?.senha || '');
+      const u = db.prepare('SELECT * FROM usuarios WHERE email=?').get(email);
+      if (!u || !u.senha_hash || !verifica(senha, u.senha_hash)) return res.status(401).json({ erro: 'e-mail ou senha incorretos' });
+      const tok = crypto.randomBytes(24).toString('hex'); db.prepare('INSERT INTO web_sessoes (token, conta_id, chat_id) VALUES (?,?,?)').run(tok, u.conta_id, u.chat_id);
+      db.prepare('UPDATE usuarios SET ultimo_login=CURRENT_TIMESTAMP WHERE id=?').run(u.id);
+      setCookie(res, tok); res.json({ ok: true, token: tok });
+    });
+
+    app.post('/api/senha', (req, res) => {
+      const s = sessao(req); if (!s) return res.status(401).json({ erro: 'não autenticado' });
+      const atual = String(req.body?.atual || ''); const nova = String(req.body?.nova || '');
+      if (nova.length < 8) return res.status(400).json({ erro: 'nova senha precisa ter pelo menos 8 caracteres' });
+      const u = db.prepare('SELECT * FROM usuarios WHERE conta_id=? AND papel=\'dono\' LIMIT 1').get(s.conta_id);
+      if (u.senha_hash && !verifica(atual, u.senha_hash)) return res.status(400).json({ erro: 'senha atual incorreta' });
+      db.prepare('UPDATE usuarios SET senha_hash=? WHERE id=?').run(hash(nova), u.id); res.json({ ok: true });
+    });
     const auth = (req, res, next) => { const s = sessao(req); if (!s) return res.status(401).json({ erro: 'não autenticado' }); req.sessao = s; next(); };
     app.get('/api/me', auth, async (req, res) => {
-      const conta = db.prepare('SELECT id, nome_dono, empresa, foco_mes, empresas FROM contas WHERE id=?').get(req.sessao.conta_id);
+      const conta = db.prepare('SELECT id, nome_dono, empresa, foco_mes, empresas, admin, plano, email, cpf_cnpj FROM contas WHERE id=?').get(req.sessao.conta_id);
       const modulos = db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(conta.id).map(x => x.modulo);
       const personas = db.prepare('SELECT modulo, nome FROM persona_config WHERE conta_id=?').all(conta.id);
       let creditos = null; try { const c = await import('../creditos/index.js'); creditos = { saldo: c.saldo(conta.id), ilimitada: c.ilimitada(conta.id), base: c.ultimaRecarga(conta.id), produto: c.PRODUTO }; } catch {}

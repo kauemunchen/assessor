@@ -134,3 +134,12 @@ body{font-family:Poppins,-apple-system,"Segoe UI",Roboto,sans-serif;background:v
 .pacotes{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .pacote{display:flex;flex-direction:column;gap:2px;align-items:flex-start;padding:12px;border:1px solid var(--sec);border-radius:12px;background:var(--fundo);cursor:pointer;font:inherit;color:var(--texto);text-align:left}
 .pacote:hover{border-color:var(--ouro)}.pacote b{font-size:14px}.pacote span{font-size:12px;color:var(--mudo)}.pacote .preco{font-size:16px;font-weight:700;color:var(--prim);margin-top:4px}.pacote .preco small{font-size:11px;font-weight:400}
+
+/* login tabs */
+.login-card{max-width:420px}
+.abas-login{display:flex;gap:4px;margin:12px 0 16px;background:var(--fundo);padding:4px;border-radius:10px}
+.abas-login .aba{flex:1;padding:8px 10px;border:0;background:transparent;color:var(--mudo);font:inherit;font-size:12px;border-radius:8px;cursor:pointer}
+.abas-login .aba.on{background:var(--card);color:var(--texto);box-shadow:var(--sombra);font-weight:600}
+.form-login h2{margin:0 0 12px;font-size:20px}
+.form-login .btn{width:100%;margin-top:4px}
+.form-login .erro{color:#E25D5D;font-size:13px;margin-top:6px;min-height:16px}

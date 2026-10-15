@@ -331,3 +331,22 @@ telas.creditos = async () => {
   } };
 };
 const NOMES_PAC = (d, id) => d.pacotes.find(p => p.id === id)?.nome || id;
+
+// ---------------- MINHA CONTA ----------------
+telas.conta = async () => {
+  const d = await api('/api/me'); const c = d.conta;
+  const corpo = `<div class="grade">
+    <div class="cartao"><h3>Dados da conta</h3>
+      <ul class="lista-s"><li><span>Nome</span><b>${esc(c.nome_dono)}</b></li><li><span>Empresa</span><b>${esc(c.empresa || '—')}</b></li><li><span>E-mail</span><b>${esc(c.email || '—')}</b></li><li><span>CPF/CNPJ</span><b>${esc(c.cpf_cnpj || '—')}</b></li><li><span>Plano</span><b>${esc(c.plano || 'trial')}</b></li>${c.admin ? '<li><span>Perfil</span><b>👑 Administrador do KM APP</b></li>' : ''}</ul>
+      <p class="d" style="margin-top:10px">Para alterar nome, empresa ou CPF/CNPJ, use a tela <b>Equipe → Conta</b>.</p>
+    </div>
+    <div class="cartao"><h3>Trocar senha</h3>
+      <form id="fSenha"><div class="campo"><label>Senha atual</label><input name="atual" type="password" required></div><div class="campo"><label>Nova senha (mín. 8 caracteres)</label><input name="nova" type="password" minlength="8" required></div><button class="btn prim">Trocar senha</button> <span class="salvo" id="senhaMsg"></span></form>
+    </div>
+    <div class="cartao"><h3>Sair</h3><p class="d">Encerra sua sessão neste navegador.</p><button class="btn sec" id="btSair2">Sair do KM APP</button></div>
+  </div>`;
+  return { titulo: '👤 Minha conta', sub: 'Seus dados, senha e sessão.', corpo, depois() {
+    $('#fSenha').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); $('#senhaMsg').textContent = ''; try { const r = await post('/api/senha', f); $('#senhaMsg').textContent = '✅ senha trocada'; e.target.reset(); } catch { $('#senhaMsg').textContent = ''; } };
+    $('#btSair2').onclick = async () => { await fetch('/api/logout', { method: 'POST', credentials: 'same-origin', headers: { authorization: 'Bearer ' + tokenLocal() } }); localStorage.removeItem('akm'); location.reload(); };
+  } };
+};
