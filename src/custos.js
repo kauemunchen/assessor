@@ -74,6 +74,17 @@ export function resumo({ contaId = null, dias = 30 } = {}) {
   return { dias, ia, mp, infra_brl: contaId ? 0 : infra, receita_brl: receita, custo_total_brl: custoTotal, margem_brl: margemReal, precos: p };
 }
 
+/** Matriz pacote × modelo: para cada pacote, qual seria o custo e margem se o cliente usasse só aquele modelo. */
+export async function matrizCustos() {
+  const p = precos(); const cambio = p['usd_brl'] || 5.5;
+  const { PACOTES, TOKENS_POR_CREDITO } = await import('./creditos/index.js');
+  const MODELOS = [['Gemini 2.5 Pro','gemini-2.5-pro'],['Gemini 2.5 Flash','gemini-2.5-flash'],['Gemini 2.5 Flash-Lite','gemini-flash-lite'],['Gemini 2.0 Flash','gemini-2.0-flash'],['Gemini 2.0 Flash-Lite','gemini-2.0-flash-lite'],['Gemini 1.5 Flash','gemini-1.5-flash'],['Gemini 1.5 Pro','gemini-1.5-pro']];
+  const custo1k = (k) => (TOKENS_POR_CREDITO * 0.7 * (p[k+'_in']||0) + TOKENS_POR_CREDITO * 0.3 * (p[k+'_out']||0)) / 1e6 * cambio;
+  const modelos = MODELOS.map(([nome, chave]) => ({ nome, chave, r_por_1k: +custo1k(chave).toFixed(5) }));
+  const matriz = PACOTES.map(pac => ({ pacote: pac.nome, tipo: pac.tipo, preco: pac.preco, creditos: pac.creditos, por_modelo: MODELOS.map(([nome, chave]) => { const custo = custo1k(chave) * pac.creditos; const taxa = pac.preco * (p['mp_pix_pct']||0) + (p['mp_pix_fixo']||0); const lucro = pac.preco - custo - taxa; return { modelo: nome, custo_ia: +custo.toFixed(2), lucro: +lucro.toFixed(2), margem_pct: pac.preco > 0 ? +(lucro / pac.preco * 100).toFixed(1) : 0 }; }) }));
+  return { modelos, matriz };
+}
+
 /** Margem bruta estimada por pacote (preço vigente × créditos × custo médio por crédito × taxa MP). */
 export async function margemPacotes() {
   const p = precos(); const cambio = p['usd_brl'] || 5.5;
