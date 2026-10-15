@@ -18,6 +18,7 @@ app.use(express.json({ limit: '2mb' }));
 const servidor = http.createServer(app);
 // App web (estático) em /app
 app.use('/app', express.static(path.resolve('src/painel'), { index: 'index.html', extensions: ['html'] }));
+app.get('/admin', (_, res) => res.redirect('/admin/'));
 app.use('/admin', express.static(path.resolve('src/painel/admin'), { index: 'index.html', extensions: ['html'] }));
 app.get('/', (_, res) => res.redirect('/app'));
 
