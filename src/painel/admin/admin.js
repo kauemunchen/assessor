@@ -122,3 +122,40 @@ telas.broadcast = async () => {
 };
 
 iniciar();
+
+telas.metricas = async () => {
+  const d = await api('/api/admin/metricas');
+  const pct = (x) => (x * 100).toFixed(1) + '%';
+  const corpo = `<div class="kpis">
+    <div class="kpi"><div class="r">Conversão trial → pagante (30d)</div><div class="v">${pct(d.taxa_conversao)}</div><div class="s">${d.trial_virou_pagante_30d} de ${d.trial_30d} contas novas</div></div>
+    <div class="kpi"><div class="r">Churn mensal (30d)</div><div class="v">${pct(d.churn_mensal)}</div><div class="s">${d.canceladas_30d} cancelamentos · ${d.assinaturas_ativas} assinaturas ativas</div></div>
+    <div class="kpi"><div class="r">Contas ativas 14d</div><div class="v">${fmtN(d.ativas_14d)}</div><div class="s">interagiram no período</div></div>
+  </div>
+  <div class="grade">
+    <div class="cartao"><h3>Cohort (criação × pagantes)</h3><div class="tabela compacta"><table><thead><tr><th>Mês</th><th>Contas criadas</th><th>Viraram pagantes</th><th>Conversão</th></tr></thead><tbody>${d.cohort.map(c => `<tr><td>${esc(c.m)}</td><td>${c.criadas}</td><td>${c.pagantes}</td><td>${c.criadas ? pct(c.pagantes / c.criadas) : '—'}</td></tr>`).join('') || '<tr><td colspan="4">Sem dados.</td></tr>'}</tbody></table></div></div>
+    <div class="cartao"><h3>Receita mensal</h3><div class="tabela compacta"><table><thead><tr><th>Mês</th><th>Cobranças</th><th style="text-align:right">R$</th></tr></thead><tbody>${d.receita_mensal.map(m => `<tr><td>${esc(m.m)}</td><td>${m.n}</td><td style="text-align:right">${fmtR(m.r)}</td></tr>`).join('') || '<tr><td colspan="3">Sem receita.</td></tr>'}</tbody></table></div></div>
+  </div>`;
+  return { titulo: '📈 Métricas', sub: 'Conversão, churn e cohort do KM APP.', corpo };
+};
+
+telas.operacao = async () => {
+  const [backups, logs] = await Promise.all([api('/api/admin/backups'), api('/api/admin/logs')]);
+  const corpo = `<div class="grade">
+    <div class="cartao"><h3>Exportar (CSV)</h3><p class="d">Baixe snapshots para planilha ou contabilidade.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${['contas', 'cobrancas', 'creditos', 'uso'].map(t => `<a class="btn sec" href="/api/admin/exportar/${t}.csv" download>${t}.csv</a>`).join('')}</div></div>
+    <div class="cartao"><h3>Backups <button class="btn sec" id="btBk">rodar agora</button></h3><p class="d">Diário às 04:00 (código + .env + banco + data/). <span id="bkSaida"></span></p>
+      <ul class="lista-s">${backups.map(b => `<li><span><a href="/api/admin/backup/${encodeURIComponent(b.nome)}" download class="mono">${esc(b.nome)}</a></span><span>${b.mb} MB · ${diaBr(b.em.replace('Z', ''))} <button class="minibtn perigo" data-bk="${esc(b.nome)}">apagar</button></span></li>`).join('') || '<li>Nenhum backup ainda.</li>'}</ul></div>
+    <div class="cartao" style="grid-column:1/-1"><h3>Limpeza de contas inativas</h3>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><label>Sem interação há mais de <input type="number" id="dias" value="60" min="7" max="365" style="width:70px"> dias</label><button class="minibtn" id="btPrev">atualizar lista</button><button class="minibtn perigo" id="btSusp">suspender selecionadas</button></div>
+      <div id="tbLimp" class="tabela compacta"><p class="d">clique "atualizar lista" para carregar.</p></div></div>
+    <div class="cartao" style="grid-column:1/-1"><h3>Log de ações do admin</h3><div class="tabela compacta" style="max-height:340px;overflow:auto"><table><thead><tr><th>Quando</th><th>Admin</th><th>Ação</th><th>Alvo</th><th>Detalhes</th></tr></thead><tbody>${logs.map(l => `<tr><td>${diaBr(l.criado_em)}</td><td>${esc(l.admin_nome || '#' + l.admin_id)}</td><td class="mono">${esc(l.acao)}</td><td class="mono">${esc(l.alvo || '')}</td><td class="mono" style="font-size:11px">${esc(l.detalhes || '')}</td></tr>`).join('') || '<tr><td colspan="5">Nenhuma ação registrada.</td></tr>'}</tbody></table></div></div>
+  </div>`;
+  return { titulo: '🧰 Operação', sub: 'Exportar, backups, limpeza e auditoria.', corpo, depois() {
+    $('#btBk').onclick = async () => { $('#bkSaida').textContent = 'gerando… (até 2 min)'; try { const r = await api('/api/admin/backup', { method: 'POST' }); $('#bkSaida').textContent = (r.saida || []).join(' · '); setTimeout(() => montarTela('operacao'), 1500); } catch { $('#bkSaida').textContent = 'falhou'; } };
+    document.querySelectorAll('button[data-bk]').forEach(b => b.onclick = async () => { if (!confirm(`Apagar ${b.dataset.bk}? Essa ação não pode ser desfeita.`)) return; await api(`/api/admin/backup/${encodeURIComponent(b.dataset.bk)}`, { method: 'DELETE' }); montarTela('operacao'); });
+    let lista = [];
+    const render = (r) => { lista = r.candidatas; $('#tbLimp').innerHTML = `<table><thead><tr><th><input type="checkbox" id="todas"></th><th>ID</th><th>Dono</th><th>Empresa</th><th>Plano</th><th>Status</th><th>Último uso</th><th style="text-align:right">Saldo</th><th>Pagas</th></tr></thead><tbody>${r.candidatas.map(c => `<tr><td><input type="checkbox" value="${c.id}" class="sel"></td><td>#${c.id}</td><td>${esc(c.nome_dono)}</td><td>${esc(c.empresa)}</td><td>${esc(PLANO[c.plano] || c.plano)}</td><td><span class="${STATUS[c.status] || 'tag'}">${esc(c.status)}</span></td><td>${c.ultimo_uso ? diaBr(c.ultimo_uso) : 'nunca'}</td><td style="text-align:right">${fmtC(c.saldo)}</td><td>${c.pagas}</td></tr>`).join('') || '<tr><td colspan="9">Nenhuma conta inativa com esse critério.</td></tr>'}</tbody></table>`; const t = $('#todas'); if (t) t.onchange = (e) => document.querySelectorAll('.sel').forEach(x => x.checked = e.target.checked); };
+    $('#btPrev').onclick = async () => { $('#tbLimp').innerHTML = '<p class="d">carregando…</p>'; render(await api(`/api/admin/limpeza?dias=${$('#dias').value}`)); };
+    $('#btSusp').onclick = async () => { const ids = [...document.querySelectorAll('.sel:checked')].map(x => Number(x.value)); if (!ids.length) return toast('Selecione pelo menos uma conta.'); if (!confirm(`Suspender ${ids.length} conta(s)? Elas param de usar o KM APP até você reativar.`)) return; await api('/api/admin/limpeza/marcar', { method: 'POST', body: JSON.stringify({ ids }) }); toast(`${ids.length} suspensa(s)`); $('#btPrev').onclick(); };
+  } };
+};

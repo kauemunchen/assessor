@@ -114,6 +114,19 @@ export function iniciarRotinas(canal) {
   cron.schedule('0 8 * * *', () => avisarVencimentos(canal), { timezone: TZ });
   cron.schedule('5 8 * * *', () => avisarTokenInstagram(canal), { timezone: TZ });
   cron.schedule('0 3 * * *', () => limparBiblioteca(canal).catch(e => console.error('limparBiblioteca', e.message)), { timezone: TZ });
+  cron.schedule('0 9 * * 1', () => avisarAdminsInativas().catch(e => console.error('inativas', e.message)), { timezone: TZ });
   cron.schedule('*/5 * * * *', () => import('../integracoes/asaas.js').then(a => a.conferirPendentes()).catch(e => console.error('asaas', e.message)), { timezone: TZ });
   cron.schedule('30 8 * * 1-6', () => cobrarDelegadas().catch(e => console.error('cobrarDelegadas', e.message)), { timezone: TZ });
+}
+
+
+/** Toda segunda 9h: avisa admins sobre contas sem interação há 60+ dias. */
+async function avisarAdminsInativas() {
+  const { getCanal } = await import('../canal/atual.js');
+  const inativas = db.prepare(`SELECT c.id, c.nome_dono, c.empresa FROM contas c WHERE c.admin=0 AND c.plano<>'ilimitado' AND c.status='ativa'
+    AND (SELECT MAX(criado_em) FROM interacoes WHERE conta_id=c.id) < datetime('now','-60 days')`).all();
+  if (!inativas.length) return;
+  const admins = db.prepare("SELECT u.chat_id FROM usuarios u JOIN contas c ON c.id=u.conta_id WHERE c.admin=1 AND u.canal='telegram'").all();
+  const texto = `📊 *KM APP · Operação*\n${inativas.length} conta(s) sem interação há 60+ dias:\n` + inativas.slice(0, 10).map(c => `- #${c.id} ${c.nome_dono} (${c.empresa})`).join('\n') + (inativas.length > 10 ? `\n…+ ${inativas.length - 10}` : '') + `\n\nAbra o painel admin → Operação → Limpeza para suspender em lote.`;
+  for (const a of admins) { try { getCanal().enviar(null, a.chat_id, texto); } catch {} }
 }

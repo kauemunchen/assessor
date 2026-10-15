@@ -1,6 +1,8 @@
 // Painel administrativo do KM APP (/admin): contas, créditos manuais, pacotes/preços, financeiro.
 // Auth: a mesma sessão web, mas restrita a contas com admin=1 (ou plano='ilimitado').
 import { db } from '../db/index.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { sessao } from './web.js';
 import { PACOTES as PACOTES_PADRAO, TARIFAS, TRIAL_CREDITOS, PRODUTO, saldo, creditar, debitar, ilimitada } from '../creditos/index.js';
 
@@ -9,6 +11,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS pacotes_cfg (id TEXT PRIMARY KEY, nome TEXT,
 if (!db.prepare('SELECT COUNT(*) n FROM pacotes_cfg').get().n) { const ins = db.prepare('INSERT INTO pacotes_cfg (id, nome, creditos, preco, tipo, ordem) VALUES (?,?,?,?,?,?)'); PACOTES_PADRAO.forEach((p, i) => ins.run(p.id, p.nome, p.creditos, p.preco, p.tipo, i)); }
 /** Lista oficial de pacotes (lida do banco). Substitui PACOTES_PADRAO em runtime. */
 export function pacotesAtivos() { return db.prepare('SELECT id, nome, creditos, preco, tipo FROM pacotes_cfg WHERE ativo=1 ORDER BY ordem, id').all(); }
+
+
+db.exec(`CREATE TABLE IF NOT EXISTS logs_admin (id INTEGER PRIMARY KEY, admin_id INTEGER, acao TEXT, alvo TEXT, detalhes TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP)`);
+function logAdmin(adminId, acao, alvo = null, detalhes = null) { try { db.prepare('INSERT INTO logs_admin (admin_id, acao, alvo, detalhes) VALUES (?,?,?,?)').run(adminId, acao, alvo && String(alvo), detalhes && JSON.stringify(detalhes)); } catch {} }
+function toCSV(rows) { if (!rows.length) return ''; const cols = Object.keys(rows[0]); const esc = (v) => { if (v === null || v === undefined) return ''; const s = String(v).replace(/"/g, '""'); return /[,"\n;]/.test(s) ? `"${s}"` : s; }; return cols.join(';') + '\n' + rows.map(r => cols.map(c => esc(r[c])).join(';')).join('\n'); }
 
 export function rotasAdmin(app) {
   const auth = (req, res, next) => {
@@ -70,6 +77,7 @@ export function rotasAdmin(app) {
     const id = Number(req.params.id); const { operacao, quantidade, motivo = '' } = req.body || {};
     const q = Math.abs(Number(quantidade)); if (!(q > 0) || !['credito', 'debito'].includes(operacao)) return res.status(400).json({ erro: 'operação inválida' });
     const ref = `admin:${req.contaId}`;
+    logAdmin(req.contaId, 'creditos', id, { operacao, quantidade: q, motivo });
     if (operacao === 'credito') creditar(id, q, { tipo: 'ajuste', motivo: motivo || 'ajuste manual (+)', ref });
     else db.prepare('INSERT INTO creditos_mov (conta_id, tipo, quantidade, motivo, ref) VALUES (?,?,?,?,?)').run(id, 'ajuste', -q, motivo || 'ajuste manual (-)', ref);
     res.json({ ok: true, saldo: saldo(id) });
@@ -78,6 +86,7 @@ export function rotasAdmin(app) {
   // Mudar status/plano/admin
   app.post('/api/admin/conta/:id', auth, (req, res) => {
     const id = Number(req.params.id); const b = req.body || {};
+    logAdmin(req.contaId, 'conta', id, b);
     if (b.status && ['ativa', 'bloqueada', 'suspensa'].includes(b.status)) db.prepare('UPDATE contas SET status=? WHERE id=?').run(b.status, id);
     if (b.plano) db.prepare('UPDATE contas SET plano=? WHERE id=?').run(b.plano, id);
     if (b.admin !== undefined) {
@@ -96,7 +105,7 @@ export function rotasAdmin(app) {
     else db.prepare('INSERT INTO pacotes_cfg (id, nome, creditos, preco, tipo, ativo, ordem) VALUES (?,?,?,?,?,?,?)').run(req.params.id, nome, Number(creditos), Number(preco), tipo || 'prepago', ativo === false ? 0 : 1, Number(ordem || 99));
     res.json({ ok: true });
   });
-  app.delete('/api/admin/pacotes/:id', auth, (req, res) => { db.prepare('DELETE FROM pacotes_cfg WHERE id=?').run(req.params.id); res.json({ ok: true }); });
+  app.delete('/api/admin/pacotes/:id', auth, (req, res) => { db.prepare('DELETE FROM pacotes_cfg WHERE id=?').run(req.params.id); logAdmin(req.contaId, 'pacote.delete', req.params.id); res.json({ ok: true }); });
 
   // Financeiro: cobranças (todas as contas)
   app.get('/api/admin/financeiro', auth, (req, res) => {
@@ -115,4 +124,61 @@ export function rotasAdmin(app) {
     let enviados = 0; for (const d of donos) { try { await canal.enviar(null, d.chat_id, `📣 *KM APP* — ${texto}`); enviados++; } catch {} }
     res.json({ ok: true, enviados, total: donos.length });
   });
+  // ---------- Operação (etapa E): logs, exportação, backup, limpeza, métricas ----------
+  app.get('/api/admin/logs', auth, (req, res) => res.json(db.prepare('SELECT l.*, c.nome_dono admin_nome FROM logs_admin l LEFT JOIN contas c ON c.id=l.admin_id ORDER BY l.id DESC LIMIT 200').all()));
+
+  app.get('/api/admin/exportar/:tipo.csv', auth, (req, res) => {
+    const t = req.params.tipo; let rows = [];
+    if (t === 'contas') rows = db.prepare(`SELECT c.id, c.nome_dono, c.empresa, c.email, c.cpf_cnpj, c.plano, c.status, c.admin, c.criado_em, (SELECT COALESCE(SUM(quantidade),0) FROM creditos_mov WHERE conta_id=c.id) saldo, (SELECT MAX(criado_em) FROM interacoes WHERE conta_id=c.id) ultimo_uso FROM contas c ORDER BY c.id`).all();
+    else if (t === 'cobrancas') rows = db.prepare(`SELECT cb.id, c.nome_dono, c.empresa, cb.asaas_id, cb.pacote_id, cb.tipo, cb.valor, cb.creditos, cb.forma, cb.status, cb.criado_em, cb.pago_em, cb.vencimento FROM cobrancas cb JOIN contas c ON c.id=cb.conta_id ORDER BY cb.id DESC`).all();
+    else if (t === 'creditos') rows = db.prepare(`SELECT cm.id, c.nome_dono, c.empresa, cm.tipo, cm.quantidade, cm.motivo, cm.modulo, cm.ref, cm.criado_em FROM creditos_mov cm JOIN contas c ON c.id=cm.conta_id ORDER BY cm.id DESC`).all();
+    else if (t === 'uso') rows = db.prepare(`SELECT u.id, c.nome_dono, u.modulo, u.modelo, u.tokens_in, u.tokens_out, u.criado_em FROM uso u JOIN contas c ON c.id=u.conta_id ORDER BY u.id DESC LIMIT 20000`).all();
+    else return res.status(400).json({ erro: 'tipo inválido' });
+    logAdmin(req.contaId, 'exportar.' + t, null, { linhas: rows.length });
+    res.setHeader('content-type', 'text/csv; charset=utf-8'); res.setHeader('content-disposition', `attachment; filename="km-app-${t}-${new Date().toISOString().slice(0, 10)}.csv"`); res.send('﻿' + toCSV(rows));
+  });
+
+  // Backups: listar, gerar agora, baixar
+  const BK = () => 'backups';
+  app.get('/api/admin/backups', auth, (req, res) => { try { if (!fs.existsSync(BK())) return res.json([]); res.json(fs.readdirSync(BK()).filter(f => f.endsWith('.tar.gz')).sort().reverse().slice(0, 50).map(f => ({ nome: f, mb: +(fs.statSync(path.join(BK(), f)).size / 1048576).toFixed(2), em: fs.statSync(path.join(BK(), f)).mtime.toISOString() }))); } catch (e) { res.status(500).json({ erro: e.message }); } });
+  app.post('/api/admin/backup', auth, async (req, res) => {
+    const { exec } = await import('node:child_process');
+    logAdmin(req.contaId, 'backup.rodar');
+    exec('bash scripts/backup.sh', { timeout: 180000 }, (err, out) => { if (err) return res.status(500).json({ erro: err.message, saida: out }); res.json({ ok: true, saida: out.trim().split('\n').slice(-5) }); });
+  });
+  app.get('/api/admin/backup/:nome', auth, (req, res) => { const p = path.join(BK(), path.basename(req.params.nome)); if (!fs.existsSync(p)) return res.status(404).json({ erro: 'não existe' }); logAdmin(req.contaId, 'backup.baixar', req.params.nome); res.download(p); });
+  app.delete('/api/admin/backup/:nome', auth, (req, res) => { const p = path.join(BK(), path.basename(req.params.nome)); if (fs.existsSync(p)) fs.unlinkSync(p); logAdmin(req.contaId, 'backup.apagar', req.params.nome); res.json({ ok: true }); });
+
+  // Limpeza / contas inativas: configuração + preview + aplicar (marca status='inativa', opcionalmente apaga após X dias)
+  app.get('/api/admin/limpeza', auth, (req, res) => {
+    const diasInativa = Number(req.query.dias || 60);
+    const candidatas = db.prepare(`SELECT c.id, c.nome_dono, c.empresa, c.plano, c.status, c.criado_em,
+      (SELECT MAX(criado_em) FROM interacoes WHERE conta_id=c.id) ultimo_uso,
+      (SELECT COALESCE(SUM(quantidade),0) FROM creditos_mov WHERE conta_id=c.id) saldo,
+      (SELECT COUNT(*) FROM cobrancas WHERE conta_id=c.id AND status='pago') pagas
+      FROM contas c WHERE c.admin=0 AND c.plano NOT IN ('ilimitado')
+      AND COALESCE((SELECT MAX(criado_em) FROM interacoes WHERE conta_id=c.id), c.criado_em) < datetime('now','-'||?||' days')
+      ORDER BY ultimo_uso`).all(diasInativa);
+    res.json({ dias: diasInativa, candidatas });
+  });
+  app.post('/api/admin/limpeza/marcar', auth, (req, res) => {
+    const ids = (req.body?.ids || []).map(Number).filter(Boolean); if (!ids.length) return res.status(400).json({ erro: 'nenhum id' });
+    const stm = db.prepare("UPDATE contas SET status='suspensa' WHERE id=? AND admin=0 AND plano<>'ilimitado'");
+    const t = db.transaction(() => { for (const id of ids) stm.run(id); }); t();
+    logAdmin(req.contaId, 'limpeza.suspender', null, { ids, n: ids.length }); res.json({ ok: true, n: ids.length });
+  });
+
+  // Métricas: conversão trial→pago, churn de plano mensal, cohort de criação
+  app.get('/api/admin/metricas', auth, (req, res) => {
+    const q = (sql, ...a) => db.prepare(sql).get(...a);
+    const trial30 = q("SELECT COUNT(*) n FROM contas WHERE criado_em >= datetime('now','-30 days')");
+    const trialComprou = q("SELECT COUNT(DISTINCT c.id) n FROM contas c JOIN cobrancas cb ON cb.conta_id=c.id AND cb.status='pago' WHERE c.criado_em >= datetime('now','-30 days')");
+    const assinaturaAtiva = q("SELECT COUNT(*) n FROM assinaturas WHERE status='ativa'");
+    const assinaturaCancelada30 = q("SELECT COUNT(*) n FROM assinaturas WHERE status='cancelada' AND cancelada_em >= datetime('now','-30 days')");
+    const cohort = db.prepare("SELECT strftime('%Y-%m', c.criado_em) m, COUNT(*) criadas, SUM(CASE WHEN (SELECT 1 FROM cobrancas WHERE conta_id=c.id AND status='pago' LIMIT 1) THEN 1 ELSE 0 END) pagantes FROM contas c WHERE c.criado_em >= datetime('now','-12 months') GROUP BY m ORDER BY m").all();
+    const receitaMensal = db.prepare("SELECT strftime('%Y-%m', pago_em) m, SUM(valor) r, COUNT(*) n FROM cobrancas WHERE status='pago' GROUP BY m ORDER BY m DESC LIMIT 12").all();
+    const ativas14d = q("SELECT COUNT(DISTINCT conta_id) n FROM interacoes WHERE criado_em >= datetime('now','-14 days')");
+    res.json({ trial_30d: trial30.n, trial_virou_pagante_30d: trialComprou.n, taxa_conversao: trial30.n ? (trialComprou.n / trial30.n) : 0, assinaturas_ativas: assinaturaAtiva.n, canceladas_30d: assinaturaCancelada30.n, churn_mensal: assinaturaAtiva.n ? (assinaturaCancelada30.n / (assinaturaAtiva.n + assinaturaCancelada30.n)) : 0, ativas_14d: ativas14d.n, cohort, receita_mensal: receitaMensal });
+  });
+
 }
