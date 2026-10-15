@@ -1,2 +1,22 @@
-{ "name": "KM APP", "short_name": "KM APP", "start_url": "/app/", "display": "standalone", "background_color": "#37414E", "theme_color": "#37414E",
-  "icons": [{ "src": "/app/icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }] }
+{
+  "name": "KM APP",
+  "short_name": "KM APP",
+  "start_url": "/app/",
+  "display": "standalone",
+  "background_color": "#37414E",
+  "theme_color": "#37414E",
+  "icons": [
+    {
+      "src": "/app/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
