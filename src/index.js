@@ -18,8 +18,8 @@ app.use(express.json({ limit: '2mb' }));
 const servidor = http.createServer(app);
 // App web (estático) em /app
 app.use('/app', express.static(path.resolve('src/painel'), { index: 'index.html', extensions: ['html'] }));
-app.get('/admin', (_, res) => res.redirect('/admin/'));
-app.use('/admin', express.static(path.resolve('src/painel/admin'), { index: 'index.html', extensions: ['html'] }));
+app.get(['/admin', '/admin/'], (_, res) => res.sendFile(path.resolve('src/painel/admin/index.html')));
+app.use('/admin', express.static(path.resolve('src/painel/admin'), { index: false, redirect: false }));
 app.get('/', (_, res) => res.redirect('/app'));
 
 const canal = criarCanal(process.env.CANAL || 'telegram', app, servidor);
