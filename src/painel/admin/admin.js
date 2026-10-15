@@ -192,10 +192,11 @@ telas.custos = async () => {
         <tr><th>Infra fixa mensal (R$)</th><td>${inp('infra_mensal_brl',1)}</td></tr>
         <tr><th>Câmbio USD → BRL</th><td>${inp('usd_brl',0.01)}</td></tr>
       </tbody></table></div>
-      <p class="d" style="margin-top:8px"><button class="btn prim" id="btSalvarPrecos">Salvar preços</button> <span class="salvo" id="prMsg"></span></p>
+      <p class="d" style="margin-top:8px"><button class="btn prim" id="btSalvarPrecos">Salvar preços</button> <button class="btn sec" id="btResetPrecos">Restaurar padrões</button> <span class="salvo" id="prMsg"></span></p>
     </div>
   </div>`;
   return { titulo: '💰 Custos & margem', sub: 'Quanto você paga de IA, taxas de pagamento e infra — e sua margem real.', corpo, depois() {
     $('#btSalvarPrecos').onclick = async () => { $('#prMsg').textContent = 'salvando…'; const inputs = document.querySelectorAll('input.pr'); for (const el of inputs) { try { await post('/api/admin/custos/preco', { chave: el.dataset.k, valor: Number(el.value) }); } catch {} } $('#prMsg').textContent = '✅ salvo'; setTimeout(() => montarTela('custos'), 1200); };
+    $('#btResetPrecos').onclick = async () => { if (!confirm('Restaurar todos os preços para os valores padrão de referência?')) return; await post('/api/admin/custos/resetar', {}); toast('✅ padrões restaurados'); setTimeout(() => montarTela('custos'), 500); };
   } };
 };

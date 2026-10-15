@@ -2,23 +2,25 @@
 // Tabela custos_cfg guarda as taxas editáveis (preço por 1M tokens de cada modelo, custo do fal, taxas MP, VPS/mês).
 import { db } from './db/index.js';
 
+// Preços de referência atualizados (USD por 1M tokens, Google Gemini public pricing).
+// Fonte: ai.google.dev/pricing — ajuste em /admin → Custos se seu plano for diferente.
 export const PRECOS_PADRAO = {
-  // USD/1M tokens (referência Google Gemini e Anthropic). Edite em /admin → Custos.
-  'gemini-2.5-flash_in': 0.30, 'gemini-2.5-flash_out': 2.50,
-  'gemini-2.5-pro_in': 1.25, 'gemini-2.5-pro_out': 10.00,
-  'gemini-2.0-flash_in': 0.10, 'gemini-2.0-flash_out': 0.40,
-  'gemini-flash-lite_in': 0.10, 'gemini-flash-lite_out': 0.40,
-  'gemini-1.5-flash_in': 0.075, 'gemini-1.5-flash_out': 0.30,
-  'gemini-1.5-pro_in': 1.25, 'gemini-1.5-pro_out': 5.00,
-  // Fal.ai (USD por imagem)
-  'fal_imagem_usd': 0.03,
-  // Mercado Pago (fração do valor + taxa fixa em R$) — ajuste pelas condições do SEU plano MP
+  'gemini-2.5-pro_in': 1.25,   'gemini-2.5-pro_out': 10.00,  // prompts ≤200k. Acima: 2.50 / 15.00
+  'gemini-2.5-flash_in': 0.30, 'gemini-2.5-flash_out': 2.50, // texto/imagem/vídeo. Áudio in: 1.00
+  'gemini-flash-lite_in': 0.10,'gemini-flash-lite_out': 0.40,// Gemini 2.5 Flash-Lite
+  'gemini-2.0-flash_in': 0.10, 'gemini-2.0-flash_out': 0.40, // texto. Áudio in: 0.70
+  'gemini-2.0-flash-lite_in': 0.075, 'gemini-2.0-flash-lite_out': 0.30,
+  'gemini-1.5-flash_in': 0.075,'gemini-1.5-flash_out': 0.30, // ≤128k. Acima: 0.15 / 0.60
+  'gemini-1.5-pro_in': 1.25,   'gemini-1.5-pro_out': 5.00,   // ≤128k. Acima: 2.50 / 10.00
+  // Fal.ai (USD por imagem) — flux/schnell que a MIA usa fica em torno de US$ 0,003
+  'fal_imagem_usd': 0.003,
+  // Mercado Pago (fração do valor + taxa fixa em R$) — ajuste pelo SEU plano MP
   'mp_pix_pct': 0.0099, 'mp_pix_fixo': 0,
-  'mp_cartao_pct': 0.0499, 'mp_cartao_fixo': 0.40,
+  'mp_cartao_pct': 0.0499, 'mp_cartao_fixo': 0.40,  // crédito liberação imediata; parcelado 4,98%+0,40 à vista
   'mp_boleto_pct': 0.019, 'mp_boleto_fixo': 3.49,
-  // Custo fixo mensal (R$) — soma de VPS, domínio, backups, etc.
+  // Custo fixo mensal (R$) — VPS Hostinger KVM 2 ~R$ 50 + domínio prorrateado + backups
   'infra_mensal_brl': 60,
-  // Câmbio USD → BRL (editável — base para converter o custo de IA)
+  // Câmbio USD → BRL de referência (base para converter o custo de IA)
   'usd_brl': 5.5,
 };
 
