@@ -32,6 +32,8 @@ services:
       - ./data:/app/data
       - ./src/personas:/app/src/personas
       - ./src/conhecimento:/app/src/conhecimento
+      - ./src/painel:/app/src/painel
+      - ./data/uploads:/app/data/uploads
     labels:
       - traefik.enable=true
       - traefik.http.routers.assessor.rule=Host(`assessor.kauemunchen.com.br`)

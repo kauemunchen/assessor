@@ -1,0 +1,2 @@
+{ "name": "Assessor KM", "short_name": "Assessor", "start_url": "/app/", "display": "standalone", "background_color": "#37414E", "theme_color": "#37414E",
+  "icons": [{ "src": "/app/icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }] }

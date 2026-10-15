@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
+import http from 'node:http';
+import path from 'node:path';
 import { criarCanal } from './canal/index.js';
 import { tratarMensagem } from './orquestrador/roteador.js';
 import { comBotoes } from './orquestrador/botoes.js';
@@ -9,9 +11,13 @@ import { setCanal } from './canal/atual.js';
 
 migrar();
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
+const servidor = http.createServer(app);
+// App web (estático) em /app
+app.use('/app', express.static(path.resolve('src/painel'), { index: 'index.html', extensions: ['html'] }));
+app.get('/', (_, res) => res.redirect('/app'));
 
-const canal = criarCanal(process.env.CANAL || 'telegram', app);
+const canal = criarCanal(process.env.CANAL || 'telegram', app, servidor);
 setCanal(canal);
 canal.aoReceber(async (msg) => {
   const t0 = Date.now(); canal.digitando?.(msg.chatId); const tick = setInterval(() => canal.digitando?.(msg.chatId), 4500);
@@ -27,7 +33,7 @@ canal.aoReceber(async (msg) => {
 
 iniciarRotinas(canal);
 app.get('/health', (_, res) => res.json({ ok: true }));
-app.listen(process.env.PORT || 3000, () => console.log('assessor-km up'));
+servidor.listen(process.env.PORT || 3000, () => console.log('assessor-km up'));
 
 import { urlAutorizacao, salvarCodigo } from './integracoes/google-calendar.js';
 app.get('/oauth/google/iniciar/:contaId', (req, res) => res.redirect(urlAutorizacao(req.params.contaId)));

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#37414E">
+<title>Assessor KM</title>
+<link rel="manifest" href="/app/manifest.json">
+<link rel="icon" href="/app/icone.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app/app.css">
+</head>
+<body>
+<div id="login" class="tela oculto">
+  <div class="card">
+    <div class="marca"><span class="km">KM</span><span>Assessor</span></div>
+    <h1>Entrar</h1>
+    <p>Abra o <b id="botNome">@AssessorKM_bot</b> no Telegram e mande:</p>
+    <div class="codigo" id="codigo">······</div>
+    <p class="mini">Código válido por 10 minutos. Esta tela entra sozinha quando o bot confirmar.</p>
+    <a id="abrirBot" class="btn ouro" target="_blank" rel="noopener">Abrir o Telegram</a>
+  </div>
+</div>
+
+<div id="app" class="tela oculto">
+  <aside id="lateral">
+    <div class="topo-lateral">
+      <div class="marca"><span class="km">KM</span><span>Assessor</span></div>
+      <button class="icone" id="fecharLateral" title="Fechar">✕</button>
+    </div>
+    <nav class="menu">
+      <a class="ativo" data-tela="conversa">💬 Conversa</a>
+      <a data-tela="equipe">👥 Equipe <span class="breve">em breve</span></a>
+      <a data-tela="marca">✨ Identidade & Marca <span class="breve">em breve</span></a>
+      <a data-tela="conexoes">🔌 Conexões <span class="breve">em breve</span></a>
+      <a data-tela="editorial">📅 Calendário editorial <span class="breve">em breve</span></a>
+      <a data-tela="documentos">📂 Documentos <span class="breve">em breve</span></a>
+      <a data-tela="ajustes">⚙️ Ajustes <span class="breve">em breve</span></a>
+    </nav>
+    <div class="bloco" id="equipeAtiva"></div>
+    <div class="bloco atalhos">
+      <div class="titulo">Atalhos</div>
+      <button data-cmd="hoje">Agenda de hoje</button>
+      <button data-cmd="programação">Programação</button>
+      <button data-cmd="biblioteca">Biblioteca</button>
+      <button data-cmd="status">Conexões</button>
+      <button data-cmd="MIA, quero criar um story">Criar story</button>
+    </div>
+    <div class="rodape-lateral"><span id="donoNome"></span><button class="link" id="sair">sair</button></div>
+  </aside>
+
+  <main id="principal">
+    <header class="barra">
+      <button class="icone" id="abrirLateral">☰</button>
+      <div class="titulo-chat"><div>Conversa</div><div class="sub" id="estado">conectando…</div></div>
+      <div class="filtros" id="filtros"></div>
+    </header>
+    <div id="lista" class="lista"></div>
+    <div id="digitando" class="digitando oculto"><span></span><span></span><span></span></div>
+    <form id="form" class="composer">
+      <button type="button" class="icone" id="anexar" title="Anexar foto, vídeo ou arquivo">📎</button>
+      <input type="file" id="arquivo" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden>
+      <textarea id="texto" rows="1" placeholder="Fale com Alfred, Olga, Tina ou MIA…"></textarea>
+      <button type="button" class="icone" id="gravar" title="Gravar áudio">🎙</button>
+      <button type="submit" class="icone enviar" title="Enviar">➤</button>
+    </form>
+    <div id="previaAnexo" class="previa-anexo oculto"></div>
+  </main>
+</div>
+<script src="/app/app.js"></script>
+</body>
+</html>

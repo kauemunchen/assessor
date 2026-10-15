@@ -103,6 +103,10 @@ export async function governanca(msg, conta) {
     db.prepare('DELETE FROM biblioteca WHERE id=?').run(b.id);
     return `🗑 Mídia #${m[2]} apagada da biblioteca e do armazenamento.`;
   }
+  if ((m = t.match(/^(?:web|entrar web|login)\s+(\d{6})$/))) {
+    const { concluirLogin } = await import('../canal/web.js');
+    return concluirLogin(m[1], conta.id, msg.chatId) ? '💻 Login no app liberado. Pode voltar ao navegador.' : 'Código inválido ou expirado (vale 10 min). Gere outro no app.';
+  }
   if ((m = msg.texto.trim().match(/^convidar?\s+(.+)$/i))) {
     const { criarConvite } = await import('./equipe.js'); const nome = caso(m[1].trim()); const codigo = criarConvite(conta.id, nome);
     return `Convite para ${nome} criado. Peça para a pessoa abrir @${process.env.TELEGRAM_BOT_USERNAME || 'AssessorKM_bot'} no Telegram e mandar:\n\nentrar ${codigo}\n\nQuando entrar, eu te aviso. Depois: "Olga, avisa ${nome.split(' ')[0]} que…" ou "Olga, repassa para ${nome.split(' ')[0]}: <tarefa> até sexta".`;
