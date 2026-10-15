@@ -21,12 +21,34 @@ const OPCOES = {
   tratamento: ['primeiro nome', 'você', 'senhor', 'chefe'],
 };
 
+// Atalhos sugeridos: top 5 mensagens curtas que o dono repete, com fallback para iniciantes.
+const ATALHOS_PADRAO = [
+  { cmd: 'hoje', rotulo: 'Agenda de hoje' },
+  { cmd: 'créditos', rotulo: 'Meu saldo' },
+  { cmd: 'status', rotulo: 'Conexões' },
+  { cmd: 'programação', rotulo: 'Programação da MIA' },
+  { cmd: 'biblioteca', rotulo: 'Biblioteca de mídia' },
+];
 export function rotasConfig(app) {
   // handlers async: encaminha rejeições ao middleware de erro (JSON)
   for (const m of ['get', 'post', 'delete']) { const orig = app[m].bind(app); app[m] = (path, ...fns) => orig(path, ...fns.map(f => (typeof f === 'function' && f.constructor.name === 'AsyncFunction' && f.length < 3) ? (req, res, next) => f(req, res).catch(next) : f)); }
   const auth = (req, res, next) => { const s = sessao(req); if (!s) return res.status(401).json({ erro: 'não autenticado' }); req.sessao = s; req.contaId = s.conta_id; next(); };
 
   // ---------- Equipe ----------
+  app.get('/api/atalhos', auth, (_, res) => {
+    const contaId = res.req.contaId;
+    // Pega as 60 últimas mensagens curtas do dono (entrada, texto), agrupa por texto normalizado, pega top 5 por frequência.
+    const rows = db.prepare("SELECT lower(trim(texto)) t, COUNT(*) n FROM mensagens WHERE conta_id=? AND direcao='entrada' AND tipo='texto' AND length(trim(texto))<=35 AND criado_em>=datetime('now','-60 days') GROUP BY t HAVING n>=2 ORDER BY n DESC, MAX(criado_em) DESC LIMIT 12").all(contaId);
+    const limpar = (s) => s.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' ');
+    const ehUtil = (s) => s.length >= 3 && !/^(sim|n[ãa]o|ok|cancela|oi|olá|bom dia|boa tarde|boa noite|obrigad[oa]|valeu|opa)$/i.test(s) && !/^\d+$/.test(s) && !/^(start|pro|max|pix|cart[ãa]o|boleto)$/i.test(s);
+    const dinamicos = rows.filter(r => ehUtil(r.t)).slice(0, 5).map(r => ({ cmd: limpar(r.t), rotulo: limpar(r.t).charAt(0).toUpperCase() + limpar(r.t).slice(1), freq: r.n }));
+    // Se tem menos de 5, completa com padrões que o dono ainda não usou.
+    const usados = new Set(dinamicos.map(x => x.cmd.toLowerCase()));
+    const fallback = ATALHOS_PADRAO.filter(x => !usados.has(x.cmd.toLowerCase()));
+    const atalhos = [...dinamicos, ...fallback].slice(0, 5);
+    res.json({ atalhos, origem: dinamicos.length >= 5 ? 'uso-real' : dinamicos.length > 0 ? 'misto' : 'padrão' });
+  });
+
   app.get('/api/equipe', auth, (req, res) => {
     const ligados = new Set(db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(req.contaId).map(x => x.modulo));
     const cfg = Object.fromEntries(db.prepare('SELECT * FROM persona_config WHERE conta_id=?').all(req.contaId).map(r => [r.modulo, r]));

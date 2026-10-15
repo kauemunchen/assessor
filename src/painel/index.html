@@ -26,28 +26,32 @@
       <div class="marca"><img src="/app/logo-km.png" class="logo-img" alt="KM"><div class="assinatura"></div></div>
       <button class="icone" id="fecharLateral" title="Fechar">✕</button>
     </div>
-    <nav class="menu">
+    <div class="saldo-chip oculto" id="saldoChip" title="Créditos — clique para ver detalhes">
+      <span class="saldo-ic">◆</span><b id="saldoNum">—</b><span id="saldoSub">créd.</span>
+      <div class="saldo-barra"><div id="saldoBarra"></div></div>
+    </div>
+    <nav class="menu principal">
       <a class="ativo" data-tela="conversa">💬 Conversa</a>
-      <a data-tela="equipe">👥 Equipe</a>
-      <a data-tela="conexoes">🔌 Conexões</a>
-      <a data-tela="marca">✨ Identidade & Marca</a>
       <a data-tela="editorial">📅 Calendário editorial</a>
       <a data-tela="documentos">📂 Documentos</a>
-      <a data-tela="creditos">💳 Créditos</a>
-      <a data-tela="conta">👤 Minha conta</a>
-      <a data-tela="ajustes">⚙️ Ajustes</a>
-      <a id="btAdmin" class="oculto" href="/admin" target="_blank">🛡 Painel admin</a>
     </nav>
     <div class="bloco" id="equipeAtiva"></div>
-    <div class="bloco saldo oculto" id="saldoBloco" data-tela="creditos"><div class="titulo">Créditos</div><div class="saldo-num"><b id="saldoNum">—</b><span id="saldoSub"></span></div><div class="saldo-barra"><div id="saldoBarra"></div></div></div>
     <div class="bloco atalhos">
       <div class="titulo">Atalhos</div>
-      <button data-cmd="hoje">Agenda de hoje</button>
-      <button data-cmd="programação">Programação</button>
-      <button data-cmd="biblioteca">Biblioteca</button>
-      <button data-cmd="status">Conexões</button>
-      <button data-cmd="MIA, quero criar um story">Criar story</button>
+      <div id="listaAtalhos"></div>
     </div>
+    <details class="menu-mais">
+      <summary><span class="rotulo">Mais</span><span class="seta">›</span></summary>
+      <nav class="menu secundario">
+        <a data-tela="conexoes">🔌 Conexões</a>
+        <a data-tela="equipe">👥 Equipe</a>
+        <a data-tela="marca">✨ Identidade &amp; Marca</a>
+        <a data-tela="creditos">💳 Créditos</a>
+        <a data-tela="conta">👤 Minha conta</a>
+        <a data-tela="ajustes">⚙️ Ajustes</a>
+      </nav>
+    </details>
+    <a id="btAdmin" class="btn-admin oculto" href="/admin" target="_blank">🛡 Painel admin</a>
     <div class="rodape-lateral"><span id="donoNome"></span><button class="link" id="sair">sair</button></div>
   </aside>
 
