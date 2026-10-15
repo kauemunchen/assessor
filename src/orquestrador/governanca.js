@@ -35,18 +35,10 @@ export async function governanca(msg, conta) {
     return `${MODS[mod]} desligado. Os dados ficam guardados.`;
   }
   if (/^(cr[ée]ditos?|saldo)$/.test(t)) { const c = await import('../creditos/index.js'); return c.textoResumo(conta.id); }
-  if ((m = t.match(/^comprar\s+(start|pro|max|mensal[_ ]pro|mensal[_ ]max)(?:\s+(pix|cart[ãa]o|boleto))?(?:\s+([\d.\/-]{11,18}))?(?:\s+(\S+@\S+))?\s*$/))) {
-    const as = await import('../integracoes/asaas.js'); const c = await import('../creditos/index.js');
-    if (!as.configurado()) return `O pagamento online ainda não está ativo neste servidor. Fale com o suporte do ${c.PRODUTO}.`;
-    const pacote = m[1].replace(' ', '_'); const forma = /cart/.test(m[2] || '') ? 'cartao' : m[2] === 'boleto' ? 'boleto' : 'pix';
-    const temDoc = as.docValido(conta.cpf_cnpj || m[3]); if (!temDoc) return `Para emitir a cobrança preciso do seu CPF ou CNPJ (uma vez só). Mande: *comprar ${m[1]} ${forma} SEU_CPF_OU_CNPJ seu@email*`;
-    try { const cb = await as.comprar(conta.id, pacote, { forma, cpfCnpj: m[3], email: m[4] }); const p = cb.pacote;
-      const cab = `🛒 ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`;
-      if (cb.pix_qr) return { foto: `data:image/png;base64,${cb.pix_qr}`, texto: `${cab}\nPix copia e cola (toque para copiar):\n\`${cb.pix_payload}\`\nAssim que o pagamento cair eu aviso e os créditos entram sozinhos. Fatura: ${cb.invoice_url}` };
-      return `${cab}\nPague por aqui: ${cb.invoice_url}\nAssim que confirmar, os créditos entram sozinhos e eu aviso.`; }
-    catch (e) { return `Não consegui gerar a cobrança: ${e.message}`; }
+  // ---- Compra de créditos: fluxo guiado com botões (pacote → forma → CPF/e-mail uma vez → QR/fatura) ----
+  if (/^(comprar|planos?|recarregar|recarga)( cr[ée]ditos?)?$/.test(t) || /^comprar\s/.test(t) || compraPendente.has(msg.chatId)) {
+    const r = await fluxoCompra(msg, conta, t, orig); if (r) return r;
   }
-  if (/^(comprar|planos?|recarregar)( cr[ée]ditos?)?$/.test(t)) { const c = await import('../creditos/index.js'); return `🛒 *${c.PRODUTO} · Recarga*\n` + c.PACOTES.map(p => `- ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`).join('\n') + `\n\nPara comprar: *comprar pro* (Pix) ou *comprar pro cartão*. Também na tela *Créditos* do app web.`; }
   if (/^status$|^conex[õo]es$/.test(t)) {
     const g = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(conta.id);
     const ig = db.prepare('SELECT * FROM instagram_auth WHERE conta_id=?').get(conta.id);
@@ -158,4 +150,59 @@ export async function governanca(msg, conta) {
   }
   if ((m = t.match(/^foco do m[êe]s[:\s]+(.+)$/))) { db.prepare('UPDATE contas SET foco_mes=? WHERE id=?').run(caso(m[1].trim()), conta.id); return `Foco do mês: ${caso(m[1].trim())}. Toda a equipe vai priorizar isso.`; }
   return null;
+}
+
+
+// ---------------- Compra de créditos (estado por chat, 15 min) ----------------
+const compraPendente = new Map(); // chatId → { pacote, forma, passo: 'forma'|'dados', em }
+const PAC_RX = /(mensal[_ ]?pro|mensal[_ ]?max|plano pro|plano max|start|pro|max)\b/;
+const normPac = (x) => { x = x.replace(/[_ ]/g, ' '); if (/plano pro|mensal pro/.test(x)) return 'mensal_pro'; if (/plano max|mensal max/.test(x)) return 'mensal_max'; return x; };
+async function fluxoCompra(msg, conta, t, orig) {
+  const c = await import('../creditos/index.js'); const as = await import('../integracoes/asaas.js');
+  const est = compraPendente.get(msg.chatId); if (est && Date.now() - est.em > 15 * 60000) compraPendente.delete(msg.chatId);
+  const e = compraPendente.get(msg.chatId);
+  const nomePac = (id) => c.PACOTES.find(p => p.id === id)?.nome || id;
+  // cancelar
+  if (e && /^(cancela|deixa|n[ãa]o|sair)\b/.test(t)) { compraPendente.delete(msg.chatId); return '👍 Ok, compra cancelada. Nada foi cobrado.'; }
+  // 1) lista de pacotes (sem pacote ainda)
+  const mp = t.match(/^comprar\s+(.+)$/); const pacTxt = mp && PAC_RX.exec(mp[1])?.[0];
+  if (!e && !pacTxt) {
+    const txt = `🛒 *${c.PRODUTO} · Recarga*\n` + c.PACOTES.map(p => `- ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`).join('\n') + '\n\nQual você quer?';
+    return { texto: txt, botoes: [c.PACOTES.filter(p => p.tipo === 'prepago').map(p => ({ t: p.nome, d: `comprar ${p.id}` })), c.PACOTES.filter(p => p.tipo === 'mensal').map(p => ({ t: p.nome.replace(' (mensal)', ' mensal'), d: `comprar ${p.id}` }))] };
+  }
+  if (!as.configurado()) return `O pagamento online ainda não está ativo neste servidor. Fale com o suporte do ${c.PRODUTO}.`;
+  // 2) pacote escolhido → forma
+  if (pacTxt) {
+    const pacote = normPac(pacTxt); const resto = mp[1].replace(PAC_RX, ' ');
+    const forma = /cart/.test(resto) ? 'cartao' : /boleto/.test(resto) ? 'boleto' : /pix/.test(resto) ? 'pix' : null;
+    const doc = resto.match(/\d[\d.\/-]{9,17}\d/)?.[0]; const email = resto.match(/\S+@\S+\.\S+/)?.[0];
+    compraPendente.set(msg.chatId, { pacote, forma, passo: forma ? 'dados' : 'forma', em: Date.now(), doc, email });
+    if (!forma) { const p = c.PACOTES.find(x => x.id === pacote); return { texto: `${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}. Como quer pagar?`, botoes: [[{ t: '⚡ Pix', d: 'pix' }, { t: '💳 Cartão', d: 'cartão' }, ...(p.tipo === 'mensal' ? [] : [{ t: '🧾 Boleto', d: 'boleto' }])], [{ t: '❌ Cancelar', d: 'cancela' }]] }; }
+    return concluirCompra(msg, conta, c, as);
+  }
+  // 3) forma escolhida
+  if (e && e.passo === 'forma') {
+    const forma = /cart/.test(t) ? 'cartao' : /boleto/.test(t) ? 'boleto' : /pix/.test(t) ? 'pix' : null;
+    if (!forma) return { texto: 'Escolha a forma de pagamento:', botoes: [[{ t: '⚡ Pix', d: 'pix' }, { t: '💳 Cartão', d: 'cartão' }], [{ t: '❌ Cancelar', d: 'cancela' }]] };
+    e.forma = forma; e.passo = 'dados'; return concluirCompra(msg, conta, c, as);
+  }
+  // 4) dados do pagador (CPF/CNPJ + e-mail opcional)
+  if (e && e.passo === 'dados') {
+    const doc = orig.match(/\d[\d.\/-]{9,17}\d/)?.[0]; const email = orig.match(/\S+@\S+\.\S+/)?.[0];
+    if (doc) e.doc = doc; if (email) e.email = email;
+    if (!doc && !email) return { texto: 'Preciso do CPF ou CNPJ do pagador (só números serve). Pode mandar junto o e-mail para o recibo.\nEx.: 000.000.000-00 nome@email.com', botoes: [[{ t: '❌ Cancelar', d: 'cancela' }]] };
+    return concluirCompra(msg, conta, c, as);
+  }
+  return null;
+}
+async function concluirCompra(msg, conta, c, as) {
+  const e = compraPendente.get(msg.chatId); if (!e) return null;
+  const docOk = as.docValido(e.doc || conta.cpf_cnpj);
+  if (!docOk) { e.passo = 'dados'; return { texto: `Para emitir a cobrança preciso do seu CPF ou CNPJ (só na primeira vez). Mande aqui, e se quiser o e-mail para o recibo junto.\nEx.: 000.000.000-00 nome@email.com`, botoes: [[{ t: '❌ Cancelar', d: 'cancela' }]] }; }
+  try {
+    const cb = await as.comprar(conta.id, e.pacote, { forma: e.forma, cpfCnpj: e.doc, email: e.email }); compraPendente.delete(msg.chatId); const p = cb.pacote;
+    const cab = `🛒 ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`;
+    if (cb.pix_qr) return { foto: `data:image/png;base64,${cb.pix_qr}`, texto: `${cab}\nPix copia e cola:\n${cb.pix_payload}\n\nAssim que o pagamento cair eu aviso e os créditos entram sozinhos.${cb.invoice_url ? '\nFatura: ' + cb.invoice_url : ''}` };
+    return `${cab}\nPague por aqui: ${cb.invoice_url}\nAssim que confirmar, os créditos entram sozinhos e eu aviso.`;
+  } catch (err) { compraPendente.delete(msg.chatId); return `Não consegui gerar a cobrança: ${err.message}`; }
 }
