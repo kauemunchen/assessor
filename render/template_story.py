@@ -5,6 +5,7 @@ Modelos: foto_faixa, frase, chamada_feed, passos, pergunta, data. Toda saída pa
 import io
 from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageEnhance
 from template_manual import fonte, h2r, wrap, titulo_destacado, logo, marca_dagua, PRIM, SEC, BRANCO, OURO
+from template_manual import logo as _logo_file
 
 def _abrir_foto(foto_bytes):
     """Abre a foto respeitando o EXIF orientation (celulares salvam retrato como landscape+rotação) e aplica tratamento leve de iluminação profissional (contraste, nitidez, cor) SEM mexer na composição."""
@@ -45,22 +46,33 @@ def _cover(foto_bytes):
     x = (f.width - W) // 2; y = (f.height - H) // 2
     return f.crop((x, y, x + W, y + H))
 
-# 1) Foto + faixa de texto (faixa #37414E translúcida SEMPRE no rodapé, texto branco, palavra dourada).
-# Padrão fixo do KM para story-foto: faixa no rodapé + marca d'água do logo no canto inferior-direito.
-# O parâmetro `posicao` é aceito para compatibilidade, mas IGNORADO — toda foto de story vai nesse layout.
+# 1) Foto + faixa de texto (faixa #37414E translúcida COLADA NO RODAPÉ, texto branco, palavra dourada).
+# Padrão fixo KM para story-foto: faixa até a borda inferior + logo KM EM CIMA da faixa (dentro dela,
+# canto superior-direito). O parâmetro `posicao` é aceito por compat, mas IGNORADO.
 def foto_faixa(foto_bytes, texto, palavra_dourada=None, etiqueta_txt=None, posicao="base"):
     img = _cover(foto_bytes).convert("RGBA")
     f = fonte("Bold", 54); tmp = ImageDraw.Draw(img)
-    linhas = wrap(tmp, texto, f, W - 2 * M - 40); lh = 66
+    # Reserva espaço no texto para o logo não encostar nele (lado direito)
+    lw = int(W * 0.13); margem = int(W * 0.045)
+    linhas = wrap(tmp, texto, f, W - 2 * M - 40 - lw - margem); lh = 66
     alt = 60 + (46 + 30 if etiqueta_txt else 0) + len(linhas) * lh + 60
-    y0 = H - ZONA_BASE - alt - 40  # SEMPRE no rodapé (padrão fixo do KM)
-    faixa = Image.new("RGBA", (W, alt), (*h2r(PRIM), 225))
+    y0 = H - alt  # COLADA no rodapé (sem respiro embaixo) — vira a base da imagem
+    faixa = Image.new("RGBA", (W, alt), (*h2r(PRIM), 235))
     img.alpha_composite(faixa, (0, y0))
     dr = ImageDraw.Draw(img); y = y0 + 48
     if etiqueta_txt:
         dr.text((M, y), etiqueta_txt.upper(), fill=h2r(OURO), font=fonte("Bold", 28)); dr.rectangle([M, y + 42, M + 64, y + 45], fill=h2r(OURO)); y += 76
-    titulo_destacado(dr, texto, palavra_dourada, f, M, y, W - 2 * M - 40, lh)
-    return _finalizar(img)
+    titulo_destacado(dr, texto, palavra_dourada, f, M, y, W - 2 * M - 40 - lw - margem, lh)
+    # Logo KM EM CIMA da faixa (sempre em branco, porque a faixa é escura #37414E), canto superior-direito dela
+    lg = logo("branco")
+    if lg is not None:
+        lh_logo = int(lg.height * lw / lg.width)
+        lg_r = lg.resize((lw, lh_logo), Image.LANCZOS)
+        lx = W - lw - margem
+        ly = y0 + (alt - lh_logo) // 2  # centralizado verticalmente dentro da faixa
+        img.alpha_composite(lg_r, (lx, ly))
+    out = io.BytesIO(); img.convert("RGB").save(out, "JPEG", quality=95)
+    return out.getvalue(), {"logo": "branco", "posicao": "em-cima-da-faixa", "faixa": "rodape-colada"}
 
 # 2) Frase do dia (fundo da marca, frase grande centralizada verticalmente, assinatura discreta)
 def frase(texto, palavra_dourada=None, etiqueta_txt=None, autoria="@kauemunchen"):
