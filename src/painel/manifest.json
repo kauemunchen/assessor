@@ -3,8 +3,8 @@
   "short_name": "KM APP",
   "start_url": "/app/",
   "display": "standalone",
-  "background_color": "#37414E",
-  "theme_color": "#37414E",
+  "background_color": "#FAF5EC",
+  "theme_color": "#FAF5EC",
   "icons": [
     {
       "src": "/app/favicon-192.png",
