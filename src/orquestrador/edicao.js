@@ -146,7 +146,7 @@ async function _tratar(e, msg, conta, canal) {
   }
   if (e.passo === 'previa') {
     if (/^(sim|aprov|ok|boa|fechou|perfeit)/i.test(t)) {
-      e.passo = 'destino'; const h = proximosHorarios();
+      e.passo = 'destino'; const h = proximosHorarios(conta.id);
       if (e.base === 'video') return { texto: 'Fechado. Como publicar?', botoes: [[{ t: '📣 Story agora', d: 'story 1' }, { t: '🎞 Reels agora', d: 'reels 1' }], [{ t: `Story ${h[0].rotulo}`, d: `story 2 ${h[0].cmd}` }, { t: `Story ${h[1].rotulo}`, d: `story 2 ${h[1].cmd}` }], [{ t: `Reels ${h[0].rotulo}`, d: `reels 2 ${h[0].cmd}` }, { t: '📚 Guardar', d: 'story 3' }], [{ t: '✖ Cancelar', d: 'cancela' }]] };
       return { texto: 'Fechado. Como publicar?', botoes: [[{ t: '📣 Publicar agora', d: '1' }], [{ t: h[0].rotulo, d: `2 ${h[0].cmd}` }, { t: h[1].rotulo, d: `2 ${h[1].cmd}` }], [{ t: '📚 Guardar na biblioteca', d: '3' }, { t: '✖ Cancelar', d: 'cancela' }]] };
     }
@@ -216,8 +216,10 @@ Responda JSON: {"texto": "frase/pergunta curta (máx 12 palavras)", "titulo": "t
   }
   if (!e.dados.palavra_dourada) e.dados.palavra_dourada = escolherDourada(e.dados.texto || e.dados.titulo || '');
 }
-const GRADE = ['12:00', '19:00'];
-function proximosHorarios() {
+let _aj = null; import('../canal/api-marca.js').then(m => { _aj = m.ajuste; }).catch(() => {});
+const grade = (contaId) => (_aj && contaId ? _aj(contaId, 'grade_horarios', null) : null) || ['12:00', '19:00'];
+function proximosHorarios(contaId) {
+  const GRADE = grade(contaId);
   const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })); const out = [];
   for (let d = 0; d < 3 && out.length < 2; d++) for (const h of GRADE) {
     const [hh, mm] = h.split(':').map(Number); const c = new Date(agora); c.setDate(c.getDate() + d); c.setHours(hh, mm, 0, 0);

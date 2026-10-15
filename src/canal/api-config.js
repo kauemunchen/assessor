@@ -97,5 +97,4 @@ export function rotasConfig(app) {
     try { const s = await import('../integracoes/google-sheets.js'); res.json(await s.cadastrar(req.contaId, { link_ou_id: req.body?.link, nome: req.body?.nome, aba: req.body?.aba })); } catch (e) { res.status(400).json({ erro: e.message }); }
   });
   app.delete('/api/conexoes/planilha/:nome', auth, (req, res) => { db.prepare('DELETE FROM planilhas WHERE conta_id=? AND nome=?').run(req.contaId, req.params.nome); res.json({ ok: true }); });
-  app.use('/api', (err, req, res, _next) => { console.error('[api]', req.path, err.message); res.status(500).json({ erro: err.message }); });
 }

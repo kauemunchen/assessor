@@ -54,12 +54,13 @@ async function resumoDoDia(canal, conta, chatId) {
 // Limpeza automática da biblioteca: mídia com mais de RETENCAO_DIAS (padrão 15) some do Cloudinary e do registro.
 // Nunca apaga mídia que ainda está em post agendado/rascunho/erro (vai publicar) — essas só depois de publicadas/canceladas.
 async function limparBiblioteca(canal) {
-  const dias = Number(process.env.BIBLIOTECA_RETENCAO_DIAS || 15);
-  const { apagar } = await import('../integracoes/cloudinary.js');
-  const limite = new Date(Date.now() - dias * 864e5).toISOString().slice(0, 19).replace('T', ' ');
-  const rows = db.prepare("SELECT * FROM biblioteca WHERE criado_em <= ? AND (protegida IS NULL OR protegida=0)").all(limite);
+  const { apagar } = await import('../integracoes/cloudinary.js'); const { ajuste } = await import('../canal/api-marca.js');
+  const diasPadrao = Number(process.env.BIBLIOTECA_RETENCAO_DIAS || 15); let dias = diasPadrao;
+  const rows = db.prepare("SELECT * FROM biblioteca WHERE (protegida IS NULL OR protegida=0)").all();
   const porConta = {};
   for (const b of rows) {
+    dias = Number(ajuste(b.conta_id, 'retencao_biblioteca_dias', diasPadrao)) || diasPadrao;
+    if (new Date(b.criado_em.replace(' ', 'T') + 'Z').getTime() > Date.now() - dias * 864e5) continue;
     const urls = [b.url, b.marcada_url].filter(Boolean);
     const emUso = urls.some(u => db.prepare("SELECT 1 FROM posts WHERE conta_id=? AND status IN ('agendado','rascunho','erro') AND midia_url LIKE ?").get(b.conta_id, `%${u}%`));
     if (emUso) continue;

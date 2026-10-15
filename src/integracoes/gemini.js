@@ -19,6 +19,8 @@ const CADEIA = [...new Set([
   'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-flash-lite',
 ].map(m => (m || '').trim()).filter(Boolean))];
 const RAPIDO = process.env.MODELO_RAPIDO || 'gemini-3.1-flash-lite';
+export const contextoUso = { contaId: null, modulo: null };
+let _registrar = null; import('../canal/api-marca.js').then(m => { _registrar = m.registrarUso; }).catch(() => {});
 export const modelo = (opts = {}, { rapido = false } = {}) => {
   const cadeia = rapido ? [RAPIDO, ...CADEIA.filter(x => x !== RAPIDO)] : CADEIA;
   const m = genai.getGenerativeModel({ model: cadeia[0], ...opts });
@@ -26,7 +28,7 @@ export const modelo = (opts = {}, { rapido = false } = {}) => {
     let ultimo;
     for (const nome of cadeia) {
       const inst = genai.getGenerativeModel({ model: nome, ...opts });
-      try { return await comRetry(() => inst.generateContent(...a), nome === cadeia[0] ? 2 : 1); }
+      try { const r = await comRetry(() => inst.generateContent(...a), nome === cadeia[0] ? 2 : 1); try { _registrar?.(contextoUso.contaId, contextoUso.modulo, nome, r?.response?.usageMetadata); } catch {} return r; }
       catch (e) { ultimo = e; if (!transitorio(e) && !/indisponível/i.test(String(e?.message))) throw e; console.warn(`[gemini] ${nome} falhou: ${String(e?.message).slice(0, 160)}`); }
     }
     throw ultimo;

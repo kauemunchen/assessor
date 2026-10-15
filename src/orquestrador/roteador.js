@@ -3,6 +3,7 @@ import { transcrever, classificar, responder } from './ia.js';
 import { obterConta, obterUsuario, modulosAtivos, configPersona } from '../db/contas.js';
 import { tentarEntrar, fluxoColaborador } from './equipe.js';
 import * as edicao from './edicao.js';
+import { contextoUso } from '../integracoes/gemini.js';
 import { executarFerramenta } from '../ferramentas/index.js';
 import * as memoria from './memoria.js';
 import { db } from '../db/index.js';
@@ -12,6 +13,7 @@ import { governanca } from './governanca.js';
 export async function tratarMensagem(msg, canal) {
   const conta = await obterConta(msg.chatId);
   if (!conta) return (await tentarEntrar(msg)) || onboarding(msg);
+  contextoUso.contaId = conta.id; contextoUso.modulo = null;
   const usuario = obterUsuario(msg.chatId);
   if (usuario && usuario.papel !== 'dono') return fluxoColaborador(msg, conta, usuario);
 
@@ -46,7 +48,7 @@ export async function tratarMensagem(msg, canal) {
         const bytes = await canal.baixarMidia(msg.midia.ref);
         const { guardarVideoEnviado } = await import('../ferramentas/social.js');
         const v = await guardarVideoEnviado(conta.id, bytes);
-        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Vídeo enviado pelo dono, já hospedado: ${v.url} (${Math.round(v.duracao || 0)} s, ${v.largura}x${v.altura}${v.avisos.length ? '; atenção: ' + v.avisos.join('; ') : ''}). Use como midia_url. PRIMEIRO pergunte, em uma linha, o que faltar: manter ou retirar o áudio? Reels (com legenda) ou Story? quando? E ofereça: "quer editar (texto na tela, legenda, corte)? diga 'editar'". Se o dono pedir edição/texto/legenda queimada, responda só: "Diga 'MIA, editar esse vídeo' que eu abro o modo edição com ele."  Quando ele responder "sem áudio/retirar", chame remover_audio(url) e use a URL devolvida. Depois salve com criar_post (formato reels|story) com a data e confirme. Não gere imagem nem marca d'água para vídeo (o sistema aplica o logo sozinho).]`;
+        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Vídeo enviado pelo dono, já hospedado: ${v.url} (${Math.round(v.duracao || 0)} s, ${v.largura}x${v.altura}${v.avisos.length ? '; atenção: ' + v.avisos.join('; ') : ''}). Use como midia_url. PRIMEIRO pergunte, em uma linha, o que faltar: manter ou retirar o áudio (padrão da conta: ${(await import('../canal/api-marca.js')).ajuste(conta.id, 'video_sem_audio_padrao', true) ? 'retirar' : 'manter'})? Reels (com legenda) ou Story? quando? E ofereça: "quer editar (texto na tela, legenda, corte)? diga 'editar'". Se o dono pedir edição/texto/legenda queimada, responda só: "Diga 'MIA, editar esse vídeo' que eu abro o modo edição com ele."  Quando ele responder "sem áudio/retirar", chame remover_audio(url) e use a URL devolvida. Depois salve com criar_post (formato reels|story) com a data e confirme. Não gere imagem nem marca d'água para vídeo (o sistema aplica o logo sozinho).]`;
       } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[vídeo recebido, mas não consegui hospedar: ${e.message}]`; }
       msg.forcarModulo = 'social';
     }
@@ -156,7 +158,7 @@ export async function tratarMensagem(msg, canal) {
   const voc = msg.texto.match(/^([A-Za-zÀ-ÿ]{2,20})[,:]\s+/);
   if (!modulo && voc) textoClass = msg.texto.slice(voc[0].length);
   if (!modulo) modulo = await classificar(textoClass, ativos);
-  console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`);
+  console.log(`[msg] ${msg.chatId} → ${modulo}: ${msg.texto.slice(0, 80)}`); contextoUso.modulo = modulo;
   const prompt = montarPrompt({ modulo, conta, ativos, texto: msg.texto });
   // Pedidos pesados (carrossel, arte, imagem): avisa na hora e deixa demorar
   if (modulo === 'social' && msg.tipo === 'texto' && /\b(carrossel|est[áa]tico|frase|arte|imagem|gera)\b/i.test(msg.texto.replace(/\[[^\]]*\]/g, ''))) {
