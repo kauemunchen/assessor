@@ -162,3 +162,117 @@ telas.ajustes = async () => {
     api('/api/ajustes/logs').then(l => { $('#logs').innerHTML = `<ul class="lista-s">${l.map(x => `<li style="flex-direction:column;align-items:flex-start;gap:2px"><span style="font-size:11px;color:var(--mudo)">${esc(x.em)} · ${esc(x.modulo || '')}</span><span>→ ${esc(x.entrada)}</span><span style="color:var(--mudo)">← ${esc(x.saida)}</span></li>`).join('')}</ul>`; });
   } };
 };
+
+// ---------------- CALENDÁRIO EDITORIAL ----------------
+const ICONE_FMT = { post: '🖼', carrossel: '🎠', reels: '🎞', story: '📣' };
+const COR_ST = { agendado: 'var(--ouro)', publicado: '#4CAF7A', rascunho: 'var(--sec)', erro: '#E25D5D' };
+let edMes = null; let edAba = 'calendario';
+telas.editorial = async () => {
+  const hoje = new Date(); if (!edMes) edMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const ini = new Date(edMes.getFullYear(), edMes.getMonth(), 1), fim = new Date(edMes.getFullYear(), edMes.getMonth() + 1, 0);
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const posts = await api(`/api/editorial?de=${iso(ini)}&ate=${iso(fim)}`);
+  const porDia = {}; const rascunhos = [];
+  for (const p of posts) { if (!p.data) rascunhos.push(p); else (porDia[p.data.slice(0, 10)] ||= []).push(p); }
+  const mini = (p) => `<div class="post-mini" draggable="${p.status !== 'publicado'}" data-id="${p.id}" style="border-left:3px solid ${COR_ST[p.status] || 'var(--sec)'}" title="${esc(p.tema || p.legenda || '')}">${p.midias[0] && !p.video ? `<img src="${p.midias[0]}" loading="lazy">` : `<span class="fmt">${ICONE_FMT[p.formato] || '📄'}</span>`}<span class="t">${p.data ? p.data.slice(11, 16) + ' ' : ''}${esc((p.tema || p.legenda || p.formato).slice(0, 34))}</span></div>`;
+  const primeiro = (ini.getDay() + 6) % 7; const dias = []; for (let i = 0; i < primeiro; i++) dias.push('<div class="dia-cel vazio"></div>');
+  for (let d = 1; d <= fim.getDate(); d++) { const k = iso(new Date(edMes.getFullYear(), edMes.getMonth(), d)); const eh = k === iso(hoje); dias.push(`<div class="dia-cel ${eh ? 'hoje' : ''}" data-dia="${k}"><div class="n">${d}</div>${(porDia[k] || []).map(mini).join('')}</div>`); }
+  const nomeMes = edMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const corpo = `
+    <div class="abas"><button class="${edAba === 'calendario' ? 'ativo' : ''}" data-aba="calendario">📅 Calendário</button><button class="${edAba === 'biblioteca' ? 'ativo' : ''}" data-aba="biblioteca">📚 Biblioteca</button></div>
+    <div id="abaCal" class="${edAba === 'calendario' ? '' : 'oculto'}">
+      <div class="cal-topo"><button class="btn sec" id="mesAnt">‹</button><b style="text-transform:capitalize">${nomeMes}</b><button class="btn sec" id="mesProx">›</button><span class="d" style="margin-left:auto;font-size:12px;color:var(--mudo)">arraste um post para outro dia · clique para editar · <span style="color:var(--ouro)">■</span> agendado <span style="color:#4CAF7A">■</span> publicado <span style="color:#E25D5D">■</span> erro</span></div>
+      <div class="cal-cab">${['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'].map(x => `<div>${x}</div>`).join('')}</div>
+      <div class="cal-grade" id="calGrade">${dias.join('')}</div>
+      <div class="cartao" style="margin-top:14px"><h3>Rascunhos (sem data) <span class="tag">${rascunhos.length}</span></h3><div class="rascunhos" id="rascunhos">${rascunhos.map(mini).join('') || '<span class="d">Nenhum. Arraste um post para cá para tirar da fila.</span>'}</div></div>
+    </div>
+    <div id="abaBib" class="${edAba === 'biblioteca' ? '' : 'oculto'}"><div id="bibLista" class="bib-grade"><span class="d">carregando…</span></div></div>
+    <div id="modal" class="modal oculto"></div>`;
+  return { titulo: '📅 Calendário editorial', sub: 'Posts da MIA: fila, publicados e rascunhos. Mudanças aqui atualizam a agenda e a publicação automática.', corpo, depois() {
+    document.querySelectorAll('.abas button').forEach(b => b.onclick = () => { edAba = b.dataset.aba; mostrarTela('editorial'); });
+    $('#mesAnt').onclick = () => { edMes = new Date(edMes.getFullYear(), edMes.getMonth() - 1, 1); mostrarTela('editorial'); };
+    $('#mesProx').onclick = () => { edMes = new Date(edMes.getFullYear(), edMes.getMonth() + 1, 1); mostrarTela('editorial'); };
+    // drag & drop
+    let arrastando = null;
+    document.querySelectorAll('.post-mini[draggable=true]').forEach(el => { el.ondragstart = (e) => { arrastando = el.dataset.id; e.dataTransfer.effectAllowed = 'move'; }; });
+    const alvos = [...document.querySelectorAll('.dia-cel:not(.vazio)'), $('#rascunhos')];
+    alvos.forEach(al => { al.ondragover = (e) => { e.preventDefault(); al.classList.add('sobre'); }; al.ondragleave = () => al.classList.remove('sobre'); al.ondrop = async (e) => { e.preventDefault(); al.classList.remove('sobre'); if (!arrastando) return; const p = posts.find(x => x.id == arrastando); const dia = al.dataset.dia; if (!dia) { await post(`/api/editorial/${arrastando}`, { data: null }); toast(`#${arrastando} virou rascunho`); } else { const hora = p?.data ? p.data.slice(11, 16) : '19:00'; await post(`/api/editorial/${arrastando}`, { data: `${dia}T${hora}` }); toast(`#${arrastando} → ${dia.split('-').reverse().slice(0, 2).join('/')} ${hora}`); } mostrarTela('editorial'); }; });
+    document.querySelectorAll('.post-mini').forEach(el => el.onclick = () => abrirPost(posts.find(x => x.id == el.dataset.id)));
+    if (edAba === 'biblioteca') carregarBiblioteca();
+  } };
+};
+function abrirPost(p) {
+  const m = $('#modal'); m.classList.remove('oculto');
+  m.innerHTML = `<div class="modal-card"><div class="modal-topo"><b>${ICONE_FMT[p.formato] || ''} Post #${p.id} <span class="tag">${p.status}</span></b><button class="icone" id="fecharModal">✕</button></div>
+    <div class="modal-corpo"><div class="modal-midia">${p.midias.length ? (p.video ? `<video src="${p.midias[0]}" controls playsinline></video>` : p.midias.map(u => `<img src="${u}">`).join('')) : '<span class="d">sem mídia</span>'}</div>
+    <form id="fPost" class="modal-form">
+      <div class="linha2"><div class="campo"><label>Formato</label><select name="formato">${['post', 'carrossel', 'reels', 'story'].map(f => `<option ${p.formato === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div><div class="campo"><label>Pilar</label><select name="pilar">${['', 'GESTÃO', 'NEGÓCIOS', 'IA', 'AUTOMAÇÃO'].map(f => `<option ${(p.pilar || '') === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div></div>
+      <div class="campo"><label>Tema</label><input name="tema" value="${esc(p.tema || '')}"></div>
+      <div class="campo"><label>Legenda</label><textarea name="legenda" rows="7">${esc(p.legenda || '')}</textarea></div>
+      <div class="campo"><label>Hashtags</label><input name="hashtags" value="${esc(p.hashtags || '')}"></div>
+      <div class="campo"><label>Data e hora (vazio = rascunho)</label><input name="data" type="datetime-local" value="${esc(p.data || '')}"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">${p.status !== 'publicado' ? `<button class="btn prim" type="submit">Salvar</button><button class="btn sec" type="button" id="pubAgora">Publicar agora</button><button class="btn perigo" type="button" id="apagarPost">Apagar</button>` : `<span class="d">Publicado em ${esc((p.publicado_em || '').slice(0, 16))} · ${esc(p.ig_media_id || '')}</span>`}<span class="salvo"></span></div>
+    </form></div></div>`;
+  $('#fecharModal').onclick = () => m.classList.add('oculto'); m.onclick = (e) => { if (e.target === m) m.classList.add('oculto'); };
+  $('#fPost').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); await post(`/api/editorial/${p.id}`, { ...f, data: f.data || null }); toast('Post salvo'); m.classList.add('oculto'); mostrarTela('editorial'); };
+  $('#pubAgora') && ($('#pubAgora').onclick = async () => { if (!confirm(`Publicar o post #${p.id} no Instagram agora?`)) return; try { const r = await post(`/api/editorial/${p.id}/publicar`, {}); toast('Publicado: ' + r.ig_media_id); } catch {} m.classList.add('oculto'); mostrarTela('editorial'); });
+  $('#apagarPost') && ($('#apagarPost').onclick = async () => { if (!confirm(`Apagar o post #${p.id}?`)) return; await del(`/api/editorial/${p.id}`); m.classList.add('oculto'); mostrarTela('editorial'); });
+}
+async function carregarBiblioteca() {
+  const itens = await api('/api/biblioteca'); const el = $('#bibLista');
+  el.innerHTML = itens.map(b => `<div class="bib-item" data-id="${b.id}">${b.tipo === 'video' ? `<video src="${b.url}" muted playsinline preload="metadata"></video>` : `<img src="${b.url}" loading="lazy">`}
+    <div class="bib-info"><div class="bib-desc">${esc(b.descricao || b.tipo)}</div><div class="d" style="font-size:11px">${b.tipo}${b.duracao ? ` · ${Math.round(b.duracao)}s` : ''} · ${esc(b.em.slice(5, 10).split('-').reverse().join('/'))} ${b.usada ? '· usada' : ''} · ${b.protegida ? '🔒 guardada' : (b.dias_restantes <= 0 ? '⏳ apaga hoje' : `⏳ ${b.dias_restantes}d`)}</div>
+    <div class="bib-acoes"><button class="btn sec" data-usar="${b.id}">Criar post</button><button class="btn sec" data-prot="${b.id}" data-v="${b.protegida ? 0 : 1}">${b.protegida ? 'Liberar' : 'Guardar'}</button><button class="btn perigo" data-apagar="${b.id}">Apagar</button></div></div></div>`).join('') || '<span class="d">Biblioteca vazia.</span>';
+  el.querySelectorAll('[data-prot]').forEach(b => b.onclick = async () => { await post(`/api/biblioteca/${b.dataset.prot}`, { protegida: b.dataset.v === '1' }); carregarBiblioteca(); });
+  el.querySelectorAll('[data-apagar]').forEach(b => b.onclick = async () => { if (!confirm('Apagar esta mídia da biblioteca e do armazenamento?')) return; try { await del(`/api/biblioteca/${b.dataset.apagar}`); } catch {} carregarBiblioteca(); });
+  el.querySelectorAll('[data-usar]').forEach(b => b.onclick = async () => { const it = itens.find(x => x.id == b.dataset.usar); const formato = prompt('Formato (post, reels, story):', it.tipo === 'video' ? 'reels' : 'story'); if (!formato) return; const data = prompt('Data e hora (AAAA-MM-DDTHH:MM) ou vazio para rascunho:', ''); const r = await post(`/api/biblioteca/${it.id}/post`, { formato, data: data || undefined }); toast(`Post #${r.id} criado (${r.status})`); edAba = 'calendario'; mostrarTela('editorial'); });
+}
+
+// ---------------- DOCUMENTOS ----------------
+let docAba = 'arquivo'; let docFiltro = { q: '', empresa: '', tipo: '' };
+telas.documentos = async () => {
+  const corpo = `<div class="abas"><button class="${docAba === 'arquivo' ? 'ativo' : ''}" data-aba="arquivo">📂 Arquivo</button><button class="${docAba === 'vencimentos' ? 'ativo' : ''}" data-aba="vencimentos">⏰ Vencimentos</button><button class="${docAba === 'cadastros' ? 'ativo' : ''}" data-aba="cadastros">👤 Cadastros</button></div><div id="docCorpo"><span class="d">carregando…</span></div><div id="modal" class="modal oculto"></div>`;
+  return { titulo: '📂 Documentos', sub: 'O que está arquivado no seu Drive, o que vence e quem está cadastrado.', corpo, depois() {
+    document.querySelectorAll('.abas button').forEach(b => b.onclick = () => { docAba = b.dataset.aba; mostrarTela('documentos'); });
+    ({ arquivo: docArquivo, vencimentos: docVencimentos, cadastros: docCadastros })[docAba]();
+  } };
+};
+async function docArquivo() {
+  const d = await api(`/api/documentos?q=${encodeURIComponent(docFiltro.q)}&empresa=${encodeURIComponent(docFiltro.empresa)}&tipo=${encodeURIComponent(docFiltro.tipo)}`);
+  $('#docCorpo').innerHTML = `<div class="filtro-linha"><input id="dq" placeholder="Buscar por título, contraparte, conteúdo…" value="${esc(docFiltro.q)}"><select id="dEmp"><option value="">Todas as empresas</option>${d.empresas.map(e => `<option ${docFiltro.empresa === e.empresa ? 'selected' : ''} value="${esc(e.empresa)}">${esc(e.empresa)} (${e.n})</option>`).join('')}</select><select id="dTipo"><option value="">Todos os tipos</option>${d.tipos.map(t => `<option ${docFiltro.tipo === t.tipo ? 'selected' : ''} value="${esc(t.tipo)}">${esc(t.tipo)} (${t.n})</option>`).join('')}</select>${d.pasta_raiz ? `<a class="btn sec" href="${d.pasta_raiz}" target="_blank">Abrir pasta no Drive</a>` : ''}</div>
+    <p class="d" style="margin:6px 0 10px">${d.docs.length} documento(s). Para arquivar um novo, mande a foto/PDF na Conversa (ou pelo Telegram).</p>
+    <div class="tabela"><table><thead><tr><th>Data</th><th>Título</th><th>Empresa</th><th>Tipo</th><th>Contraparte</th><th></th></tr></thead><tbody>${d.docs.map(x => `<tr data-id="${x.id}"><td>${esc((x.data || '').split('-').reverse().join('/'))}</td><td>${x.sensivel ? '🔒 ' : ''}${esc(x.titulo)}<div class="d" style="font-size:11px">${esc((x.resumo || '').slice(0, 90))}</div></td><td>${esc(x.empresa)}</td><td>${esc(x.tipo)}</td><td>${esc(x.contraparte || '')}</td><td style="white-space:nowrap"><a class="btn sec" href="${x.link}" target="_blank">abrir</a> <button class="btn sec" data-ed="${x.id}">editar</button></td></tr>`).join('')}</tbody></table></div>`;
+  const aplicar = () => { docFiltro = { q: $('#dq').value, empresa: $('#dEmp').value, tipo: $('#dTipo').value }; docArquivo(); };
+  $('#dq').onkeydown = (e) => { if (e.key === 'Enter') aplicar(); }; $('#dEmp').onchange = aplicar; $('#dTipo').onchange = aplicar;
+  document.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => { const x = d.docs.find(y => y.id == b.dataset.ed); const m = $('#modal'); m.classList.remove('oculto');
+    m.innerHTML = `<div class="modal-card"><div class="modal-topo"><b>Documento #${x.id}</b><button class="icone" id="fecharModal">✕</button></div><form id="fDoc" class="modal-form" style="padding:14px">
+      <div class="campo"><label>Título</label><input name="titulo" value="${esc(x.titulo)}"></div><div class="linha2"><div class="campo"><label>Empresa</label><input name="empresa" value="${esc(x.empresa)}"></div><div class="campo"><label>Tipo</label><select name="tipo">${['Contratos', 'Fiscal', 'Pessoal', 'Veículos', 'Licenças', 'Imóveis', 'Financeiro', 'Jurídico', 'Seguros', 'Outros'].map(t => `<option ${x.tipo === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div></div>
+      <div class="linha2"><div class="campo"><label>Contraparte</label><input name="contraparte" value="${esc(x.contraparte || '')}"></div><div class="campo"><label>Data</label><input name="data" type="date" value="${esc(x.data || '')}"></div></div>
+      <p class="d">Mudar empresa/tipo/ano move o arquivo de pasta no Drive.</p><button class="btn prim">Salvar</button></form></div>`;
+    $('#fecharModal').onclick = () => m.classList.add('oculto'); $('#fDoc').onsubmit = async (e) => { e.preventDefault(); await post(`/api/documentos/${x.id}`, Object.fromEntries(new FormData(e.target))); toast('Documento atualizado'); m.classList.add('oculto'); docArquivo(); }; });
+}
+async function docVencimentos() {
+  const v = await api('/api/vencimentos');
+  const cls = (d) => d < 0 ? 'off' : d <= 7 ? 'warn' : 'ok';
+  $('#docCorpo').innerHTML = `<div class="cartao" style="margin-bottom:12px"><h3>Nova vigência / validade</h3><form id="fVig" class="linha2" style="grid-template-columns:2fr 1fr 1fr 1fr auto;align-items:end"><div class="campo"><label>Descrição</label><input name="descricao" required placeholder="Alvará Mais Têxtil"></div><div class="campo"><label>Empresa</label><input name="empresa"></div><div class="campo"><label>Vence em</label><input name="vence_em" type="date" required></div><div class="campo"><label>Aviso prévio (dias)</label><input name="aviso_previo_dias" type="number" value="0"></div><button class="btn prim" style="margin-bottom:8px">Registrar</button></form></div>
+    <div class="tabela"><table><thead><tr><th>Vence</th><th>Descrição</th><th>Empresa</th><th>Dias</th><th></th></tr></thead><tbody>${v.map(x => `<tr><td>${esc(x.vence_em.split('-').reverse().join('/'))}</td><td>${esc(x.descricao)}${x.renovacao_auto ? ' <span class="tag">renova auto</span>' : ''}${x.aviso_previo_dias ? ` <span class="tag">aviso ${x.aviso_previo_dias}d</span>` : ''}${x.link ? ` <a href="${x.link}" target="_blank">doc</a>` : ''}</td><td>${esc(x.empresa || '')}</td><td><span class="tag ${cls(x.dias)}">${x.dias < 0 ? `venceu há ${-x.dias}d` : x.dias === 0 ? 'hoje' : `${x.dias}d`}</span></td><td style="white-space:nowrap"><button class="btn sec" data-ren="${x.id}">Renovar</button> <button class="btn perigo" data-enc="${x.id}">Encerrar</button></td></tr>`).join('') || '<tr><td colspan="5" class="d">Nenhuma vigência ativa.</td></tr>'}</tbody></table></div>`;
+  $('#fVig').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.aviso_previo_dias = Number(f.aviso_previo_dias || 0); await post('/api/vencimentos', f); toast('Vigência registrada (avisos 30/7/1 + agenda)'); docVencimentos(); };
+  document.querySelectorAll('[data-ren]').forEach(b => b.onclick = async () => { const nd = prompt('Nova data de vencimento (AAAA-MM-DD):'); if (!nd) return; await post(`/api/vencimentos/${b.dataset.ren}/encerrar`, { nova_data: nd }); docVencimentos(); });
+  document.querySelectorAll('[data-enc]').forEach(b => b.onclick = async () => { if (!confirm('Encerrar esta vigência (para de avisar)?')) return; await post(`/api/vencimentos/${b.dataset.enc}/encerrar`, {}); docVencimentos(); });
+}
+async function docCadastros(q = '') {
+  const c = await api(`/api/cadastros?q=${encodeURIComponent(q)}`);
+  $('#docCorpo').innerHTML = `<div class="filtro-linha"><input id="cq" placeholder="Buscar nome, CNPJ/CPF, e-mail, telefone" value="${esc(q)}"><button class="btn prim" id="novoCad">+ Novo cadastro</button></div>
+    <div class="tabela"><table><thead><tr><th>Tipo</th><th>Nome</th><th>Documento</th><th>Contato</th><th>Vínculo</th><th></th></tr></thead><tbody>${c.map(x => `<tr><td>${esc(x.tipo || '')}</td><td>${esc(x.nome)}${x.completo ? '' : ' <span class="tag warn">incompleto</span>'}</td><td>${esc(x.documento || '')}</td><td>${esc([x.email, x.telefone].filter(Boolean).join(' · '))}</td><td>${esc(x.empresa_vinculo || '')}</td><td style="white-space:nowrap"><button class="btn sec" data-edc='${esc(JSON.stringify(x))}'>editar</button> <button class="btn perigo" data-rmc="${x.id}">remover</button></td></tr>`).join('') || '<tr><td colspan="6" class="d">Nenhum cadastro.</td></tr>'}</tbody></table></div>`;
+  $('#cq').onkeydown = (e) => { if (e.key === 'Enter') docCadastros($('#cq').value); };
+  const form = (x = {}) => { const m = $('#modal'); m.classList.remove('oculto');
+    m.innerHTML = `<div class="modal-card"><div class="modal-topo"><b>${x.id ? 'Editar' : 'Novo'} cadastro</b><button class="icone" id="fecharModal">✕</button></div><form id="fCad" class="modal-form" style="padding:14px">
+      <div class="linha2"><div class="campo"><label>Tipo</label><select name="tipo">${['cliente', 'fornecedor', 'colaborador', 'prestador', 'outro'].map(t => `<option ${x.tipo === t ? 'selected' : ''}>${t}</option>`).join('')}</select></div><div class="campo"><label>Nome</label><input name="nome" required value="${esc(x.nome || '')}"></div></div>
+      <div class="linha2"><div class="campo"><label>CNPJ/CPF</label><input name="documento" value="${esc(x.documento || '')}"></div><div class="campo"><label>Empresa vinculada</label><input name="empresa_vinculo" value="${esc(x.empresa_vinculo || '')}"></div></div>
+      <div class="linha2"><div class="campo"><label>E-mail</label><input name="email" value="${esc(x.email || '')}"></div><div class="campo"><label>Telefone</label><input name="telefone" value="${esc(x.telefone || '')}"></div></div>
+      <div class="campo"><label>Endereço</label><input name="endereco" value="${esc(x.endereco || '')}"></div><button class="btn prim">Salvar</button></form></div>`;
+    $('#fecharModal').onclick = () => m.classList.add('oculto'); $('#fCad').onsubmit = async (e) => { e.preventDefault(); await post('/api/cadastros', Object.fromEntries(new FormData(e.target))); toast('Cadastro salvo'); m.classList.add('oculto'); docCadastros($('#cq')?.value || ''); }; };
+  $('#novoCad').onclick = () => form();
+  document.querySelectorAll('[data-edc]').forEach(b => b.onclick = () => form(JSON.parse(b.dataset.edc)));
+  document.querySelectorAll('[data-rmc]').forEach(b => b.onclick = async () => { if (!confirm('Remover cadastro?')) return; await del(`/api/cadastros/${b.dataset.rmc}`); docCadastros($('#cq').value); });
+}

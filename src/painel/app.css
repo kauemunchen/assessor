@@ -104,3 +104,26 @@ body{font-family:Poppins,-apple-system,"Segoe UI",Roboto,sans-serif;background:v
 .lista-s li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;background:var(--fundo);border-radius:10px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--prim);color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;z-index:50;box-shadow:var(--sombra)}
 .salvo{color:#1E7A45;font-size:12px;margin-left:8px}
+/* calendário editorial */
+.abas{display:flex;gap:6px;margin-bottom:14px}.abas button{border:1px solid var(--sec);background:var(--card);color:var(--texto);border-radius:999px;padding:7px 14px;cursor:pointer;font:inherit;font-size:13px}.abas button.ativo{background:var(--prim);color:#fff;border-color:var(--prim)}
+.cal-topo{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.cal-cab{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;font-size:11px;color:var(--mudo);text-transform:uppercase;letter-spacing:.06em;padding:0 2px}
+.cal-grade{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dia-cel{min-height:96px;background:var(--card);border-radius:10px;padding:4px;box-shadow:var(--sombra);display:flex;flex-direction:column;gap:3px}
+.dia-cel.vazio{background:transparent;box-shadow:none}.dia-cel.hoje .n{color:var(--ouro);font-weight:700}.dia-cel.sobre{outline:2px dashed var(--ouro)}
+.dia-cel .n{font-size:12px;color:var(--mudo);padding:0 2px}
+.post-mini{display:flex;align-items:center;gap:5px;background:var(--fundo);border-radius:6px;padding:3px 5px;font-size:11px;cursor:grab;overflow:hidden}
+.post-mini img{width:22px;height:22px;object-fit:cover;border-radius:4px;flex:none}.post-mini .fmt{flex:none}.post-mini .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rascunhos{display:flex;flex-wrap:wrap;gap:6px;min-height:36px}.rascunhos .post-mini{max-width:260px}.rascunhos.sobre{outline:2px dashed var(--ouro);border-radius:8px}
+.bib-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.bib-item{background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--sombra)}.bib-item img,.bib-item video{width:100%;aspect-ratio:9/16;object-fit:cover;display:block;background:var(--fundo);max-height:280px}
+.bib-info{padding:8px 10px}.bib-desc{font-size:13px;font-weight:600;margin-bottom:2px}.bib-acoes{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}.bib-acoes .btn{padding:5px 8px;font-size:11px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:40;padding:12px}
+.modal-card{background:var(--card);border-radius:16px;max-width:900px;width:100%;max-height:92vh;overflow:auto;box-shadow:var(--sombra)}
+.modal-topo{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--sec)}
+.modal-corpo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px;padding:14px}
+.modal-midia img,.modal-midia video{width:100%;border-radius:10px;display:block;margin-bottom:6px;max-height:60vh;object-fit:contain;background:var(--fundo)}
+@media (max-width:760px){.modal-corpo{grid-template-columns:1fr}.cal-grade{grid-template-columns:repeat(7,minmax(0,1fr))}.dia-cel{min-height:60px}.post-mini .t{display:none}.post-mini img{width:18px;height:18px}}
+/* documentos */
+.filtro-linha{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.filtro-linha input,.filtro-linha select{font:inherit;padding:9px 10px;border:1px solid var(--sec);border-radius:10px;background:var(--card);color:var(--texto)}.filtro-linha input{flex:1;min-width:200px}
+.tabela{background:var(--card);border-radius:12px;box-shadow:var(--sombra);overflow:auto}.tabela table{width:100%;border-collapse:collapse;font-size:13px}.tabela th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mudo);padding:10px 12px;border-bottom:1px solid var(--sec)}.tabela td{padding:10px 12px;border-bottom:1px solid var(--fundo);vertical-align:top}.tabela tr:hover td{background:var(--fundo)}

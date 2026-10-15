@@ -7,6 +7,7 @@ import { tratarMensagem } from './orquestrador/roteador.js';
 import { comBotoes } from './orquestrador/botoes.js';
 import { rotasConfig } from './canal/api-config.js';
 import { rotasMarca } from './canal/api-marca.js';
+import { rotasDados } from './canal/api-dados.js';
 import { iniciarRotinas } from './rotinas/scheduler.js';
 import { migrar } from './db/migrate.js';
 import { setCanal } from './canal/atual.js';
@@ -23,6 +24,7 @@ const canal = criarCanal(process.env.CANAL || 'telegram', app, servidor);
 setCanal(canal);
 rotasConfig(app);
 rotasMarca(app);
+rotasDados(app);
 app.use('/api', (err, req, res, _next) => { console.error('[api]', req.path, err.message); res.status(500).json({ erro: err.message }); });
 canal.aoReceber(async (msg) => {
   const t0 = Date.now(); canal.digitando?.(msg.chatId); const tick = setInterval(() => canal.digitando?.(msg.chatId), 4500);
