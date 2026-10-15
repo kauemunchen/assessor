@@ -73,3 +73,19 @@ export function resumo({ contaId = null, dias = 30 } = {}) {
   const margemReal = contaId ? 0 : +((mp.total_liquido || 0) - (ia.total_brl || 0) - infra).toFixed(2);
   return { dias, ia, mp, infra_brl: contaId ? 0 : infra, receita_brl: receita, custo_total_brl: custoTotal, margem_brl: margemReal, precos: p };
 }
+
+/** Margem bruta estimada por pacote (preço vigente × créditos × custo médio por crédito × taxa MP). */
+export async function margemPacotes() {
+  const p = precos(); const cambio = p['usd_brl'] || 5.5;
+  const { PACOTES, TOKENS_POR_CREDITO } = await import('./creditos/index.js' /* resolved relative to this file */);
+  // Custo médio por crédito: 1000 tokens no Gemini 2.5 Flash, mix 70% in + 30% out
+  const custoIAperCred = ((TOKENS_POR_CREDITO * 0.7) * p['gemini-2.5-flash_in'] + (TOKENS_POR_CREDITO * 0.3) * p['gemini-2.5-flash_out']) / 1e6 * cambio;
+  return PACOTES.map(pac => {
+    const custoIAtotal = pac.creditos * custoIAperCred;
+    const taxaPix = pac.preco * p['mp_pix_pct'] + p['mp_pix_fixo'];
+    const taxaCartao = pac.preco * p['mp_cartao_pct'] + p['mp_cartao_fixo'];
+    const lucroPix = pac.preco - custoIAtotal - taxaPix;
+    const lucroCartao = pac.preco - custoIAtotal - taxaCartao;
+    return { ...pac, custo_credito: +custoIAperCred.toFixed(4), custo_ia: +custoIAtotal.toFixed(2), taxa_pix: +taxaPix.toFixed(2), taxa_cartao: +taxaCartao.toFixed(2), lucro_pix: +lucroPix.toFixed(2), lucro_cartao: +lucroCartao.toFixed(2), margem_pix_pct: +(lucroPix / pac.preco * 100).toFixed(1), margem_cartao_pct: +(lucroCartao / pac.preco * 100).toFixed(1) };
+  });
+}

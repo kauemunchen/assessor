@@ -125,7 +125,7 @@ export function rotasAdmin(app) {
     res.json({ ok: true, enviados, total: donos.length });
   });
   // ---------- Custos: quanto você paga de IA + MP + VPS, e qual sua margem ----------
-  app.get('/api/admin/custos', auth, async (req, res) => { const { resumo } = await import('../custos.js'); const geral = resumo({ dias: Number(req.query.dias || 30) }); const admin = resumo({ contaId: req.contaId, dias: Number(req.query.dias || 30) }); res.json({ geral, admin, admin_conta: db.prepare('SELECT nome_dono, plano, admin FROM contas WHERE id=?').get(req.contaId) }); });
+  app.get('/api/admin/custos', auth, async (req, res) => { const { resumo, margemPacotes } = await import('../custos.js'); const dias = Number(req.query.dias || 30); const geral = resumo({ dias }); const admin = resumo({ contaId: req.contaId, dias }); const margens = await margemPacotes(); res.json({ geral, admin, margens, admin_conta: db.prepare('SELECT nome_dono, plano, admin FROM contas WHERE id=?').get(req.contaId) }); });
   app.post('/api/admin/custos/resetar', auth, async (req, res) => { const { PRECOS_PADRAO, definirPreco } = await import('../custos.js'); for (const [k, v] of Object.entries(PRECOS_PADRAO)) definirPreco(k, v); logAdmin(req.contaId, 'custos.resetar'); res.json({ ok: true }); });
   app.post('/api/admin/custos/preco', auth, async (req, res) => { const { definirPreco } = await import('../custos.js'); const b = req.body || {}; if (!b.chave) return res.status(400).json({ erro: 'chave?' }); definirPreco(b.chave, b.valor); logAdmin(req.contaId, 'custos.preco', b.chave, { valor: b.valor }); res.json({ ok: true }); });
 
