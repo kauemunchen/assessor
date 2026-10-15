@@ -9,6 +9,10 @@ async function post(path, body, json = true) {
 export const paletas = () => fetch(BASE + '/paletas').then(r => r.json());
 export const frase = (texto, { paleta = 'km', autoria = '@kauemunchen', template = 'manual', palavra_dourada, etiqueta } = {}) => post('/frase', { frase: texto, paleta, autoria, template, palavra_dourada, etiqueta });
 export const letreiro = (gancho) => post('/letreiro', { gancho });
+import { contextoUso } from './gemini.js';
+import { cobrar } from '../creditos/index.js';
+const cobra = (item, vezes = 1) => cobrar(contextoUso.contaId, item, { modulo: contextoUso.modulo || 'social', vezes });
+
 export async function marcaDagua(bytes, { posicao = 'inferior-direito', proporcao = 0.14, assinatura = false } = {}) {
   const r = await fetch(`${BASE}/marca-dagua?posicao=${posicao}&proporcao=${proporcao}&assinatura=${assinatura ? 1 : 0}`, { method: 'POST', body: bytes });
   if (!r.ok) throw new Error(`render /marca-dagua: ${r.status} ${await r.text()}`);
@@ -17,6 +21,7 @@ export async function marcaDagua(bytes, { posicao = 'inferior-direito', proporca
 }
 export const comLogo = (bytes) => post('/logo', bytes, false);
 export async function carrossel(dados, { paleta = 'km', template = 'manual' } = {}) {
+  cobra('render_carrossel');
   const zip = await post('/carrossel', { dados, paleta, template });
   return extrairZip(zip);
 }
@@ -34,6 +39,7 @@ function extrairZip(buf) {
 
 /** Story 9:16 no padrão KM. dados = {modelo, ...}; foto/capa = Buffer opcional. Devolve {bytes, info}. */
 export async function story(dados, { foto, capa } = {}) {
+  cobra('render_story');
   const fd = new FormData(); fd.append('json', JSON.stringify(dados));
   if (foto) fd.append('foto', new Blob([foto]), 'foto.jpg');
   if (capa) fd.append('capa', new Blob([capa]), 'capa.jpg');
@@ -45,6 +51,7 @@ export async function story(dados, { foto, capa } = {}) {
 
 /** Edição de vídeo (ffmpeg no render). ops: {enquadrar, cortar, letreiro, legendas}. Sempre sai com o logo KM. */
 export async function editarVideo(bytes, ops) {
+  cobra('video_edicao');
   const fd = new FormData(); fd.append('json', JSON.stringify(ops)); fd.append('video', new Blob([bytes]), 'in.mp4');
   const r = await fetch(BASE + '/video/editar', { method: 'POST', body: fd });
   if (!r.ok) { let e = ''; try { e = (await r.json()).erro; } catch { e = await r.text(); } throw new Error(`edição de vídeo: ${String(e).slice(0, 300)}`); }
@@ -52,4 +59,4 @@ export async function editarVideo(bytes, ops) {
   return { bytes: Buffer.from(await r.arrayBuffer()), info };
 }
 export async function infoVideo(bytes) { const r = await fetch(BASE + '/video/info', { method: 'POST', body: bytes }); if (!r.ok) throw new Error('info do vídeo falhou'); return r.json(); }
-export async function audioDoVideo(bytes) { return post('/video/audio', bytes, false); }
+export async function audioDoVideo(bytes) { cobra('video_audio'); return post('/video/audio', bytes, false); }

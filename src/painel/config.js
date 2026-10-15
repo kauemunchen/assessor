@@ -276,3 +276,34 @@ async function docCadastros(q = '') {
   document.querySelectorAll('[data-edc]').forEach(b => b.onclick = () => form(JSON.parse(b.dataset.edc)));
   document.querySelectorAll('[data-rmc]').forEach(b => b.onclick = async () => { if (!confirm('Remover cadastro?')) return; await del(`/api/cadastros/${b.dataset.rmc}`); docCadastros($('#cq').value); });
 }
+
+// ---------------- CRÉDITOS ----------------
+telas.creditos = async () => {
+  const d = await api('/api/creditos'); const fmtC = (n) => Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  const pct = d.ilimitada ? 100 : Math.max(0, Math.min(100, d.saldo / (d.base || 1) * 100));
+  const cor = d.ilimitada ? '#4CAF7A' : pct <= 5 ? '#E25D5D' : pct <= 20 ? '#E0A030' : 'var(--ouro)';
+  const maxDia = Math.max(1, ...d.por_dia.map(x => x.gasto || 0));
+  const TIPO = { trial: 'Boas-vindas', compra: 'Compra', plano: 'Plano mensal', credito: 'Crédito', ajuste: 'Ajuste', debito: 'Consumo' };
+  const corpo = `<div class="grade">
+    <div class="cartao" style="grid-column:1/-1">
+      <h3>Saldo <span class="tag ${d.ilimitada ? 'ok' : pct <= 5 ? 'off' : pct <= 20 ? 'warn' : ''}">${d.ilimitada ? 'conta ilimitada (admin)' : d.plano === 'trial' ? 'período de teste' : 'plano ' + esc(d.plano || '')}</span></h3>
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span style="font-size:40px;font-weight:700">${d.ilimitada ? '∞' : fmtC(d.saldo)}</span><span class="d" style="font-size:14px">créditos${d.dias_restantes != null ? ` · no ritmo atual, dá para ~${d.dias_restantes} dias` : ''}</span></div>
+      <div class="saldo-barra"><div style="width:${pct}%;background:${cor}"></div></div>
+      <p class="d" style="margin-top:8px">1 crédito = ${d.tokens_por_credito.toLocaleString('pt-BR')} tokens de IA. Story ou arte ${d.tarifas.render_story}, carrossel ${d.tarifas.render_carrossel}, edição de vídeo ${d.tarifas.video_edicao}, imagem gerada por IA ${d.tarifas.fal_imagem}, áudio de vídeo ${d.tarifas.video_audio}. Agenda e publicações programadas não param quando o saldo zera.</p>
+    </div>
+    <div class="cartao"><h3>Comprar créditos</h3><p class="d">Pix ou cartão via Asaas. Créditos pré-pagos não vencem; o plano mensal renova todo mês.</p>
+      <div class="pacotes">${d.pacotes.map(p => `<button class="pacote" data-id="${p.id}"><b>${esc(p.nome)}</b><span>${p.creditos.toLocaleString('pt-BR')} créditos</span><span class="preco">R$ ${p.preco}${p.tipo === 'mensal' ? '<small>/mês</small>' : ''}</span></button>`).join('')}</div>
+      <p class="d" id="compraMsg" style="margin-top:8px"></p></div>
+    <div class="cartao"><h3>Consumo (30 dias)</h3>
+      <ul class="lista-s"><li><span>Total gasto</span><b>${fmtC(d.gasto_30d)}</b></li><li><span>Média por dia</span><b>${fmtC(d.media_dia)}</b></li></ul>
+      <p class="d" style="margin-top:10px">Por assessor</p><ul class="lista-s">${d.por_modulo.map(x => `<li><span>${esc(NOMES[x.modulo] || x.modulo)}</span><span>${fmtC(x.gasto)} · ${x.n} usos</span></li>`).join('') || '<li>Sem consumo ainda.</li>'}</ul>
+      <p class="d" style="margin-top:10px">Por tipo</p><ul class="lista-s">${d.por_tipo.map(x => `<li><span>${esc(x.item || '—')}</span><span>${fmtC(x.gasto)}</span></li>`).join('') || '<li>—</li>'}</ul>
+      <p class="d" style="margin-top:10px">Por dia</p><div style="display:flex;align-items:flex-end;gap:3px;height:60px">${d.por_dia.map(x => `<div title="${x.d}: ${fmtC(x.gasto)} créditos" style="flex:1;background:var(--ouro);border-radius:3px 3px 0 0;height:${Math.max(3, Math.round((x.gasto || 0) / maxDia * 60))}px"></div>`).join('') || '<span class="d">—</span>'}</div></div>
+    <div class="cartao" style="grid-column:1/-1"><h3>Histórico</h3><div class="tabela"><table><thead><tr><th>Quando</th><th>Tipo</th><th>Descrição</th><th>Assessor</th><th style="text-align:right">Créditos</th></tr></thead><tbody>
+      ${d.historico.map(h => `<tr><td>${esc(h.criado_em.slice(0, 16).replace('T', ' '))}</td><td><span class="tag ${h.quantidade > 0 ? 'ok' : ''}">${TIPO[h.tipo] || esc(h.tipo)}</span></td><td>${esc(h.motivo || '')}${h.ref && h.ref.startsWith('tokens:') ? ` <small style="color:var(--mudo)">${Number(h.ref.slice(7)).toLocaleString('pt-BR')} tokens</small>` : ''}</td><td>${esc(NOMES[h.modulo] || h.modulo || '')}</td><td style="text-align:right;${h.quantidade > 0 ? 'color:#1E7A45' : ''}">${h.quantidade > 0 ? '+' : ''}${fmtC(h.quantidade)}</td></tr>`).join('') || '<tr><td colspan="5">Nenhuma movimentação.</td></tr>'}
+    </tbody></table></div></div>
+  </div>`;
+  return { titulo: '💳 Créditos', sub: `Saldo, consumo e recargas do ${esc(d.produto)}.`, corpo, depois() {
+    document.querySelectorAll('.pacote').forEach(b => b.onclick = () => { $('#compraMsg').textContent = `Pagamento via Asaas entra na próxima etapa. Por enquanto, peça a liberação do pacote "${b.querySelector('b').textContent}" ao suporte do ${d.produto}.`; });
+  } };
+};

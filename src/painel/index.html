@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#37414E">
-<title>Assessor KM</title>
+<title>KM APP</title>
 <link rel="manifest" href="/app/manifest.json">
 <link rel="icon" href="/app/icone.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/app/app.css">
@@ -12,7 +12,7 @@
 <body>
 <div id="login" class="tela oculto">
   <div class="card">
-    <div class="marca"><span class="km">KM</span><span>Assessor</span></div>
+    <div class="marca"><span class="km">KM</span><span>APP</span></div>
     <h1>Entrar</h1>
     <p>Abra o <b id="botNome">@AssessorKM_bot</b> no Telegram e mande:</p>
     <div class="codigo" id="codigo">······</div>
@@ -24,7 +24,7 @@
 <div id="app" class="tela oculto">
   <aside id="lateral">
     <div class="topo-lateral">
-      <div class="marca"><span class="km">KM</span><span>Assessor</span></div>
+      <div class="marca"><span class="km">KM</span><span>APP</span></div>
       <button class="icone" id="fecharLateral" title="Fechar">✕</button>
     </div>
     <nav class="menu">
@@ -34,9 +34,11 @@
       <a data-tela="marca">✨ Identidade & Marca</a>
       <a data-tela="editorial">📅 Calendário editorial</a>
       <a data-tela="documentos">📂 Documentos</a>
+      <a data-tela="creditos">💳 Créditos</a>
       <a data-tela="ajustes">⚙️ Ajustes</a>
     </nav>
     <div class="bloco" id="equipeAtiva"></div>
+    <div class="bloco saldo oculto" id="saldoBloco" data-tela="creditos"><div class="titulo">Créditos</div><div class="saldo-num"><b id="saldoNum">—</b><span id="saldoSub"></span></div><div class="saldo-barra"><div id="saldoBarra"></div></div></div>
     <div class="bloco atalhos">
       <div class="titulo">Atalhos</div>
       <button data-cmd="hoje">Agenda de hoje</button>

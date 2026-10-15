@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db } from '../db/index.js';
 import { sessao } from './web.js';
+import { debitarTokens, resumo as resumoCreditos } from '../creditos/index.js';
 
 const CONHECIMENTO = path.resolve('src/conhecimento');
 db.exec(`CREATE TABLE IF NOT EXISTS ajustes (conta_id INTEGER, chave TEXT, valor TEXT, PRIMARY KEY (conta_id, chave));
@@ -11,7 +12,7 @@ CREATE TABLE IF NOT EXISTS uso (id INTEGER PRIMARY KEY, conta_id INTEGER, modulo
 export function ajuste(contaId, chave, padrao = null) { const r = db.prepare('SELECT valor FROM ajustes WHERE conta_id=? AND chave=?').get(contaId, chave); if (!r) return padrao; try { return JSON.parse(r.valor); } catch { return r.valor; } }
 export function definirAjuste(contaId, chave, valor) { db.prepare('INSERT INTO ajustes (conta_id, chave, valor) VALUES (?,?,?) ON CONFLICT(conta_id, chave) DO UPDATE SET valor=excluded.valor').run(contaId, chave, JSON.stringify(valor)); }
 /** Registro de uso de IA (chamado pelo gemini.js quando houver usageMetadata). */
-export function registrarUso(contaId, modulo, modelo, meta) { try { if (!meta) return; db.prepare('INSERT INTO uso (conta_id, modulo, tokens_in, tokens_out, modelo) VALUES (?,?,?,?,?)').run(contaId || 0, modulo || null, meta.promptTokenCount || 0, meta.candidatesTokenCount || 0, modelo || null); } catch {} }
+export function registrarUso(contaId, modulo, modelo, meta) { try { if (!meta) return; db.prepare('INSERT INTO uso (conta_id, modulo, tokens_in, tokens_out, modelo) VALUES (?,?,?,?,?)').run(contaId || 0, modulo || null, meta.promptTokenCount || 0, meta.candidatesTokenCount || 0, modelo || null); debitarTokens(contaId, modulo, (meta.totalTokenCount || (meta.promptTokenCount || 0) + (meta.candidatesTokenCount || 0)), modelo); } catch {} }
 
 const CAMPOS_ID = ['perfil', 'nicho', 'publico', 'tom', 'pilares', 'hashtags_fixas', 'hashtags_pilar', 'ctas', 'agenda', 'fase', 'formatos', 'cores', 'tipografia', 'provas', 'series', 'descricao'];
 const AJUSTES_PADRAO = { grade_horarios: ['12:00', '19:00'], retencao_biblioteca_dias: Number(process.env.BIBLIOTECA_RETENCAO_DIAS || 15), video_sem_audio_padrao: true, story_posicao_faixa: 'base', marcador_social: 'Social Media', marcador_vencimentos: 'Profissional', avisos_vencimento: [30, 7, 1], hora_vencimentos: '08:00', hora_limpeza: '03:00' };
@@ -47,6 +48,9 @@ export function rotasMarca(app) {
       const r = await render.story({ modelo, texto, titulo: texto, palavra_dourada, etiqueta, itens: ['Defina o resultado', 'Documente o como', 'Acompanhe pelo indicador'], quando: 'Quinta, 19h' });
       res.setHeader('content-type', 'image/jpeg'); res.send(r.bytes); } catch (e) { res.status(500).json({ erro: e.message }); }
   });
+
+  // ---------- Créditos ----------
+  app.get('/api/creditos', auth, (req, res) => res.json(resumoCreditos(req.contaId)));
 
   // ---------- Ajustes ----------
   app.get('/api/ajustes', auth, (req, res) => {

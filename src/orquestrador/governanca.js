@@ -34,6 +34,8 @@ export async function governanca(msg, conta) {
     db.prepare('UPDATE modulos SET ligado=0 WHERE conta_id=? AND modulo=?').run(conta.id, mod);
     return `${MODS[mod]} desligado. Os dados ficam guardados.`;
   }
+  if (/^(cr[ée]ditos?|saldo)$/.test(t)) { const c = await import('../creditos/index.js'); return c.textoResumo(conta.id); }
+  if (/^(comprar|planos?|recarregar)( cr[ée]ditos?)?$/.test(t)) { const c = await import('../creditos/index.js'); return `🛒 *${c.PRODUTO} · Recarga*\n` + c.PACOTES.map(p => `- ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`).join('\n') + `\n\nO pagamento (Pix/cartão via Asaas) entra na tela *Créditos* do app web na próxima etapa. Por enquanto, fale com o suporte do ${c.PRODUTO} para liberar.`; }
   if (/^status$|^conex[õo]es$/.test(t)) {
     const g = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(conta.id);
     const ig = db.prepare('SELECT * FROM instagram_auth WHERE conta_id=?').get(conta.id);

@@ -21,6 +21,7 @@ async function iniciar() {
   try { me = await api('/api/me'); } catch { return; }
   $('#login').classList.add('oculto'); $('#app').classList.remove('oculto');
   $('#donoNome').textContent = me.conta.nome_dono;
+  if (me.creditos) { const c = me.creditos; const pct = c.ilimitada ? 100 : Math.max(0, Math.min(100, c.saldo / (c.base || 1) * 100)); $('#saldoBloco').classList.remove('oculto'); $('#saldoNum').textContent = c.ilimitada ? '∞' : Number(c.saldo).toLocaleString('pt-BR', { maximumFractionDigits: 0 }); $('#saldoSub').textContent = c.ilimitada ? 'ilimitado' : pct <= 5 ? 'recarregue' : pct <= 20 ? 'acabando' : 'créditos'; const b = $('#saldoBarra'); b.style.width = pct + '%'; b.style.background = c.ilimitada ? '#4CAF7A' : pct <= 5 ? '#E25D5D' : pct <= 20 ? '#E0A030' : 'var(--ouro)'; $('#saldoBloco').onclick = () => { mostrarTela('creditos'); $('#lateral').classList.remove('aberta'); }; }
   const nome = (m) => me.personas.find(p => p.modulo === m)?.nome || NOMES[m];
   $('#equipeAtiva').innerHTML = `<div class="titulo">Equipe ativa</div>` + me.modulos.map(m => `<div class="equipe-item"><span class="dot"></span>${nome(m)} <span style="opacity:.6;font-size:12px">· ${NOMES[m]}</span></div>`).join('');
   $('#filtros').innerHTML = `<button class="ativo" data-f="">Todos</button>` + me.modulos.map(m => `<button data-f="${m}">${nome(m)}</button>`).join('');

@@ -20,11 +20,13 @@ const CADEIA = [...new Set([
 ].map(m => (m || '').trim()).filter(Boolean))];
 const RAPIDO = process.env.MODELO_RAPIDO || 'gemini-3.1-flash-lite';
 export const contextoUso = { contaId: null, modulo: null };
+let _creditos = null; import('../creditos/index.js').then(m => { _creditos = m; }).catch(() => {});
 let _registrar = null; import('../canal/api-marca.js').then(m => { _registrar = m.registrarUso; }).catch(() => {});
 export const modelo = (opts = {}, { rapido = false } = {}) => {
   const cadeia = rapido ? [RAPIDO, ...CADEIA.filter(x => x !== RAPIDO)] : CADEIA;
   const m = genai.getGenerativeModel({ model: cadeia[0], ...opts });
   m.generateContent = async (...a) => {
+    if (_creditos && contextoUso.contaId && !_creditos.podeUsar(contextoUso.contaId, { tolerancia: 3 })) throw new Error('sem créditos: recarregue em Créditos no app ou mande "comprar"');
     let ultimo;
     for (const nome of cadeia) {
       const inst = genai.getGenerativeModel({ model: nome, ...opts });

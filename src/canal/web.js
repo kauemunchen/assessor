@@ -52,11 +52,12 @@ export class WebCanal {
     app.get('/api/login/status', (req, res) => { const c = db.prepare('SELECT * FROM web_codigos WHERE token=?').get(req.query.token || ''); if (!c) return res.status(404).json({ ok: false }); if (!c.usado) return res.json({ ok: false, aguardando: true }); res.setHeader('Set-Cookie', `akm=${c.token}; Path=/; Max-Age=${180 * 86400}; SameSite=Lax; HttpOnly${process.env.PUBLIC_URL?.startsWith('https') ? '; Secure' : ''}`); res.json({ ok: true, token: c.token }); });
     app.post('/api/logout', (req, res) => { const s = sessao(req); if (s) db.prepare('DELETE FROM web_sessoes WHERE token=?').run(s.token); res.setHeader('Set-Cookie', 'akm=; Path=/; Max-Age=0'); res.json({ ok: true }); });
     const auth = (req, res, next) => { const s = sessao(req); if (!s) return res.status(401).json({ erro: 'não autenticado' }); req.sessao = s; next(); };
-    app.get('/api/me', auth, (req, res) => {
+    app.get('/api/me', auth, async (req, res) => {
       const conta = db.prepare('SELECT id, nome_dono, empresa, foco_mes, empresas FROM contas WHERE id=?').get(req.sessao.conta_id);
       const modulos = db.prepare('SELECT modulo FROM modulos WHERE conta_id=? AND ligado=1').all(conta.id).map(x => x.modulo);
       const personas = db.prepare('SELECT modulo, nome FROM persona_config WHERE conta_id=?').all(conta.id);
-      res.json({ conta, modulos: ['diretor', ...modulos], personas });
+      let creditos = null; try { const c = await import('../creditos/index.js'); creditos = { saldo: c.saldo(conta.id), ilimitada: c.ilimitada(conta.id), base: c.ultimaRecarga(conta.id), produto: c.PRODUTO }; } catch {}
+      res.json({ conta, modulos: ['diretor', ...modulos], personas, creditos });
     });
     app.get('/api/mensagens', auth, (req, res) => {
       const antes = Number(req.query.antes || 0); const lim = Math.min(200, Number(req.query.limite || 60));

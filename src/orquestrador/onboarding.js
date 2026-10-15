@@ -9,6 +9,7 @@ export function onboarding(msg) {
   const r = db.prepare('INSERT INTO contas (nome_dono, empresa) VALUES (?,?)').run(e.nome, texto);
   db.prepare('INSERT INTO usuarios (conta_id, canal, chat_id, nome, papel) VALUES (?,?,?,?,?)').run(r.lastInsertRowid, 'telegram', msg.chatId, e.nome, 'dono');
   db.prepare('INSERT INTO modulos (conta_id, modulo, ligado) VALUES (?,?,1)').run(r.lastInsertRowid, 'secretaria');
+  import('../creditos/index.js').then(c => c.concederTrial(Number(r.lastInsertRowid))).catch(() => {});
   estado.delete(msg.chatId);
   return `Conta criada. A Secretária já está ligada. Pode mandar áudio ou texto: "marca reunião com o João quinta 14h", "me lembra de pagar o INSS dia 20". Para conectar o Google Agenda, diga "conectar Google".`;
 }

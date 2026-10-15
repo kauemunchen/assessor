@@ -16,6 +16,9 @@ export async function tratarMensagem(msg, canal) {
   contextoUso.contaId = conta.id; contextoUso.modulo = null;
   const usuario = obterUsuario(msg.chatId);
   if (usuario && usuario.papel !== 'dono') return fluxoColaborador(msg, conta, usuario);
+  // Créditos: sem saldo, só comandos livres (status, créditos, sim/não, login web…)
+  const cred = await import('../creditos/index.js');
+  if (!cred.podeUsar(conta.id) && !(msg.tipo === 'texto' && cred.COMANDOS_LIVRES.test((msg.texto || '').trim()))) return cred.mensagemBloqueio(conta.id);
 
   if (msg.tipo === 'audio') {
     await canal.enviar(msg.conta, msg.chatId, '🎧 Ouvindo…');

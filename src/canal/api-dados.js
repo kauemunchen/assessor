@@ -1,9 +1,10 @@
 // API: Calendário editorial (posts, biblioteca) e Documentos (arquivo, vencimentos, cadastros).
 import { db } from '../db/index.js';
 import { sessao } from './web.js';
+import { contextoUso } from '../integracoes/gemini.js';
 
 export function rotasDados(app) {
-  const auth = (req, res, next) => { const s = sessao(req); if (!s) return res.status(401).json({ erro: 'não autenticado' }); req.contaId = s.conta_id; req.chatId = s.chat_id; next(); };
+  const auth = (req, res, next) => { const s = sessao(req); if (!s) return res.status(401).json({ erro: 'não autenticado' }); req.contaId = s.conta_id; req.chatId = s.chat_id; contextoUso.contaId = s.conta_id; next(); };
   const conta = (req) => db.prepare('SELECT * FROM contas WHERE id=?').get(req.contaId);
   const mapaPost = (p) => ({ id: p.id, formato: p.formato, pilar: p.pilar, tema: p.tema, data: p.data, legenda: p.legenda, hashtags: p.hashtags, status: p.status, ig_media_id: p.ig_media_id, publicado_em: p.publicado_em, criado_em: p.criado_em,
     midias: p.midia_url ? (p.midia_url.startsWith('[') ? JSON.parse(p.midia_url) : [p.midia_url]) : [], video: !!p.midia_url && /\.(mp4|mov|webm)(\?|$)|\/video\/upload\//.test(p.midia_url) });
