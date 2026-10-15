@@ -26,17 +26,19 @@ async function iniciar() {
   $('#filtros').innerHTML = `<button class="ativo" data-f="">Todos</button>` + me.modulos.map(m => `<button data-f="${m}">${nome(m)}</button>`).join('');
   $('#filtros').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; filtro = b.dataset.f || null; [...$('#filtros').children].forEach(x => x.classList.toggle('ativo', x === b)); render(); };
   $('#texto').placeholder = `Fale com ${me.modulos.map(nome).slice(0, 4).join(', ')}…`;
-  await carregar(); conectar();
+  await carregar(); conectar(); setTimeout(irParaFim, 600); window.addEventListener('resize', () => { if (pertoDoFim($('#lista'))) irParaFim(); });
 }
 
 // ---------- mensagens ----------
 let msgs = [];
 async function carregar(antes) {
   const lote = await api(`/api/mensagens?limite=60${antes ? `&antes=${antes}` : ''}`);
-  msgs = antes ? [...lote, ...msgs] : lote; maisAntigo = msgs[0]?.id; render(!antes);
+  msgs = antes ? [...lote, ...msgs] : lote; maisAntigo = lote.length ? msgs[0]?.id : null; render(!antes, !!antes);
 }
-function render(rolar = true) {
-  const lista = $('#lista'); const alturaAntes = lista.scrollHeight;
+let carregandoAntigas = false;
+function pertoDoFim(lista) { return lista.scrollHeight - lista.scrollTop - lista.clientHeight < 120; }
+function render(rolar = true, manterPosicao = false) {
+  const lista = $('#lista'); const alturaAntes = lista.scrollHeight; const topoAntes = lista.scrollTop;
   const vis = filtro ? msgs.filter(m => m.direcao === 'entrada' || m.modulo === filtro) : msgs;
   let dia = ''; const html = [];
   for (const m of vis) {
@@ -44,8 +46,22 @@ function render(rolar = true) {
     if (dd !== dia) { dia = dd; html.push(`<div class="dia">${dd}</div>`); }
     html.push(bolha(m, d));
   }
-  lista.innerHTML = html.join('');
-  if (rolar) lista.scrollTop = lista.scrollHeight; else lista.scrollTop = lista.scrollHeight - alturaAntes;
+  bloqueiaScroll = true; lista.innerHTML = html.join('');
+  if (manterPosicao) lista.scrollTop = lista.scrollHeight - alturaAntes + topoAntes;
+  else if (rolar) irParaFim();
+  requestAnimationFrame(() => { bloqueiaScroll = false; });
+}
+let bloqueiaScroll = false;
+function irParaFim() { const l = $('#lista'); l.scrollTop = l.scrollHeight; requestAnimationFrame(() => { l.scrollTop = l.scrollHeight; }); setTimeout(() => { l.scrollTop = l.scrollHeight; }, 250); }
+/** Acrescenta uma mensagem nova sem redesenhar tudo; rola só se o dono já estava no fim. */
+function acrescentar(m) {
+  const lista = $('#lista'); const noFim = pertoDoFim(lista);
+  if (filtro && !(m.direcao === 'entrada' || m.modulo === filtro)) return;
+  const d = new Date(m.em.replace(' ', 'T') + 'Z');
+  lista.insertAdjacentHTML('beforeend', bolha(m, d));
+  if (noFim || m.direcao === 'entrada') irParaFim();
+  // imagens/vídeos que carregam depois empurram o fim: acompanha
+  lista.lastElementChild?.querySelectorAll('img,video').forEach(el => el.addEventListener('load', () => { if (pertoDoFim(lista) || noFim) irParaFim(); }, { once: true }));
 }
 const esc = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 function fmt(t) {
@@ -72,17 +88,17 @@ $('#lista').addEventListener('click', (e) => {
   const b = e.target.closest('.botoes button'); if (!b) return;
   b.closest('.botoes').classList.add('usados'); enviar(b.dataset.d);
 });
-$('#lista').addEventListener('scroll', () => { if ($('#lista').scrollTop < 40 && maisAntigo) { const a = maisAntigo; maisAntigo = null; carregar(a); } });
+$('#lista').addEventListener('scroll', async () => { if (bloqueiaScroll || carregandoAntigas) return; if ($('#lista').scrollTop < 40 && maisAntigo) { carregandoAntigas = true; const a = maisAntigo; try { await carregar(a); } finally { carregandoAntigas = false; } } });
 
 // ---------- websocket ----------
 function conectar() {
   const tok = tokenLocal(); const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/ws?token=${tok}`);
-  ws.onopen = () => $('#estado').textContent = 'ao vivo · sincronizado com o Telegram';
+  ws.onopen = () => { $('#estado').textContent = 'ao vivo · sincronizado com o Telegram'; irParaFim(); };
   ws.onclose = () => { $('#estado').textContent = 'reconectando…'; setTimeout(conectar, 2500); };
   ws.onmessage = (ev) => {
     const e = JSON.parse(ev.data);
-    if (e.tipo === 'mensagem') { msgs.push(e.mensagem); $('#digitando').classList.add('oculto'); render(); }
+    if (e.tipo === 'mensagem') { msgs.push(e.mensagem); $('#digitando').classList.add('oculto'); acrescentar(e.mensagem); }
     if (e.tipo === 'digitando') { $('#digitando').classList.remove('oculto'); clearTimeout(conectar._t); conectar._t = setTimeout(() => $('#digitando').classList.add('oculto'), 6000); }
   };
 }

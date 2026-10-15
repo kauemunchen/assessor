@@ -42,7 +42,7 @@ body{font-family:Poppins,-apple-system,"Segoe UI",Roboto,sans-serif;background:v
 .filtros{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
 .filtros button{border:1px solid var(--sec);background:transparent;color:var(--texto);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
 .filtros button.ativo{background:var(--prim);color:#fff;border-color:var(--prim)}
-.lista{flex:1;overflow:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth;overflow-x:hidden}
+.lista{flex:1;overflow:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:10px;overflow-x:hidden;overflow-anchor:auto}
 .msg{max-width:min(720px,88%);min-width:0;padding:10px 14px;border-radius:var(--raio);box-shadow:var(--sombra);white-space:pre-wrap;word-wrap:break-word;line-height:1.45;position:relative}
 .msg.entrada{align-self:flex-end;margin-left:auto;background:var(--eu);border-bottom-right-radius:6px}
 .msg.saida{align-self:flex-start;background:var(--bot);border-bottom-left-radius:6px}
