@@ -45,13 +45,15 @@ def _cover(foto_bytes):
     x = (f.width - W) // 2; y = (f.height - H) // 2
     return f.crop((x, y, x + W, y + H))
 
-# 1) Foto + faixa de texto (faixa #37414E translúcida na base, texto branco, palavra dourada)
+# 1) Foto + faixa de texto (faixa #37414E translúcida SEMPRE no rodapé, texto branco, palavra dourada).
+# Padrão fixo do KM para story-foto: faixa no rodapé + marca d'água do logo no canto inferior-direito.
+# O parâmetro `posicao` é aceito para compatibilidade, mas IGNORADO — toda foto de story vai nesse layout.
 def foto_faixa(foto_bytes, texto, palavra_dourada=None, etiqueta_txt=None, posicao="base"):
     img = _cover(foto_bytes).convert("RGBA")
     f = fonte("Bold", 54); tmp = ImageDraw.Draw(img)
     linhas = wrap(tmp, texto, f, W - 2 * M - 40); lh = 66
     alt = 60 + (46 + 30 if etiqueta_txt else 0) + len(linhas) * lh + 60
-    y0 = (H - ZONA_BASE - alt - 40) if posicao == "base" else (ZONA_TOPO + 40)
+    y0 = H - ZONA_BASE - alt - 40  # SEMPRE no rodapé (padrão fixo do KM)
     faixa = Image.new("RGBA", (W, alt), (*h2r(PRIM), 225))
     img.alpha_composite(faixa, (0, y0))
     dr = ImageDraw.Draw(img); y = y0 + 48

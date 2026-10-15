@@ -303,7 +303,7 @@ def story_ep():
     m = j.get("modelo")
     if m == "foto_faixa":
         if not foto: return jsonify(erro="foto obrigatória"), 400
-        out, info = story.foto_faixa(foto, j.get("texto", ""), j.get("palavra_dourada"), j.get("etiqueta"), j.get("posicao", "base"))
+        out, info = story.foto_faixa(foto, j.get("texto", ""), j.get("palavra_dourada"), j.get("etiqueta"), "base")  # padrão KM fixo: faixa SEMPRE no rodapé
     elif m == "frase": out, info = story.frase(j.get("texto", ""), j.get("palavra_dourada"), j.get("etiqueta"), j.get("autoria", "@kauemunchen"))
     elif m == "chamada_feed": out, info = story.chamada_feed(j.get("titulo", ""), capa, j.get("palavra_dourada"), j.get("chamada", "Novo no feed"), j.get("formato", "carrossel"))
     elif m == "passos": out, info = story.passos(j.get("titulo", ""), j.get("itens", []), j.get("palavra_dourada"), j.get("etiqueta"))
