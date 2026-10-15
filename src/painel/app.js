@@ -46,8 +46,7 @@ async function iniciar() {
     const b = $('#saldoBarra'); b.style.width = pct + '%'; b.style.background = c.ilimitada ? 'var(--sage)' : pct <= 5 ? 'var(--coral)' : pct <= 20 ? 'var(--dourado)' : 'linear-gradient(90deg,var(--coral),var(--dourado))';
     $('#saldoChip').onclick = () => { mostrarTela('creditos'); $('#lateral').classList.remove('aberta'); };
   }
-  // Atalhos dinâmicos (top 5 do uso real)
-  carregarAtalhos();
+  document.querySelectorAll('.atalhos button').forEach(b => b.onclick = () => { enviar(b.dataset.cmd); $('#lateral').classList.remove('aberta'); });
   const nome = (m) => me.personas.find(p => p.modulo === m)?.nome || NOMES[m];
   $('#equipeAtiva').innerHTML = `<div class="titulo">Equipe ativa</div>` + me.modulos.map(m => `<div class="equipe-item"><span class="dot"></span>${nome(m)} <span style="opacity:.6;font-size:12px">· ${NOMES[m]}</span></div>`).join('');
   $('#filtros').innerHTML = `<button class="ativo" data-f="">Todos</button>` + me.modulos.map(m => `<button data-f="${m}">${nome(m)}</button>`).join('');
@@ -172,14 +171,6 @@ $('#gravar').onclick = async () => {
 // ---------- lateral / atalhos / sair ----------
 $('#abrirLateral').onclick = () => $('#lateral').classList.add('aberta');
 $('#fecharLateral').onclick = () => $('#lateral').classList.remove('aberta');
-async function carregarAtalhos() {
-  try {
-    const r = await api('/api/atalhos'); const lst = $('#listaAtalhos'); if (!lst) return;
-    const escA = (s) => String(s ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
-    lst.innerHTML = r.atalhos.map(a => `<button data-cmd="${escA(a.cmd)}" title="Enviar: ${escA(a.cmd)}">${escA(a.rotulo)}${a.freq ? `<span class="freq">${a.freq}×</span>` : ''}</button>`).join('');
-    lst.querySelectorAll('button').forEach(b => b.onclick = () => { enviar(b.dataset.cmd); $('#lateral').classList.remove('aberta'); });
-  } catch {}
-}
 document.querySelectorAll('.menu a').forEach(a => a.onclick = () => { window.mostrarTela?.(a.dataset.tela); $('#lateral').classList.remove('aberta'); });
 $('#sair').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); localStorage.removeItem('akm'); location.reload(); };
 

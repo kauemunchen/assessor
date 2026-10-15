@@ -279,8 +279,5 @@ details.menu-mais[open] summary .seta{transform:rotate(90deg);color:var(--coral)
 
 .atalhos{padding:12px}
 .atalhos .titulo{font-family:var(--f-display);font-style:italic;color:var(--tinta-mid);font-size:12.5px;margin-bottom:6px;font-weight:500}
-.atalhos #listaAtalhos{display:flex;flex-direction:column;gap:2px}
-.atalhos button{display:flex;align-items:center;width:100%;text-align:left;background:transparent;border:0;color:var(--tinta-mid);padding:7px 8px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px;gap:7px}
+.atalhos button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--tinta-mid);padding:7px 8px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px}
 .atalhos button:hover{background:var(--papel-2);color:var(--tinta)}
-.atalhos button .freq{margin-left:auto;font-size:10px;color:var(--tinta-dim);background:var(--papel-2);padding:1px 6px;border-radius:999px;font-weight:600}
-.atalhos button:hover .freq{background:var(--branco)}
