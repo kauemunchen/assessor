@@ -29,9 +29,9 @@
     </div>
     <nav class="menu">
       <a class="ativo" data-tela="conversa">💬 Conversa</a>
-      <a data-tela="equipe">👥 Equipe <span class="breve">em breve</span></a>
+      <a data-tela="equipe">👥 Equipe</a>
+      <a data-tela="conexoes">🔌 Conexões</a>
       <a data-tela="marca">✨ Identidade & Marca <span class="breve">em breve</span></a>
-      <a data-tela="conexoes">🔌 Conexões <span class="breve">em breve</span></a>
       <a data-tela="editorial">📅 Calendário editorial <span class="breve">em breve</span></a>
       <a data-tela="documentos">📂 Documentos <span class="breve">em breve</span></a>
       <a data-tela="ajustes">⚙️ Ajustes <span class="breve">em breve</span></a>
@@ -49,6 +49,7 @@
   </aside>
 
   <main id="principal">
+    <section id="tela-config" class="config oculto"></section>
     <header class="barra">
       <button class="icone" id="abrirLateral">☰</button>
       <div class="titulo-chat"><div>Conversa</div><div class="sub" id="estado">conectando…</div></div>
@@ -67,5 +68,6 @@
   </main>
 </div>
 <script src="/app/app.js"></script>
+<script src="/app/config.js"></script>
 </body>
 </html>

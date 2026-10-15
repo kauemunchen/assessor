@@ -146,7 +146,7 @@ $('#gravar').onclick = async () => {
 $('#abrirLateral').onclick = () => $('#lateral').classList.add('aberta');
 $('#fecharLateral').onclick = () => $('#lateral').classList.remove('aberta');
 document.querySelectorAll('.atalhos button').forEach(b => b.onclick = () => { enviar(b.dataset.cmd); $('#lateral').classList.remove('aberta'); });
-document.querySelectorAll('.menu a').forEach(a => a.onclick = () => { if (a.dataset.tela !== 'conversa') alert('Essa tela entra na próxima etapa.'); $('#lateral').classList.remove('aberta'); });
+document.querySelectorAll('.menu a').forEach(a => a.onclick = () => { window.mostrarTela?.(a.dataset.tela); $('#lateral').classList.remove('aberta'); });
 $('#sair').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); localStorage.removeItem('akm'); location.reload(); };
 
 // PWA

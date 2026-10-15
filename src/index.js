@@ -5,6 +5,7 @@ import path from 'node:path';
 import { criarCanal } from './canal/index.js';
 import { tratarMensagem } from './orquestrador/roteador.js';
 import { comBotoes } from './orquestrador/botoes.js';
+import { rotasConfig } from './canal/api-config.js';
 import { iniciarRotinas } from './rotinas/scheduler.js';
 import { migrar } from './db/migrate.js';
 import { setCanal } from './canal/atual.js';
@@ -19,6 +20,7 @@ app.get('/', (_, res) => res.redirect('/app'));
 
 const canal = criarCanal(process.env.CANAL || 'telegram', app, servidor);
 setCanal(canal);
+rotasConfig(app);
 canal.aoReceber(async (msg) => {
   const t0 = Date.now(); canal.digitando?.(msg.chatId); const tick = setInterval(() => canal.digitando?.(msg.chatId), 4500);
   try {

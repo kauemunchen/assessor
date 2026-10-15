@@ -15,6 +15,7 @@ const agoraISO = () => new Date().toLocaleString('sv-SE', { timeZone: TZ }).repl
 const hojeISO = () => agoraISO().slice(0, 10);
 const agoraLocal = () => new Date(new Date().toLocaleString('en-US', { timeZone: TZ }));
 const hhmm = () => agoraISO().slice(11, 16);
+const normHora = (h) => { if (!h) return null; const m = String(h).match(/^(\d{1,2})(?:[:h](\d{2}))?/); return m ? `${m[1].padStart(2, '0')}:${m[2] || '00'}` : null; };
 
 function proximaOcorrencia(iso, rec) {
   const d = new Date(iso + (iso.length === 16 ? ':00' : '')); // interpretado como hora de parede
@@ -106,7 +107,7 @@ export function iniciarRotinas(canal) {
     const agora = hhmm();
     for (const u of db.prepare(`SELECT u.chat_id, c.* FROM usuarios u JOIN contas c ON c.id=u.conta_id WHERE u.papel='dono'`).all()) {
       const cfg = configPersona(u.id, 'diretor');
-      if (cfg.hora_resumo?.replace('h', ':00').padStart(5, '0') === agora) resumoDoDia(canal, u, u.chat_id).catch(e => console.error('resumo', e.message));
+      if (normHora(cfg.hora_resumo) === agora) resumoDoDia(canal, u, u.chat_id).catch(e => console.error('resumo', e.message));
     }
   }, { timezone: TZ });
   cron.schedule('0 8 * * *', () => avisarVencimentos(canal), { timezone: TZ });
