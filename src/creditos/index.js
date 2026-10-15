@@ -27,13 +27,17 @@ export const TARIFAS = {
   fal_imagem: 4,         // imagem gerada por IA (fal.ai)
   transcricao_min: 0.5,  // por minuto de áudio transcrito (além dos tokens)
 };
-export const PACOTES = [
+export const PACOTES_PADRAO = [
   { id: 'start', nome: 'Start', creditos: 1000, preco: 49, tipo: 'prepago' },
   { id: 'pro', nome: 'Pro', creditos: 3000, preco: 129, tipo: 'prepago' },
   { id: 'max', nome: 'Max', creditos: 8000, preco: 299, tipo: 'prepago' },
   { id: 'mensal_pro', nome: 'Plano Pro (mensal)', creditos: 3000, preco: 99, tipo: 'mensal' },
   { id: 'mensal_max', nome: 'Plano Max (mensal)', creditos: 8000, preco: 249, tipo: 'mensal' },
 ];
+/** Lista de pacotes vigente — lê de pacotes_cfg (editável no painel admin) e cai no padrão se a tabela ainda não existe. */
+export function pacotes() { try { if (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='pacotes_cfg'").get()) { const rows = db.prepare('SELECT id, nome, creditos, preco, tipo FROM pacotes_cfg WHERE ativo=1 ORDER BY ordem, id').all(); if (rows.length) return rows; } } catch {} return PACOTES_PADRAO; }
+/** Compat: código antigo lê `PACOTES` como array; agora é um Proxy que delega para `pacotes()`. */
+export const PACOTES = new Proxy([], { get(_t, k) { const arr = pacotes(); return typeof arr[k] === 'function' ? arr[k].bind(arr) : arr[k]; }, has(_t, k) { return k in pacotes(); }, ownKeys() { return Reflect.ownKeys(pacotes()); }, getOwnPropertyDescriptor(_t, k) { return Object.getOwnPropertyDescriptor(pacotes(), k); } });
 
 const contaDe = (id) => db.prepare('SELECT id, plano, status, admin, creditos_alerta, nome_dono FROM contas WHERE id=?').get(id);
 export function ilimitada(contaId) { const c = contaDe(contaId); return !!c && (c.admin === 1 || c.plano === 'ilimitado'); }

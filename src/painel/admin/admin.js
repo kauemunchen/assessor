@@ -1,0 +1,124 @@
+// Painel admin do KM APP. Vanilla JS. Reusa o token do app (/app).
+const $ = (s) => document.querySelector(s); const esc = (s) => String(s ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const token = () => new URLSearchParams(location.search).get('token') || localStorage.getItem('akm');
+const api = async (p, o = {}) => { const tk = token(); const r = await fetch(p, { credentials: 'same-origin', ...o, headers: { 'content-type': 'application/json', ...(o.headers || {}), ...(tk ? { authorization: 'Bearer ' + tk } : {}) } }); if (r.status === 401 || r.status === 403) { $('#app').classList.add('oculto'); $('#login401').classList.remove('oculto'); throw new Error('auth'); } const j = await r.json().catch(() => ({})); if (j.erro) toast('⚠️ ' + j.erro); return j; };
+const toast = (t) => { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2500); };
+const fmtR = (n) => 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtC = (n) => Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+const fmtN = (n) => Number(n || 0).toLocaleString('pt-BR');
+const diaBr = (s) => s ? new Date(s + 'Z').toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+const PLANO = { trial: 'Trial', prepago: 'Pré-pago', ilimitado: 'Ilimitado', mensal_pro: 'Pro mensal', mensal_max: 'Max mensal' };
+const STATUS = { ativa: 'tag ok', bloqueada: 'tag off', suspensa: 'tag warn' };
+
+const telas = {};
+async function iniciar() {
+  try { const r = await api('/api/admin/resumo'); if (!r.produto) throw new Error('sem acesso'); } catch { return; }
+  $('#app').classList.remove('oculto'); montarTela('resumo');
+  document.querySelectorAll('.menu a').forEach(a => a.onclick = () => montarTela(a.dataset.tela));
+}
+function montarTela(nome) {
+  document.querySelectorAll('.menu a').forEach(a => a.classList.toggle('ativo', a.dataset.tela === nome));
+  $('#tela').innerHTML = '<p class="sub">carregando…</p>'; telas[nome]().then(({ titulo, sub, corpo, depois }) => { $('#tela').innerHTML = `<h1>${titulo}</h1><p class="sub">${sub || ''}</p>${corpo}`; depois?.(); });
+}
+
+telas.resumo = async () => {
+  const d = await api('/api/admin/resumo');
+  const spark = (serie, chave) => { const max = Math.max(1, ...serie.map(x => x[chave] || 0)); return `<div class="sparkline">${serie.map(x => `<div title="${x.d}: ${x[chave] || 0}" style="height:${Math.max(2, (x[chave] || 0) / max * 38)}px"></div>`).join('')}</div>`; };
+  const corpo = `<div class="kpis">
+    <div class="kpi"><div class="r">Contas</div><div class="v">${fmtN(d.contas.total)}</div><div class="s">${d.contas.ativas} ativas · ${d.contas.bloqueadas} bloqueadas · ${d.contas.em_trial} em trial</div></div>
+    <div class="kpi"><div class="r">Faturamento 30d</div><div class="v">${fmtR(d.faturamento_30d.bruto)}</div><div class="s">${d.faturamento_30d.n} cobranças · hoje ${fmtR(d.faturamento_hoje.bruto)}</div>${spark(d.por_dia, 'r')}</div>
+    <div class="kpi"><div class="r">Pendente</div><div class="v">${fmtR(d.pendente.bruto)}</div><div class="s">${d.pendente.n} cobranças aguardando</div></div>
+    <div class="kpi"><div class="r">Assinaturas ativas</div><div class="v">${fmtN(d.assinaturas.ativas)}</div><div class="s">MRR ${fmtR(d.assinaturas.mrr || 0)}</div></div>
+    <div class="kpi"><div class="r">Créditos (30d)</div><div class="v">${fmtC(d.creditos_30d.consumidos)}</div><div class="s">consumidos · ${fmtC(d.creditos_30d.emitidos)} emitidos</div></div>
+    <div class="kpi"><div class="r">IA (30d)</div><div class="v">${fmtN(d.uso_30d.chamadas)}</div><div class="s">chamadas · ${fmtN(d.uso_30d.tokens)} tokens</div></div>
+  </div>
+  <div class="grade">
+    <div class="cartao"><h3>Novas contas (30d)</h3>${spark(d.novas, 'n')}<p class="d">${d.novas.reduce((a, b) => a + b.n, 0)} contas criadas</p></div>
+    <div class="cartao"><h3>Tokens por assessor (30d)</h3><ul class="lista-s">${d.por_modulo.map(x => `<li><span>${esc(x.modulo || '—')}</span><span>${fmtN(x.tokens)} tokens · ${x.chamadas} chamadas</span></li>`).join('') || '<li>Sem uso ainda.</li>'}</ul></div>
+    <div class="cartao" style="grid-column:1/-1"><h3>Top 10 consumidores (30d)</h3><div class="tabela compacta"><table><thead><tr><th>Conta</th><th>Empresa</th><th style="text-align:right">Créditos gastos</th><th></th></tr></thead><tbody>${d.top_gasto.map(c => `<tr><td>${esc(c.nome_dono)}</td><td>${esc(c.empresa)}</td><td style="text-align:right">${fmtC(c.gasto)}</td><td><button class="minibtn" data-conta="${c.id}">abrir</button></td></tr>`).join('') || '<tr><td colspan="4">Sem dados.</td></tr>'}</tbody></table></div></div>
+  </div>`;
+  return { titulo: '📊 Resumo', sub: `KM APP · últimos 30 dias`, corpo, depois() { document.querySelectorAll('button[data-conta]').forEach(b => b.onclick = () => abrirConta(Number(b.dataset.conta))); } };
+};
+
+telas.contas = async () => {
+  return { titulo: '🏢 Contas', sub: 'Todas as contas do KM APP. Clique para ver detalhes, ajustar créditos ou bloquear.', corpo: `
+    <div class="linha-busca">
+      <input id="qc" placeholder="buscar nome, empresa, CPF/CNPJ, e-mail…" style="flex:1">
+      <div class="sel-filtro" id="fc">${['', 'ativas', 'bloqueadas', 'trial', 'mensal', 'inativas'].map(f => `<button data-f="${f}" class="${!f ? 'on' : ''}">${f || 'todas'}</button>`).join('')}</div>
+    </div>
+    <div class="tabela compacta"><table><thead><tr><th>ID</th><th>Dono</th><th>Empresa</th><th>Plano</th><th>Status</th><th style="text-align:right">Saldo</th><th style="text-align:right">30d</th><th>Último uso</th><th>Criada</th><th></th></tr></thead><tbody id="tbc"><tr><td colspan="10">carregando…</td></tr></tbody></table></div>`,
+    async depois() {
+      let filtro = ''; let q = '';
+      const render = async () => { const rows = await api(`/api/admin/contas?filtro=${filtro}&q=${encodeURIComponent(q)}`); $('#tbc').innerHTML = rows.map(c => `<tr><td class="mono">#${c.id}${c.admin ? ' 👑' : ''}</td><td>${esc(c.nome_dono)}</td><td>${esc(c.empresa)}</td><td>${esc(PLANO[c.plano] || c.plano || '—')}</td><td><span class="${STATUS[c.status] || 'tag'}">${esc(c.status)}</span></td><td style="text-align:right">${c.plano === 'ilimitado' || c.admin ? '∞' : fmtC(c.saldo)}</td><td style="text-align:right">${fmtC(c.gasto_30d)}</td><td>${c.ultimo_uso ? diaBr(c.ultimo_uso) : '—'}</td><td>${diaBr(c.criado_em)}</td><td><button class="minibtn" data-id="${c.id}">abrir</button></td></tr>`).join('') || '<tr><td colspan="10">Nenhuma conta.</td></tr>'; document.querySelectorAll('#tbc button').forEach(b => b.onclick = () => abrirConta(Number(b.dataset.id))); };
+      $('#qc').oninput = (e) => { q = e.target.value; clearTimeout(window._bq); window._bq = setTimeout(render, 250); };
+      $('#fc').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; filtro = b.dataset.f; document.querySelectorAll('#fc button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+      render();
+    } };
+};
+
+async function abrirConta(id) {
+  const d = await api(`/api/admin/conta/${id}`);
+  const c = d.conta; const div = document.createElement('div'); div.className = 'dialog'; const planos = ['trial', 'prepago', 'ilimitado', 'mensal_pro', 'mensal_max'];
+  div.innerHTML = `<div class="cartao" style="position:relative"><button class="fechar">✕</button>
+    <h2 style="margin:0 0 4px">#${c.id} · ${esc(c.nome_dono)} ${c.admin ? '👑' : ''}</h2>
+    <p class="d">${esc(c.empresa)} · ${esc(c.email || '—')} · ${esc(c.cpf_cnpj || 'sem CPF/CNPJ')} · criada ${diaBr(c.criado_em)}</p>
+    <div class="kpis"><div class="kpi"><div class="r">Saldo</div><div class="v">${d.ilimitada ? '∞' : fmtC(d.saldo)}</div></div><div class="kpi"><div class="r">Plano</div><div class="v" style="font-size:16px">${esc(PLANO[c.plano] || c.plano)}</div></div><div class="kpi"><div class="r">Status</div><div class="v" style="font-size:16px"><span class="${STATUS[c.status] || 'tag'}">${esc(c.status)}</span></div></div></div>
+    <form id="fAjc" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:4px"><div class="campo"><label>Operação</label><select name="operacao"><option value="credito">+ Creditar</option><option value="debito">− Debitar</option></select></div><div class="campo"><label>Quantidade</label><input name="quantidade" type="number" min="0.01" step="0.1" required style="width:120px"></div><div class="campo" style="flex:1;min-width:200px"><label>Motivo</label><input name="motivo" placeholder="ex.: cortesia, estorno manual"></div><button class="btn prim">Aplicar</button></form>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><label>Plano <select id="selPlano">${planos.map(p => `<option ${p === c.plano ? 'selected' : ''}>${p}</option>`).join('')}</select></label><label>Status <select id="selStatus">${['ativa', 'bloqueada', 'suspensa'].map(s => `<option ${s === c.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label><label><input type="checkbox" id="chkAdmin" ${c.admin ? 'checked' : ''}> admin</label><button class="minibtn" id="btSalvar">salvar</button></div>
+    <h3 style="margin-top:16px">Uso (30d)</h3><ul class="lista-s">${d.uso_30d.map(x => `<li><span>${esc(x.modulo || '—')}</span><span>${fmtN(x.tokens)} tokens · ${x.chamadas} chamadas</span></li>`).join('') || '<li>Sem uso.</li>'}</ul>
+    <h3>Cobranças</h3><div class="tabela compacta"><table><thead><tr><th>Data</th><th>Pacote</th><th>Forma</th><th>Valor</th><th>Status</th></tr></thead><tbody>${d.cobrancas.map(cb => `<tr><td>${diaBr(cb.criado_em)}</td><td>${esc(cb.pacote_id)}</td><td>${esc(cb.forma)}</td><td>${fmtR(cb.valor)}</td><td><span class="${cb.status === 'pago' ? 'tag ok' : cb.status === 'pendente' ? 'tag warn' : 'tag off'}">${esc(cb.status)}</span>${cb.invoice_url && cb.status === 'pendente' ? ` <a href="${esc(cb.invoice_url)}" target="_blank" rel="noopener">link</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="5">Nenhuma cobrança.</td></tr>'}</tbody></table></div>
+    <h3>Movimentos de crédito</h3><div class="tabela compacta" style="max-height:250px;overflow:auto"><table><thead><tr><th>Quando</th><th>Tipo</th><th>Descrição</th><th>Assessor</th><th style="text-align:right">Qtd</th></tr></thead><tbody>${d.movimentos.map(m => `<tr><td>${diaBr(m.criado_em)}</td><td>${esc(m.tipo)}</td><td>${esc(m.motivo || '')} ${m.ref ? `<small style="color:var(--mudo)">${esc(m.ref)}</small>` : ''}</td><td>${esc(m.modulo || '—')}</td><td style="text-align:right;${m.quantidade > 0 ? 'color:#1E7A45' : ''}">${m.quantidade > 0 ? '+' : ''}${fmtC(m.quantidade)}</td></tr>`).join('')}</tbody></table></div>
+    </div>`;
+  document.body.appendChild(div);
+  div.querySelector('.fechar').onclick = () => div.remove(); div.onclick = (e) => { if (e.target === div) div.remove(); };
+  div.querySelector('#fAjc').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); await api(`/api/admin/conta/${id}/creditos`, { method: 'POST', body: JSON.stringify(f) }); toast('✅ aplicado'); div.remove(); abrirConta(id); };
+  div.querySelector('#btSalvar').onclick = async () => { await api(`/api/admin/conta/${id}`, { method: 'POST', body: JSON.stringify({ plano: $('#selPlano').value, status: $('#selStatus').value, admin: $('#chkAdmin').checked }) }); toast('✅ atualizado'); div.remove(); abrirConta(id); };
+}
+
+telas.financeiro = async () => {
+  const d = await api('/api/admin/financeiro');
+  const total = d.cobrancas.filter(c => c.status === 'pago').reduce((a, b) => a + b.valor, 0);
+  const corpo = `<div class="linha-busca"><div class="sel-filtro" id="fs">${['', 'pago', 'pendente', 'vencido', 'cancelado', 'estornado'].map(s => `<button data-s="${s}" class="${!s ? 'on' : ''}">${s || 'todas'}</button>`).join('')}</div></div>
+    <div class="kpis"><div class="kpi"><div class="r">Pagas (filtro atual)</div><div class="v">${fmtR(total)}</div></div><div class="kpi"><div class="r">Faturamento histórico</div><div class="v">${fmtR(d.por_mes.reduce((a, b) => a + (b.r || 0), 0))}</div><div class="s">${d.por_mes.length} meses com movimento</div></div></div>
+    <div class="grade"><div class="cartao"><h3>Por mês</h3><ul class="lista-s">${d.por_mes.map(m => `<li><span>${esc(m.m)}</span><span>${fmtR(m.r)} · ${m.n} cobranças</span></li>`).join('') || '<li>Sem receita.</li>'}</ul></div></div>
+    <div class="tabela compacta" style="margin-top:12px"><table><thead><tr><th>Data</th><th>Conta</th><th>Pacote</th><th>Forma</th><th style="text-align:right">Valor</th><th>Status</th><th></th></tr></thead><tbody id="tfin"></tbody></table></div>`;
+  return { titulo: '💳 Financeiro', sub: 'Todas as cobranças emitidas pelo KM APP via Asaas.', corpo, async depois() {
+    let status = ''; const render = async () => { const r = await api(`/api/admin/financeiro${status ? `?status=${status}` : ''}`); $('#tfin').innerHTML = r.cobrancas.map(c => `<tr><td>${diaBr(c.criado_em)}</td><td><button class="minibtn" data-c="${c.conta_id}">${esc(c.nome_dono)} <small>${esc(c.empresa)}</small></button></td><td>${esc(c.pacote_id)}</td><td>${esc(c.forma)}</td><td style="text-align:right">${fmtR(c.valor)}</td><td><span class="${c.status === 'pago' ? 'tag ok' : c.status === 'pendente' ? 'tag warn' : 'tag off'}">${esc(c.status)}</span></td><td>${c.invoice_url ? `<a class="minibtn" href="${esc(c.invoice_url)}" target="_blank" rel="noopener">fatura</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="7">Nenhuma cobrança.</td></tr>'; document.querySelectorAll('#tfin button[data-c]').forEach(b => b.onclick = () => abrirConta(Number(b.dataset.c))); };
+    $('#fs').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; status = b.dataset.s; document.querySelectorAll('#fs button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+    render();
+  } };
+};
+
+telas.pacotes = async () => {
+  const d = await api('/api/admin/pacotes');
+  const corpo = `<p class="d">Edite nome, créditos e preço de cada pacote. Alterações entram em vigor imediatamente (tela Créditos no app, comando <code>comprar</code> no Telegram). Trial atual: <b>${d.trial}</b> créditos.</p>
+    <div class="tabela compacta"><table><thead><tr><th>ID</th><th>Nome</th><th>Créditos</th><th>Preço R$</th><th>Tipo</th><th>Ativo</th><th>Ordem</th><th></th></tr></thead><tbody id="tpac">${d.pacotes.map(p => `<tr data-id="${esc(p.id)}">
+      <td class="mono">${esc(p.id)}</td>
+      <td><input value="${esc(p.nome)}" data-k="nome"></td>
+      <td><input type="number" value="${p.creditos}" data-k="creditos" style="width:90px"></td>
+      <td><input type="number" step="0.01" value="${p.preco}" data-k="preco" style="width:90px"></td>
+      <td><select data-k="tipo"><option ${p.tipo === 'prepago' ? 'selected' : ''}>prepago</option><option ${p.tipo === 'mensal' ? 'selected' : ''}>mensal</option></select></td>
+      <td><input type="checkbox" data-k="ativo" ${p.ativo ? 'checked' : ''}></td>
+      <td><input type="number" value="${p.ordem}" data-k="ordem" style="width:60px"></td>
+      <td><button class="minibtn" data-salvar>salvar</button> <button class="minibtn perigo" data-apagar>apagar</button></td>
+    </tr>`).join('')}</tbody></table></div>
+    <h3 style="margin-top:16px">Novo pacote</h3><form id="fNovo" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end"><div class="campo"><label>ID (slug)</label><input name="id" required placeholder="plus"></div><div class="campo"><label>Nome</label><input name="nome" required placeholder="Plus"></div><div class="campo"><label>Créditos</label><input name="creditos" type="number" required></div><div class="campo"><label>R$</label><input name="preco" type="number" step="0.01" required></div><div class="campo"><label>Tipo</label><select name="tipo"><option>prepago</option><option>mensal</option></select></div><button class="btn prim">Criar</button></form>
+    <h3 style="margin-top:16px">Tarifas fixas (código)</h3><ul class="lista-s">${Object.entries(d.tarifas).map(([k, v]) => `<li><span>${esc(k.replace(/_/g, ' '))}</span><span>${v} crédito(s)</span></li>`).join('')}</ul><p class="d">Para mudar essas tarifas, edite <code>TARIFAS</code> em <code>src/creditos/index.js</code> e faça deploy.</p>`;
+  return { titulo: '🛒 Pacotes & preços', sub: 'Catálogo do KM APP exibido ao cliente final.', corpo, depois() {
+    document.querySelectorAll('#tpac tr').forEach(tr => {
+      const id = tr.dataset.id;
+      tr.querySelector('[data-salvar]').onclick = async () => { const body = {}; tr.querySelectorAll('[data-k]').forEach(el => { const k = el.dataset.k; body[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value; }); await api(`/api/admin/pacotes/${id}`, { method: 'POST', body: JSON.stringify(body) }); toast('✅ salvo'); };
+      tr.querySelector('[data-apagar]').onclick = async () => { if (!confirm(`Apagar o pacote ${id}?`)) return; await api(`/api/admin/pacotes/${id}`, { method: 'DELETE' }); toast('🗑 removido'); montarTela('pacotes'); };
+    });
+    $('#fNovo').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); await api(`/api/admin/pacotes/${f.id}`, { method: 'POST', body: JSON.stringify(f) }); toast('✅ criado'); montarTela('pacotes'); };
+  } };
+};
+
+telas.broadcast = async () => {
+  return { titulo: '📣 Avisos', sub: 'Mensagem única para todos os donos de conta via Telegram.', corpo: `
+    <form id="fBr" class="cartao"><div class="campo"><label>Para quem</label><select name="filtro"><option value="ativas">Contas ativas</option><option value="todas">Todas</option><option value="trial">Em trial</option><option value="bloqueadas">Bloqueadas (saldo zerado)</option></select></div><div class="campo"><label>Mensagem</label><textarea name="texto" rows="5" required placeholder="Ex.: Nova função de edição de vídeo liberada. Mande 'editar meu vídeo' depois de enviar o arquivo."></textarea></div><button class="btn prim">Enviar</button> <span class="salvo" id="brMsg"></span></form>
+    <p class="d" style="margin-top:12px">A mensagem é enviada como <b>📣 KM APP</b> + o texto, para cada dono via Telegram. Recomendado: avisos de manutenção, mudanças de preço, novas funções.</p>`,
+    depois() { $('#fBr').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); if (!confirm(`Enviar para os donos com filtro "${f.filtro}"?`)) return; $('#brMsg').textContent = 'enviando…'; const r = await api('/api/admin/broadcast', { method: 'POST', body: JSON.stringify(f) }); $('#brMsg').textContent = r.ok ? `✅ ${r.enviados}/${r.total} enviados` : ''; }; } };
+};
+
+iniciar();

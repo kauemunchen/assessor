@@ -18,6 +18,7 @@ app.use(express.json({ limit: '2mb' }));
 const servidor = http.createServer(app);
 // App web (estático) em /app
 app.use('/app', express.static(path.resolve('src/painel'), { index: 'index.html', extensions: ['html'] }));
+app.use('/admin', express.static(path.resolve('src/painel/admin'), { index: 'index.html', extensions: ['html'] }));
 app.get('/', (_, res) => res.redirect('/app'));
 
 const canal = criarCanal(process.env.CANAL || 'telegram', app, servidor);
@@ -25,6 +26,7 @@ setCanal(canal);
 rotasConfig(app);
 rotasMarca(app);
 rotasDados(app);
+import('./canal/api-admin.js').then(a => a.rotasAdmin(app)).catch(e => console.error('admin', e.message));
 import('./integracoes/asaas.js').then(a => a.rotaWebhook(app)).catch(e => console.error('asaas', e.message));
 app.use('/api', (err, req, res, _next) => { console.error('[api]', req.path, err.message); res.status(500).json({ erro: err.message }); });
 canal.aoReceber(async (msg) => {
