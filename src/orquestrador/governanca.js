@@ -108,6 +108,7 @@ export async function governanca(msg, conta) {
     db.prepare('DELETE FROM biblioteca WHERE id=?').run(b.id);
     return `🗑 Mídia #${m[2]} apagada da biblioteca e do armazenamento.`;
   }
+  if (/^(web|app|app web|abrir web|entrar na web)$/.test(t)) { const dom = process.env.PUBLIC_URL || process.env.WEBAPP_URL || 'https://seu-dominio'; return `💻 Abra ${dom.replace(/\/$/, '')}/app no navegador. Ele mostra um código de 6 dígitos. Volte aqui e me mande *web 123456* (seu código). Nessa mesma conta você vê a conversa em tempo real, o calendário editorial, documentos e créditos.`; }
   if ((m = t.match(/^(?:web|entrar web|login)\s+(\d{6})$/))) {
     const { concluirLogin } = await import('../canal/web.js');
     return concluirLogin(m[1], conta.id, msg.chatId) ? '💻 Login no app liberado. Pode voltar ao navegador.' : 'Código inválido ou expirado (vale 10 min). Gere outro no app.';
