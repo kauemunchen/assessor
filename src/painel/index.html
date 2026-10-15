@@ -26,16 +26,11 @@
       <div class="marca"><img src="/app/logo-km.png" class="logo-img" alt="KM"><div class="assinatura"></div></div>
       <button class="icone" id="fecharLateral" title="Fechar">✕</button>
     </div>
-    <div class="saldo-chip oculto" id="saldoChip" title="Créditos — clique para ver detalhes">
-      <span class="saldo-ic">◆</span><b id="saldoNum">—</b><span id="saldoSub">créd.</span>
-      <div class="saldo-barra"><div id="saldoBarra"></div></div>
-    </div>
     <nav class="menu principal">
       <a class="ativo" data-tela="conversa">💬 Conversa</a>
       <a data-tela="editorial">📅 Calendário editorial</a>
       <a data-tela="documentos">📂 Documentos</a>
     </nav>
-    <div class="bloco" id="equipeAtiva"></div>
     <div class="bloco atalhos">
       <div class="titulo">Atalhos</div>
       <button data-cmd="hoje">Agenda de hoje</button>
@@ -55,6 +50,11 @@
         <a data-tela="ajustes">⚙️ Ajustes</a>
       </nav>
     </details>
+    <div class="bloco" id="equipeAtiva"></div>
+    <div class="saldo-chip oculto" id="saldoChip" title="Créditos — clique para ver detalhes">
+      <span class="saldo-ic">◆</span><b id="saldoNum">—</b><span id="saldoSub">créd.</span>
+      <div class="saldo-barra"><div id="saldoBarra"></div></div>
+    </div>
     <a id="btAdmin" class="btn-admin oculto" href="/admin" target="_blank">🛡 Painel admin</a>
     <div class="rodape-lateral"><span id="donoNome"></span><button class="link" id="sair">sair</button></div>
   </aside>
