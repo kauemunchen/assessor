@@ -8,3 +8,11 @@
 - **Comandos no Telegram/Conversa**: `créditos` (saldo/consumo), `comprar` (pacotes).
 - **App web**: tela *Créditos* (saldo, barra, pacotes, consumo por assessor/tipo/dia, histórico) e saldo na lateral. API: `GET /api/creditos`; `/api/me` traz `creditos`.
 - **Próximas etapas**: B onboarding + isolamento; C Asaas (Pix/cartão, webhook, mensal com renovação); D painel /admin (contas, créditos manuais, pacotes, financeiro); E operação/broadcast/NFS-e.
+
+## Etapa C — Asaas (Pix, cartão, boleto, plano mensal)
+- `src/integracoes/asaas.js`: cliente por conta (`contas.asaas_cliente_id`, CPF/CNPJ e e-mail pedidos na 1ª compra), cobranças (`cobrancas`) e assinaturas (`assinaturas`).
+- Pré-pago: `POST /payments` (PIX → QR + copia e cola; cartão/boleto → fatura do Asaas). Mensal: `POST /subscriptions` (ciclo MONTHLY) — cada cobrança paga soma os créditos do pacote e marca `contas.plano`.
+- Confirmação: webhook `POST /webhooks/asaas` (eventos PAYMENT_RECEIVED/CONFIRMED creditam; REFUNDED/CHARGEBACK estornam; OVERDUE/DELETED marcam). Idempotente por `asaas_id`. Reforço: polling das pendentes a cada 5 min e ao abrir a cobrança no app.
+- Comandos: `comprar` (lista), `comprar pro` (Pix, manda o QR), `comprar pro cartão`, `comprar start pix 000.000.000-00 email@x` (1ª vez, para cadastrar o pagador).
+- App: tela Créditos → escolher pacote → forma + CPF/CNPJ → QR Pix / fatura; atualiza sozinha ao confirmar; cancelar plano mensal.
+- **Configurar no Asaas** (sandbox e depois produção): Integrações → chave de API → `ASAAS_API_KEY`; Webhooks → URL `https://SEU_DOMINIO/webhooks/asaas`, versão v3, token de autenticação = `ASAAS_WEBHOOK_TOKEN`, eventos de cobrança (PAYMENT_*), fila síncrona ligada.

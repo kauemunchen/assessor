@@ -291,9 +291,12 @@ telas.creditos = async () => {
       <div class="saldo-barra"><div style="width:${pct}%;background:${cor}"></div></div>
       <p class="d" style="margin-top:8px">1 crédito = ${d.tokens_por_credito.toLocaleString('pt-BR')} tokens de IA. Story ou arte ${d.tarifas.render_story}, carrossel ${d.tarifas.render_carrossel}, edição de vídeo ${d.tarifas.video_edicao}, imagem gerada por IA ${d.tarifas.fal_imagem}, áudio de vídeo ${d.tarifas.video_audio}. Agenda e publicações programadas não param quando o saldo zera.</p>
     </div>
-    <div class="cartao"><h3>Comprar créditos</h3><p class="d">Pix ou cartão via Asaas. Créditos pré-pagos não vencem; o plano mensal renova todo mês.</p>
-      <div class="pacotes">${d.pacotes.map(p => `<button class="pacote" data-id="${p.id}"><b>${esc(p.nome)}</b><span>${p.creditos.toLocaleString('pt-BR')} créditos</span><span class="preco">R$ ${p.preco}${p.tipo === 'mensal' ? '<small>/mês</small>' : ''}</span></button>`).join('')}</div>
-      <p class="d" id="compraMsg" style="margin-top:8px"></p></div>
+    <div class="cartao"><h3>Comprar créditos ${d.asaas ? (d.ambiente === 'producao' ? '' : '<span class="tag warn">sandbox</span>') : '<span class="tag off">pagamento indisponível</span>'}</h3><p class="d">Pix ou cartão via Asaas. Créditos pré-pagos não vencem; o plano mensal renova todo mês e soma créditos ao saldo.</p>
+      ${d.assinatura ? `<p class="d">Plano ativo: <b>${esc(d.assinatura.pacote?.nome || d.assinatura.pacote_id)}</b> · próxima cobrança ${esc(d.assinatura.proxima || '')} <button class="btn perigo" id="btCancelarPlano" style="margin-left:6px">cancelar plano</button></p>` : ''}
+      <div class="pacotes">${d.pacotes.map(p => `<button class="pacote" data-id="${p.id}" ${!d.asaas ? 'disabled' : ''}><b>${esc(p.nome)}</b><span>${p.creditos.toLocaleString('pt-BR')} créditos</span><span class="preco">R$ ${p.preco}${p.tipo === 'mensal' ? '<small>/mês</small>' : ''}</span></button>`).join('')}</div>
+      <div id="compra" class="oculto" style="margin-top:12px;border-top:1px solid var(--sec);padding-top:12px"></div>
+      ${d.cobrancas.length ? `<p class="d" style="margin-top:12px">Cobranças</p><ul class="lista-s">${d.cobrancas.slice(0, 8).map(c => `<li><span>${esc(c.criado_em.slice(0, 10))} · ${esc(NOMES_PAC(d, c.pacote_id))} · R$ ${c.valor}</span><span><span class="tag ${c.status === 'pago' ? 'ok' : c.status === 'pendente' ? 'warn' : 'off'}">${esc(c.status)}</span>${c.status === 'pendente' && c.invoice_url ? ` <a href="${esc(c.invoice_url)}" target="_blank" rel="noopener">pagar</a>` : ''}</span></li>`).join('')}</ul>` : ''}
+    </div>
     <div class="cartao"><h3>Consumo (30 dias)</h3>
       <ul class="lista-s"><li><span>Total gasto</span><b>${fmtC(d.gasto_30d)}</b></li><li><span>Média por dia</span><b>${fmtC(d.media_dia)}</b></li></ul>
       <p class="d" style="margin-top:10px">Por assessor</p><ul class="lista-s">${d.por_modulo.map(x => `<li><span>${esc(NOMES[x.modulo] || x.modulo)}</span><span>${fmtC(x.gasto)} · ${x.n} usos</span></li>`).join('') || '<li>Sem consumo ainda.</li>'}</ul>
@@ -304,6 +307,27 @@ telas.creditos = async () => {
     </tbody></table></div></div>
   </div>`;
   return { titulo: '💳 Créditos', sub: `Saldo, consumo e recargas do ${esc(d.produto)}.`, corpo, depois() {
-    document.querySelectorAll('.pacote').forEach(b => b.onclick = () => { $('#compraMsg').textContent = `Pagamento via Asaas entra na próxima etapa. Por enquanto, peça a liberação do pacote "${b.querySelector('b').textContent}" ao suporte do ${d.produto}.`; });
+    let poll = null;
+    const mostrarCobranca = (cb) => {
+      const box = $('#compra'); box.classList.remove('oculto');
+      box.innerHTML = `<h3 style="font-size:15px;margin:0 0 6px">${esc(cb.pacote?.nome || cb.pacote_id)} · R$ ${cb.valor}${cb.tipo === 'mensal' ? '/mês' : ''} <span class="tag warn" id="cbStatus">aguardando pagamento</span></h3>
+        ${cb.pix_qr ? `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start"><img src="data:image/png;base64,${cb.pix_qr}" alt="QR Pix" style="width:180px;height:180px;border-radius:8px;border:1px solid var(--sec)"><div style="flex:1;min-width:200px"><p class="d">Abra o app do banco, escolha Pix → ler QR code, ou use o copia e cola:</p><textarea readonly id="pixCopia" rows="4" style="width:100%;font:12px monospace;padding:8px;border:1px solid var(--sec);border-radius:8px">${esc(cb.pix_payload)}</textarea><div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap"><button class="btn prim" id="btCopiar">Copiar código Pix</button>${cb.invoice_url ? `<a class="btn sec" href="${esc(cb.invoice_url)}" target="_blank" rel="noopener">Abrir fatura</a>` : ''}</div></div></div>`
+          : `<p class="d">Conclua o pagamento na fatura segura do Asaas (cartão de crédito${cb.forma === 'boleto' ? ' / boleto' : ''}).</p><a class="btn prim" href="${esc(cb.invoice_url)}" target="_blank" rel="noopener">Abrir fatura e pagar</a>`}
+        <p class="d" style="margin-top:8px">Assim que o pagamento for confirmado, os créditos entram sozinhos (esta tela atualiza).</p>`;
+      const bc = $('#btCopiar'); if (bc) bc.onclick = async () => { try { await navigator.clipboard.writeText(cb.pix_payload); toast('Código Pix copiado'); } catch { $('#pixCopia').select(); document.execCommand('copy'); toast('Código Pix copiado'); } };
+      clearInterval(poll); poll = setInterval(async () => { try { const r = await api(`/api/creditos/cobranca/${cb.asaas_id}`); if (r.status === 'pago') { clearInterval(poll); $('#cbStatus').textContent = 'pago ✓'; $('#cbStatus').className = 'tag ok'; toast(`+${Number(r.creditos).toLocaleString('pt-BR')} créditos`); setTimeout(() => { mostrarTela('creditos'); iniciar?.(); }, 1500); } else if (r.status !== 'pendente') { clearInterval(poll); $('#cbStatus').textContent = r.status; $('#cbStatus').className = 'tag off'; } } catch {} }, 5000);
+    };
+    document.querySelectorAll('.pacote').forEach(b => b.onclick = () => {
+      const p = d.pacotes.find(x => x.id === b.dataset.id); const pg = d.pagador || {}; const box = $('#compra'); box.classList.remove('oculto');
+      box.innerHTML = `<form id="fCompra"><h3 style="font-size:15px;margin:0 0 6px">${esc(p.nome)} · ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}</h3>
+        <div class="linha2"><div class="campo"><label>Forma de pagamento</label><select name="forma">${p.tipo === 'mensal' ? '<option value="cartao">Cartão de crédito (renova sozinho)</option><option value="pix">Pix (todo mês você paga o QR)</option>' : '<option value="pix">Pix (na hora)</option><option value="cartao">Cartão de crédito</option><option value="boleto">Boleto</option>'}</select></div><div class="campo"><label>CPF ou CNPJ do pagador</label><input name="cpf_cnpj" required value="${esc(pg.cpf_cnpj || '')}" placeholder="000.000.000-00"></div></div>
+        <div class="linha2"><div class="campo"><label>Nome / razão social</label><input name="nome" value="${esc(pg.nome || '')}"></div><div class="campo"><label>E-mail (recibo)</label><input name="email" type="email" value="${esc(pg.email || '')}"></div></div>
+        <div style="display:flex;gap:8px;align-items:center"><button class="btn prim">Gerar cobrança</button><button type="button" class="btn sec" id="btCancelarCompra">cancelar</button><span class="salvo" id="compraEst"></span></div></form>`;
+      $('#btCancelarCompra').onclick = () => { box.classList.add('oculto'); box.innerHTML = ''; };
+      $('#fCompra').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); $('#compraEst').textContent = 'gerando…'; try { const cb = await post('/api/creditos/comprar', { pacote_id: p.id, ...f }); mostrarCobranca(cb); } catch { $('#compraEst').textContent = ''; } };
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    const bcp = $('#btCancelarPlano'); if (bcp) bcp.onclick = async () => { if (!confirm('Cancelar o plano mensal? Os créditos já recebidos continuam no saldo.')) return; await post('/api/creditos/assinatura/cancelar', {}); toast('Plano cancelado'); mostrarTela('creditos'); };
   } };
 };
+const NOMES_PAC = (d, id) => d.pacotes.find(p => p.id === id)?.nome || id;

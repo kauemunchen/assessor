@@ -43,6 +43,12 @@ export class TelegramCanal {
       if (!r.ok) { console.error('[telegram] sendVideo falhou:', r.description); await this._post({ chat_id: chatId, text: semMarkdown((resposta.texto || '') + '\n' + resposta.video) }); }
       return;
     }
+    if (resposta && typeof resposta === 'object' && resposta.foto && String(resposta.foto).startsWith('data:')) { // imagem embutida (ex.: QR Pix) → upload multipart
+      const b64 = String(resposta.foto).split(',')[1] || ''; const fd = new FormData(); fd.append('chat_id', String(chatId)); fd.append('photo', new Blob([Buffer.from(b64, 'base64')], { type: 'image/png' }), 'qr.png'); fd.append('caption', semMarkdown(resposta.texto || '').slice(0, 1000));
+      const r = await fetch(`${API}/bot${this.token}/sendPhoto`, { method: 'POST', body: fd }).then(r => r.json());
+      if (!r.ok) { console.error('[telegram] sendPhoto(data) falhou:', r.description); await this._post({ chat_id: chatId, text: semMarkdown(resposta.texto || '') }); }
+      return;
+    }
     if (resposta && typeof resposta === 'object' && resposta.foto) {
       const r = await fetch(`${API}/bot${this.token}/sendPhoto`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: resposta.foto, caption: semMarkdown(resposta.texto || '').slice(0, 1000), reply_markup: teclado(resposta.botoes) }) }).then(r => r.json());
       if (!r.ok) console.error('[telegram] sendPhoto falhou:', r.description);

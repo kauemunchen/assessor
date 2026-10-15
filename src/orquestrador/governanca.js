@@ -35,7 +35,18 @@ export async function governanca(msg, conta) {
     return `${MODS[mod]} desligado. Os dados ficam guardados.`;
   }
   if (/^(cr[ée]ditos?|saldo)$/.test(t)) { const c = await import('../creditos/index.js'); return c.textoResumo(conta.id); }
-  if (/^(comprar|planos?|recarregar)( cr[ée]ditos?)?$/.test(t)) { const c = await import('../creditos/index.js'); return `🛒 *${c.PRODUTO} · Recarga*\n` + c.PACOTES.map(p => `- ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`).join('\n') + `\n\nO pagamento (Pix/cartão via Asaas) entra na tela *Créditos* do app web na próxima etapa. Por enquanto, fale com o suporte do ${c.PRODUTO} para liberar.`; }
+  if ((m = t.match(/^comprar\s+(start|pro|max|mensal[_ ]pro|mensal[_ ]max)(?:\s+(pix|cart[ãa]o|boleto))?(?:\s+([\d.\/-]{11,18}))?(?:\s+(\S+@\S+))?\s*$/))) {
+    const as = await import('../integracoes/asaas.js'); const c = await import('../creditos/index.js');
+    if (!as.configurado()) return `O pagamento online ainda não está ativo neste servidor. Fale com o suporte do ${c.PRODUTO}.`;
+    const pacote = m[1].replace(' ', '_'); const forma = /cart/.test(m[2] || '') ? 'cartao' : m[2] === 'boleto' ? 'boleto' : 'pix';
+    const temDoc = as.docValido(conta.cpf_cnpj || m[3]); if (!temDoc) return `Para emitir a cobrança preciso do seu CPF ou CNPJ (uma vez só). Mande: *comprar ${m[1]} ${forma} SEU_CPF_OU_CNPJ seu@email*`;
+    try { const cb = await as.comprar(conta.id, pacote, { forma, cpfCnpj: m[3], email: m[4] }); const p = cb.pacote;
+      const cab = `🛒 ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`;
+      if (cb.pix_qr) return { foto: `data:image/png;base64,${cb.pix_qr}`, texto: `${cab}\nPix copia e cola (toque para copiar):\n\`${cb.pix_payload}\`\nAssim que o pagamento cair eu aviso e os créditos entram sozinhos. Fatura: ${cb.invoice_url}` };
+      return `${cab}\nPague por aqui: ${cb.invoice_url}\nAssim que confirmar, os créditos entram sozinhos e eu aviso.`; }
+    catch (e) { return `Não consegui gerar a cobrança: ${e.message}`; }
+  }
+  if (/^(comprar|planos?|recarregar)( cr[ée]ditos?)?$/.test(t)) { const c = await import('../creditos/index.js'); return `🛒 *${c.PRODUTO} · Recarga*\n` + c.PACOTES.map(p => `- ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`).join('\n') + `\n\nPara comprar: *comprar pro* (Pix) ou *comprar pro cartão*. Também na tela *Créditos* do app web.`; }
   if (/^status$|^conex[õo]es$/.test(t)) {
     const g = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(conta.id);
     const ig = db.prepare('SELECT * FROM instagram_auth WHERE conta_id=?').get(conta.id);

@@ -25,6 +25,7 @@ setCanal(canal);
 rotasConfig(app);
 rotasMarca(app);
 rotasDados(app);
+import('./integracoes/asaas.js').then(a => a.rotaWebhook(app)).catch(e => console.error('asaas', e.message));
 app.use('/api', (err, req, res, _next) => { console.error('[api]', req.path, err.message); res.status(500).json({ erro: err.message }); });
 canal.aoReceber(async (msg) => {
   const t0 = Date.now(); canal.digitando?.(msg.chatId); const tick = setInterval(() => canal.digitando?.(msg.chatId), 4500);

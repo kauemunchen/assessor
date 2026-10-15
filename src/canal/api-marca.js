@@ -50,7 +50,13 @@ export function rotasMarca(app) {
   });
 
   // ---------- Créditos ----------
-  app.get('/api/creditos', auth, (req, res) => res.json(resumoCreditos(req.contaId)));
+  app.get('/api/creditos', auth, async (req, res) => { const as = await import('../integracoes/asaas.js'); const c = db.prepare('SELECT cpf_cnpj, email, nome_dono FROM contas WHERE id=?').get(req.contaId);
+    res.json({ ...resumoCreditos(req.contaId), asaas: as.configurado(), ambiente: process.env.ASAAS_AMBIENTE || 'sandbox', assinatura: as.assinaturaAtiva(req.contaId) || null, cobrancas: as.listarCobrancas(req.contaId), pagador: { nome: c.nome_dono, cpf_cnpj: c.cpf_cnpj, email: c.email } }); });
+  app.post('/api/creditos/comprar', auth, async (req, res) => { const as = await import('../integracoes/asaas.js'); const b = req.body || {};
+    try { res.json(await as.comprar(req.contaId, b.pacote_id, { forma: b.forma, nome: b.nome, cpfCnpj: b.cpf_cnpj, email: b.email })); } catch (e) { res.status(400).json({ erro: e.message }); } });
+  app.get('/api/creditos/cobranca/:id', auth, async (req, res) => { const as = await import('../integracoes/asaas.js'); const c = as.cobranca(req.contaId, req.params.id); if (!c) return res.status(404).json({ erro: 'não existe' });
+    if (c.status === 'pendente') { await as.conferirPendentes().catch(() => {}); } res.json(as.cobranca(req.contaId, req.params.id)); });
+  app.post('/api/creditos/assinatura/cancelar', auth, async (req, res) => { const as = await import('../integracoes/asaas.js'); try { res.json(await as.cancelarAssinatura(req.contaId)); } catch (e) { res.status(400).json({ erro: e.message }); } });
 
   // ---------- Ajustes ----------
   app.get('/api/ajustes', auth, (req, res) => {
