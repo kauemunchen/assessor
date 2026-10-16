@@ -114,7 +114,12 @@ export async function governanca(msg, conta) {
     return concluirLogin(m[1], conta.id, msg.chatId) ? '💻 Login no app liberado. Pode voltar ao navegador.' : 'Código inválido ou expirado (vale 10 min). Gere outro no app.';
   }
   if ((m = msg.texto.trim().match(/^convidar?\s+(.+)$/i))) {
-    const { criarConvite } = await import('./equipe.js'); const nome = caso(m[1].trim()); const codigo = criarConvite(conta.id, nome);
+    // Bug antigo: usava caso(m[1]) para recuperar a caixa original, mas caso() busca em `t` (lowercase),
+    // nunca achava um fragmento com maiúsculas e devolvia "" — nome ia vazio pro banco e a pessoa
+    // ficava fantasma (Olga não achava depois). m[1] já veio do msg.texto, com a caixa certa.
+    const { criarConvite } = await import('./equipe.js'); const nome = m[1].trim();
+    if (!nome) return 'Diga o nome: *convidar <Nome>*.';
+    const codigo = criarConvite(conta.id, nome);
     return `Convite para ${nome} criado. Peça para a pessoa abrir @${process.env.TELEGRAM_BOT_USERNAME || 'AssessorKM_bot'} no Telegram e mandar:\n\nentrar ${codigo}\n\nQuando entrar, eu te aviso. Depois: "Olga, avisa ${nome.split(' ')[0]} que…" ou "Olga, repassa para ${nome.split(' ')[0]}: <tarefa> até sexta".`;
   }
   if (/^(pessoas|minha equipe|equipe externa|colaboradores)$/.test(t)) {
