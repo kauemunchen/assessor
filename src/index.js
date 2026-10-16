@@ -20,6 +20,9 @@ const servidor = http.createServer(app);
 app.use('/app', express.static(path.resolve('src/painel'), { index: 'index.html', extensions: ['html'] }));
 app.get(['/admin', '/admin/'], (_, res) => res.sendFile(path.resolve('src/painel/admin/index.html')));
 app.use('/admin', express.static(path.resolve('src/painel/admin'), { index: false, redirect: false }));
+// Manual público — sem auth, serve pra quem acabou de criar conta e precisa do passo-a-passo
+app.get(['/ajuda', '/ajuda/'], (_, res) => res.sendFile(path.resolve('src/painel/ajuda/index.html')));
+app.use('/ajuda', express.static(path.resolve('src/painel/ajuda'), { index: false, redirect: false }));
 app.get('/', (_, res) => res.redirect('/app'));
 
 const canal = criarCanal(process.env.CANAL || 'telegram', app, servidor);

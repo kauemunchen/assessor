@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FAF5EC">
+<title>Manual · KM APP</title>
+<link rel="icon" href="/app/favicon.png" type="image/png">
+<meta name="description" content="Guia de boas-vindas do KM APP: cadastro, Telegram, Google, Instagram, identidade de marca, tom de voz e todas as liberações.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Studio Caloroso v2 — manual KM APP (página /app/ajuda) */
+  :root {
+    --papel: #FAF5EC;
+    --papel-fundo: #F3EBDA;
+    --tinta: #1C1E26;
+    --tinta-mid: #4A4D59;
+    --tinta-fraca: #7A7D87;
+    --coral: #E85D4A;
+    --sage: #6E8367;
+    --dourado: #B9964B;
+    --linha: rgba(28, 30, 38, 0.12);
+    --cartao: #FFFFFF;
+    --cartao-sombra: 0 1px 2px rgba(28, 30, 38, 0.04), 0 8px 24px rgba(28, 30, 38, 0.06);
+    --f-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+    --f-corpo: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --f-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --papel: #16181F; --papel-fundo: #0F1116; --tinta: #ECEAE3; --tinta-mid: #B2B4BE; --tinta-fraca: #70737D;
+      --coral: #F27A69; --sage: #93A98A; --dourado: #D4B470; --linha: rgba(236, 234, 227, 0.14);
+      --cartao: #1E2029; --cartao-sombra: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --papel: #16181F; --papel-fundo: #0F1116; --tinta: #ECEAE3; --tinta-mid: #B2B4BE; --tinta-fraca: #70737D;
+    --coral: #F27A69; --sage: #93A98A; --dourado: #D4B470; --linha: rgba(236, 234, 227, 0.14);
+    --cartao: #1E2029; --cartao-sombra: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--papel); color: var(--tinta); font-family: var(--f-corpo); font-size: 16px; line-height: 1.6; margin: 0; }
+  body { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: 72px; padding-bottom: 48px; }
+
+  a { color: var(--coral); text-decoration: none; border-bottom: 1px solid currentColor; }
+  a:hover { opacity: 0.75; }
+  code { font-family: var(--f-mono); font-size: 0.88em; background: var(--papel-fundo); padding: 1px 6px; border-radius: 4px; color: var(--tinta); border: 1px solid var(--linha); }
+  pre { font-family: var(--f-mono); background: var(--papel-fundo); padding: 14px 16px; border-radius: 10px; overflow-x: auto; border: 1px solid var(--linha); font-size: 14px; line-height: 1.5; }
+  pre code { background: none; padding: 0; border: none; }
+
+  /* Barra superior fixa */
+  .barra { position: fixed; top: 0; left: 0; right: 0; height: 56px; background: var(--papel); border-bottom: 1px solid var(--linha); display: flex; align-items: center; justify-content: space-between; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); z-index: 100; backdrop-filter: blur(8px); }
+  .barra .ident { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.14em; color: var(--tinta-fraca); text-transform: uppercase; }
+  .barra .acoes { display: flex; gap: 10px; align-items: center; }
+  .barra a.btn { font-family: var(--f-corpo); font-size: 13px; font-weight: 500; color: var(--tinta); border: 1px solid var(--linha); padding: 7px 14px; border-radius: 999px; background: var(--cartao); transition: all 0.15s; }
+  .barra a.btn:hover { opacity: 1; background: var(--papel-fundo); border-color: var(--coral); color: var(--coral); }
+  .barra a.btn.primario { background: var(--coral); color: #FFF; border-color: var(--coral); }
+  .barra a.btn.primario:hover { background: var(--tinta); color: var(--papel); border-color: var(--tinta); }
+  @media (max-width: 540px) {
+    .barra .ident { display: none; }
+    .barra a.btn { font-size: 12px; padding: 7px 10px; }
+  }
+
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  /* Capa */
+  .capa { margin-bottom: 56px; padding-bottom: 32px; border-bottom: 1px solid var(--linha); }
+  .capa .marca { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.18em; color: var(--tinta-fraca); text-transform: uppercase; margin-bottom: 20px; }
+  .capa h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(40px, 7vw, 64px); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 20px; text-wrap: balance; }
+  .capa h1 em { font-style: italic; color: var(--coral); font-weight: 300; }
+  .capa .intro { font-size: 18px; color: var(--tinta-mid); max-width: 56ch; text-wrap: pretty; margin: 0 0 24px; }
+  .capa .meta { display: flex; flex-wrap: wrap; gap: 16px 24px; font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.04em; color: var(--tinta-fraca); }
+  .capa .meta span strong { color: var(--tinta); font-weight: 500; }
+
+  /* Sumário */
+  .sumario { background: var(--cartao); border: 1px solid var(--linha); border-radius: 12px; padding: 20px 24px; margin-bottom: 48px; box-shadow: var(--cartao-sombra); }
+  .sumario .titulo { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.14em; color: var(--tinta-fraca); text-transform: uppercase; margin-bottom: 12px; }
+  .sumario ol { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; counter-reset: s; }
+  .sumario li { counter-increment: s; display: flex; gap: 10px; align-items: baseline; font-size: 14px; }
+  .sumario li::before { content: counter(s, decimal-leading-zero); font-family: var(--f-mono); font-size: 11px; color: var(--coral); min-width: 24px; }
+  .sumario a { color: var(--tinta); border: none; }
+  .sumario a:hover { color: var(--coral); }
+  @media (max-width: 540px) { .sumario ol { grid-template-columns: 1fr; } }
+
+  /* Seções */
+  section { margin-bottom: 56px; scroll-margin-top: 80px; }
+  section header { margin-bottom: 24px; }
+  section .numero { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.18em; color: var(--coral); text-transform: uppercase; display: block; margin-bottom: 6px; }
+  section h2 { font-family: var(--f-display); font-weight: 400; font-size: clamp(28px, 4.5vw, 36px); line-height: 1.15; letter-spacing: -0.015em; margin: 0 0 8px; text-wrap: balance; }
+  section .subtitulo { font-size: 16px; color: var(--tinta-mid); margin: 0; max-width: 56ch; }
+
+  h3 { font-family: var(--f-display); font-weight: 500; font-size: 20px; line-height: 1.3; margin: 32px 0 10px; letter-spacing: -0.01em; }
+  h4 { font-family: var(--f-corpo); font-weight: 600; font-size: 14px; line-height: 1.4; margin: 20px 0 6px; letter-spacing: 0.01em; }
+  p { margin: 0 0 14px; max-width: 62ch; text-wrap: pretty; }
+  ul, ol { max-width: 62ch; padding-left: 20px; margin: 0 0 14px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--tinta-fraca); }
+
+  .passo { display: grid; grid-template-columns: 36px 1fr; gap: 16px; padding: 20px 0; border-top: 1px solid var(--linha); }
+  .passo:first-of-type { border-top: none; padding-top: 8px; }
+  .passo .n { font-family: var(--f-display); font-weight: 400; font-size: 24px; color: var(--coral); line-height: 1.2; font-style: italic; }
+  .passo h3 { margin: 0 0 8px; font-weight: 400; font-size: 18px; }
+  .passo p:last-child { margin-bottom: 0; }
+
+  .agentes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0 28px; }
+  .agente { background: var(--cartao); border: 1px solid var(--linha); border-radius: 12px; padding: 18px 20px; box-shadow: var(--cartao-sombra); }
+  .agente .nome { font-family: var(--f-display); font-weight: 400; font-size: 22px; letter-spacing: -0.01em; }
+  .agente .nome em { font-style: italic; color: var(--coral); font-size: 14px; margin-left: 6px; font-family: var(--f-corpo); font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase; }
+  .agente .papel { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--tinta-fraca); text-transform: uppercase; margin: 2px 0 10px; }
+  .agente p { font-size: 14px; margin-bottom: 10px; }
+  .agente .faz { font-size: 13px; color: var(--tinta-mid); }
+  .agente .faz strong { color: var(--tinta); font-weight: 500; }
+
+  .tabela-wrap { overflow-x: auto; margin: 16px 0 24px; border: 1px solid var(--linha); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 0; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--linha); }
+  th { background: var(--papel-fundo); font-weight: 500; font-size: 12px; letter-spacing: 0.04em; color: var(--tinta-mid); text-transform: uppercase; }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+  .nota { background: var(--cartao); border-left: 3px solid var(--coral); padding: 16px 20px; border-radius: 0 10px 10px 0; margin: 20px 0; box-shadow: var(--cartao-sombra); }
+  .nota .rotulo { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--coral); text-transform: uppercase; margin-bottom: 6px; }
+  .nota.sage { border-left-color: var(--sage); }
+  .nota.sage .rotulo { color: var(--sage); }
+  .nota.dourado { border-left-color: var(--dourado); }
+  .nota.dourado .rotulo { color: var(--dourado); }
+  .nota p:last-child { margin-bottom: 0; }
+
+  /* FAQ como aba de verdade: botão de filtro + accordion */
+  .faq-controles { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .faq-controles input { flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid var(--linha); border-radius: 999px; background: var(--cartao); color: var(--tinta); font: inherit; font-size: 14px; }
+  .faq-controles input:focus { outline: none; border-color: var(--coral); }
+
+  details { border-top: 1px solid var(--linha); padding: 16px 0; }
+  details:last-of-type { border-bottom: 1px solid var(--linha); }
+  summary { font-family: var(--f-display); font-weight: 400; font-size: 18px; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font-family: var(--f-corpo); font-weight: 300; font-size: 24px; color: var(--coral); transition: transform 0.2s; }
+  details[open] summary::after { transform: rotate(45deg); }
+  details[open] { padding-bottom: 20px; }
+  details > p, details > ul, details > ol, details > pre { margin-top: 12px; font-size: 15px; }
+  details.oculto { display: none; }
+
+  footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--linha); font-size: 13px; color: var(--tinta-fraca); display: flex; flex-wrap: wrap; gap: 16px 32px; justify-content: space-between; }
+  footer .assinatura { font-family: var(--f-display); font-style: italic; }
+  footer .assinatura strong { font-style: normal; color: var(--tinta); font-weight: 500; font-family: var(--f-corpo); letter-spacing: 0.1em; text-transform: uppercase; font-size: 12px; }
+
+  @media print {
+    .barra, .faq-controles { display: none; }
+    body { padding-top: 0; }
+    details { page-break-inside: avoid; }
+    details[open] summary::after { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="barra" aria-label="Barra do manual">
+  <div class="acoes">
+    <a href="/app" class="btn">← Voltar ao app</a>
+  </div>
+  <div class="ident">KM APP · Manual</div>
+  <div class="acoes">
+    <a href="/ajuda/manual.pdf" class="btn primario" download>⬇ Baixar PDF</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<header class="capa">
+  <div class="marca">KM APP · Manual de boas-vindas</div>
+  <h1>Como pôr o KM APP para <em>trabalhar por você</em>.</h1>
+  <p class="intro">Este guia leva você do cadastro até o primeiro post publicado. Faça na ordem: cada passo libera uma ferramenta, e a equipe só funciona completa depois do último.</p>
+  <div class="meta">
+    <span>Tempo estimado · <strong>45 min</strong></span>
+    <span>Trial · <strong>250 créditos grátis</strong></span>
+    <span>Suporte · <strong>Aldred no Telegram</strong></span>
+  </div>
+</header>
+
+<nav class="sumario" aria-label="Sumário">
+  <div class="titulo">Sumário</div>
+  <ol>
+    <li><a href="#cap-1">O que é o KM APP</a></li>
+    <li><a href="#cap-2">Sua equipe de 5 agentes</a></li>
+    <li><a href="#cap-3">O que cada ferramenta faz</a></li>
+    <li><a href="#cap-4">Créditos e limites</a></li>
+    <li><a href="#cap-5">Cadastro no app</a></li>
+    <li><a href="#cap-6">Vincular ao Telegram</a></li>
+    <li><a href="#cap-7">Liberar o Google (Gmail, Agenda, Drive, Tasks, Planilhas)</a></li>
+    <li><a href="#cap-8">Liberar o Instagram (Meta)</a></li>
+    <li><a href="#cap-9">Identidade de marca (logo, cores, tipografia)</a></li>
+    <li><a href="#cap-10">Jeito de falar da MIA (tom, pilares, hashtags)</a></li>
+    <li><a href="#cap-11">Ajustes finais e grade editorial</a></li>
+    <li><a href="#faq">FAQ e resolução de problemas</a></li>
+  </ol>
+</nav>
+
+<section id="cap-1">
+  <header>
+    <span class="numero">01 · Visão geral</span>
+    <h2>O KM APP é a sua equipe terceirizada que roda em três lugares ao mesmo tempo.</h2>
+  </header>
+  <p>Você fala com um grupo de assessores que divide o trabalho entre si: um cuida da sua agenda e dos seus e-mails, outro do financeiro, outra dos documentos, outra das suas redes sociais, outra do chão de fábrica. Todos reportam a Aldred (o Diretor), que lê a conversa, decide quem executa e devolve a resposta.</p>
+  <p>Você conversa com eles por três canais, ligados ao mesmo "escritório":</p>
+  <ul>
+    <li><strong>Telegram</strong> — o bot do KM APP no celular; é a entrada mais rápida para áudios, fotos e comandos no dia a dia.</li>
+    <li><strong>App web</strong> em <code>assessor.kauemunchen.com.br</code> — conversa completa, painel visual, configurações, biblioteca de mídias, calendário editorial.</li>
+    <li><strong>App no celular (PWA)</strong> — o mesmo app web instalado como aplicativo nativo pelo botão "Adicionar à tela inicial".</li>
+  </ul>
+  <div class="nota">
+    <div class="rotulo">O que ele NÃO faz</div>
+    <p>Nenhuma ação externa (publicar, cobrar, mandar e-mail, apagar arquivo) sai sem sua confirmação explícita. Nenhum assessor movimenta dinheiro. Nenhum apaga documento do seu Drive — isso você faz direto no Google. Nenhum publica no Instagram sem seu "sim".</p>
+  </div>
+</section>
+
+<section id="cap-2">
+  <header>
+    <span class="numero">02 · Sua equipe</span>
+    <h2>Cinco pessoas, uma hierarquia simples.</h2>
+    <p class="subtitulo">Você pede o que precisa — não precisa saber quem faz. Aldred roteia. Mas conhecer cada um ajuda a dar comandos mais diretos: "Olga, agenda…", "MIA, cria um post…".</p>
+  </header>
+
+  <div class="agentes">
+    <div class="agente">
+      <div class="nome">Aldred <em>Diretor</em></div>
+      <div class="papel">Decide quem executa</div>
+      <p class="faz">Lê sua mensagem, chama o assessor certo e devolve a resposta com uma <strong>leitura gerencial</strong> no fim: o fato, o número (quando houver), o próximo passo.</p>
+    </div>
+
+    <div class="agente">
+      <div class="nome">Olga <em>Secretária</em></div>
+      <div class="papel">Agenda · E-mails · Planilhas</div>
+      <p class="faz">Marca compromisso no Google Calendar com o marcador certo (Saúde, Família, Profissional, Financeiro), lê e responde Gmail (sempre pedindo "sim" antes de enviar), lança linhas em Google Sheets, confirma data por extenso antes de salvar.</p>
+    </div>
+
+    <div class="agente">
+      <div class="nome">Estag <em>Documentos</em></div>
+      <div class="papel">Arquivamento · Validades</div>
+      <p class="faz">Recebe foto/PDF/link do Drive, identifica (contrato, nota, boleto, certidão, RG…), arquiva na pasta certa no seu Google Drive, extrai vigência e lembra 30, 7 e 1 dia antes de vencer.</p>
+    </div>
+
+    <div class="agente">
+      <div class="nome">MIA <em>Social Media</em></div>
+      <div class="papel">Instagram · Conteúdo</div>
+      <p class="faz">Cria posts (feed, carrossel, story, reels) seguindo seu manual de marca, agenda publicação, publica no Instagram, lê métricas, mantém a grade editorial. <strong>Nunca</strong> publica sem sua aprovação.</p>
+    </div>
+
+    <div class="agente">
+      <div class="nome">Tina <em>Financeiro</em></div>
+      <div class="papel">Caixa · DRE · Cobrança</div>
+      <p class="faz">Separa por carteiras (PF, PJ), registra lançamento, dá baixa com comprovante, monta DRE gerencial mensal, projeta fluxo de caixa, aponta desvio e consequência. Nunca movimenta dinheiro.</p>
+    </div>
+
+    <div class="agente">
+      <div class="nome">Produção <em>AgilFac</em></div>
+      <div class="papel">Chão de fábrica</div>
+      <p class="faz">Específico para quem usa AgilFac (Mais Têxtil, Douglas): lê OPs, calcula produtividade por célula/colaboradora, avisa risco de atraso, registra embarque. Multiempresa.</p>
+    </div>
+  </div>
+
+  <h3>Como falar com cada um</h3>
+  <p>Você pode chamar pelo nome ("Olga, marca…") ou só pedir ("marca uma reunião…"). Aldred roteia. Mensagens vagas ganham uma pergunta de volta — uma só, nunca duas.</p>
+</section>
+
+<section id="cap-3">
+  <header>
+    <span class="numero">03 · Ferramentas</span>
+    <h2>O que você pode pedir, e como pedir.</h2>
+  </header>
+
+  <h3>Agenda e e-mail (Olga)</h3>
+  <ul>
+    <li><em>"Olga, marca consulta no Gaya quinta às 15h"</em> — cria no Google Calendar, marcador Saúde, lembrete 1h antes.</li>
+    <li><em>"troca/muda/remarca a consulta do Gaya para sexta 10h"</em> — ela busca pelo nome e move. Nunca pergunta ID.</li>
+    <li><em>"o que tem para hoje?"</em> ou <em>"agenda da semana"</em> — lista com marcadores entre colchetes.</li>
+    <li>Cola uma mensagem de confirmação da clínica/escola/cliente → ela extrai data, hora, local e marca sozinha.</li>
+    <li><em>"lê meus e-mails"</em> ou <em>"tem algo urgente no e-mail?"</em> — resume em 3 linhas o que precisa de decisão.</li>
+    <li><em>"responde o João dizendo que fecho sexta"</em> — escreve, mostra a prévia, só envia depois do seu "sim".</li>
+  </ul>
+
+  <h3>Documentos (Estag)</h3>
+  <ul>
+    <li>Mande uma <strong>foto</strong>, <strong>PDF</strong> ou <strong>link do Drive</strong> — ele identifica, arquiva na pasta certa (<code>/Empresa/{nome}/Tipo/Ano</code>) e confirma em uma linha com o link.</li>
+    <li><em>"Estag, busca o contrato da Mais Têxtil"</em> ou <em>"qual o CPF do Breno?"</em> — ele abre o arquivo e responde direto.</li>
+    <li><em>"o que vence esse mês?"</em> — lista com datas.</li>
+    <li>Arquivo acima de 20 MB → mande o link do Drive em vez do arquivo direto.</li>
+  </ul>
+
+  <h3>Redes sociais (MIA)</h3>
+  <ul>
+    <li><em>"MIA, cria um post sobre delegação"</em> — ela sugere legenda, hashtags, imagem e salva como rascunho na hora.</li>
+    <li><em>"MIA, quero criar um story"</em> — abre o modo edição guiado com botões (foto / vídeo / só texto).</li>
+    <li><em>"MIA, mostra o calendário editorial"</em> — lista rascunhos, agendados e publicados.</li>
+    <li>Mande uma foto sua para o Instagram → ela já aplica a marca d'água KM com a cor certa pelo fundo e propõe legenda.</li>
+    <li><em>"MIA, publica agora"</em> ou <em>"agenda para amanhã 19h"</em> → só sai com confirmação final.</li>
+  </ul>
+
+  <h3>Financeiro (Tina)</h3>
+  <ul>
+    <li><em>"Tina, lança 850 reais de insumo da Mais Têxtil"</em> — registra na carteira certa.</li>
+    <li><em>"como está o caixa esse mês?"</em> — devolve valor + comparação com mês anterior + leitura de uma linha.</li>
+    <li><em>"gera a DRE de setembro"</em> — monta DRE gerencial por empresa.</li>
+    <li>Foto do extrato bancário → ela concilia com os lançamentos.</li>
+  </ul>
+
+  <h3>Produção (AgilFac — opcional)</h3>
+  <ul>
+    <li><em>"como está a produção hoje?"</em> — lista OPs em andamento, atrasos, risco.</li>
+    <li><em>"produtividade da célula 2 em setembro"</em> — número + comparação.</li>
+    <li>Só disponível para contas que ligaram o módulo e têm token do AgilFac.</li>
+  </ul>
+</section>
+
+<section id="cap-4">
+  <header>
+    <span class="numero">04 · Créditos</span>
+    <h2>Como o consumo é medido — e seu limite grátis.</h2>
+  </header>
+  <p>O KM APP usa IA de ponta (Gemini, fal.ai, OpenAI) por trás, e cada operação consome créditos. <strong>1 crédito = 1.000 tokens de IA.</strong> Operações de render (imagem, vídeo, story) e geração de arte têm tarifa fixa:</p>
+
+  <div class="tabela-wrap">
+    <table>
+      <thead><tr><th>Operação</th><th>Custo</th><th>Quando acontece</th></tr></thead>
+      <tbody>
+        <tr><td>Conversa normal</td><td class="num">~0,2–2 cr</td><td>por mensagem (depende do tamanho)</td></tr>
+        <tr><td>Transcrição de áudio</td><td class="num">0,5 cr/min</td><td>+ tokens pela interpretação</td></tr>
+        <tr><td>Render de story KM</td><td class="num">1 cr</td><td>por arte gerada</td></tr>
+        <tr><td>Render de imagem / marca d'água</td><td class="num">1 cr</td><td>por imagem processada</td></tr>
+        <tr><td>Render de carrossel</td><td class="num">3 cr</td><td>pacote completo (todos os slides)</td></tr>
+        <tr><td>Edição de vídeo (corte, faixa, legenda)</td><td class="num">5 cr</td><td>por vídeo processado</td></tr>
+        <tr><td>Áudio de vídeo (extrair / remover)</td><td class="num">1 cr</td><td>por vídeo</td></tr>
+        <tr><td>Imagem gerada por IA (fal.ai)</td><td class="num">4 cr</td><td>por imagem</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota sage">
+    <div class="rotulo">Trial — 250 créditos grátis</div>
+    <p>Toda conta nova recebe <strong>250 créditos</strong> ao se cadastrar. Nada expira. Quando acabar, você compra um pacote em <em>Créditos</em> no app (Pix instantâneo via Mercado Pago, ou plano mensal). Posts e agendamentos já programados continuam saindo mesmo com saldo zerado.</p>
+  </div>
+
+  <h3>Pacotes</h3>
+  <div class="tabela-wrap">
+    <table>
+      <thead><tr><th>Plano</th><th>Créditos</th><th>Preço</th><th>Tipo</th></tr></thead>
+      <tbody>
+        <tr><td>Start</td><td class="num">1.000</td><td class="num">R$ 49</td><td>pré-pago</td></tr>
+        <tr><td>Pro</td><td class="num">3.000</td><td class="num">R$ 129</td><td>pré-pago</td></tr>
+        <tr><td>Max</td><td class="num">8.000</td><td class="num">R$ 299</td><td>pré-pago</td></tr>
+        <tr><td>Pro Mensal</td><td class="num">3.000/mês</td><td class="num">R$ 99/mês</td><td>recorrente</td></tr>
+        <tr><td>Max Mensal</td><td class="num">8.000/mês</td><td class="num">R$ 249/mês</td><td>recorrente</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="cap-5">
+  <header>
+    <span class="numero">05 · Cadastro</span>
+    <h2>Comece pelo app web.</h2>
+  </header>
+
+  <div class="passo">
+    <div class="n">i.</div>
+    <div>
+      <h3>Abra <code>assessor.kauemunchen.com.br/app</code></h3>
+      <p>Pelo navegador do computador ou do celular. Funciona em qualquer navegador moderno (Chrome, Safari, Edge, Firefox).</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">ii.</div>
+    <div>
+      <h3>Clique em "Criar conta"</h3>
+      <p>Preencha: seu nome, empresa (opcional), e-mail válido, CPF ou CNPJ (validado com dígito), e uma senha de pelo menos 8 caracteres. O CPF/CNPJ é usado para pagamento via Pix e para emitir recibos.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">iii.</div>
+    <div>
+      <h3>Pronto — 250 créditos caem na hora</h3>
+      <p>Você já cai dentro do app, logado, e vê a conversa com Aldred. O saldo aparece no chip "Créditos" na barra lateral.</p>
+    </div>
+  </div>
+
+  <div class="nota dourado">
+    <div class="rotulo">Instale como app no celular</div>
+    <p>No <strong>iPhone</strong>: Safari → botão compartilhar → "Adicionar à Tela Inicial". No <strong>Android</strong>: Chrome → menu de três pontos → "Instalar app" (ou "Adicionar à tela inicial"). O ícone KM aparece como se fosse um app nativo, e abre em tela cheia.</p>
+  </div>
+</section>
+
+<section id="cap-6">
+  <header>
+    <span class="numero">06 · Telegram</span>
+    <h2>Ligue o bot — é lá que você fala por áudio e manda foto no celular.</h2>
+    <p class="subtitulo">O Telegram é a entrada rápida. Toda mensagem que entra lá espelha no app web, e vice-versa — mesma conversa, dois lugares.</p>
+  </header>
+
+  <div class="passo">
+    <div class="n">i.</div>
+    <div>
+      <h3>No app web, menu "Mais" → "Conexões" → "Vincular Telegram"</h3>
+      <p>O sistema gera um <strong>código de 6 dígitos</strong>, válido por 10 minutos.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">ii.</div>
+    <div>
+      <h3>Abra o Telegram e procure o bot</h3>
+      <p>Nome: <code>@AssessorKM_bot</code> (ou o nome do bot da sua instalação). Toque em "Iniciar".</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">iii.</div>
+    <div>
+      <h3>Mande o código no chat do bot</h3>
+      <p>Formato: <code>web 123456</code> (a palavra "web" seguida do código). O app vai detectar sozinho e completar a vinculação — você vê uma marca verde na tela de conexões.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">iv.</div>
+    <div>
+      <h3>Teste</h3>
+      <p>Mande um <em>"oi"</em> no bot. Aldred responde apresentando a equipe. A mesma mensagem aparece no app web no mesmo instante.</p>
+    </div>
+  </div>
+</section>
+
+<section id="cap-7">
+  <header>
+    <span class="numero">07 · Google</span>
+    <h2>Uma única autorização libera Gmail, Agenda, Drive, Tasks e Planilhas.</h2>
+    <p class="subtitulo">O KM APP usa a conta Google que você escolher. Tudo o que a Estag arquiva vai no SEU Drive, tudo que a Olga marca entra na SUA agenda — nada fica em um "sistema separado".</p>
+  </header>
+
+  <div class="passo">
+    <div class="n">i.</div>
+    <div>
+      <h3>No app, "Mais" → "Conexões" → botão "Conectar Google"</h3>
+      <p>Ou mande no bot: <code>conectar google</code>. Aldred devolve o link exato de autorização.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">ii.</div>
+    <div>
+      <h3>Faça login na conta Google que você quer usar</h3>
+      <p>Use preferencialmente uma conta <strong>exclusiva do seu trabalho</strong> (ex.: a conta da empresa). Evite usar sua conta pessoal se possível.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">iii.</div>
+    <div>
+      <h3>Na tela "O KM APP quer acessar sua conta Google", marque TODAS as caixas</h3>
+      <p>São as permissões que o sistema precisa:</p>
+      <ul>
+        <li><strong>Google Agenda</strong> — ler, criar e remover eventos (Olga usa).</li>
+        <li><strong>Gmail — leitura</strong> — ler os seus e-mails (Olga resume para você).</li>
+        <li><strong>Gmail — envio</strong> — enviar e-mails pelo seu endereço (sempre após sua confirmação).</li>
+        <li><strong>Gmail — compor</strong> — criar rascunhos para você revisar no próprio Gmail.</li>
+        <li><strong>Google Drive</strong> — ler e escrever arquivos (Estag arquiva seus documentos lá).</li>
+        <li><strong>Google Tasks</strong> — criar, editar e organizar tarefas (lista de pendências).</li>
+      </ul>
+      <p>Se qualquer uma ficar desmarcada, a ferramenta correspondente para de funcionar com uma mensagem clara ("A autorização atual não inclui o Drive. Diga 'conectar google' de novo…"). Pode voltar e refazer a qualquer momento — o antigo é substituído.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">iv.</div>
+    <div>
+      <h3>Google vai avisar que o app "não foi verificado"</h3>
+      <p>Isso é esperado — é um aplicativo de uso interno, não distribuído em marketplace público. Clique em <strong>"Avançado"</strong> → <strong>"Acessar KM APP (não seguro)"</strong>. Essa tela só aparece na primeira vez, e os dados ficam só entre o seu Google e o seu KM APP.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">v.</div>
+    <div>
+      <h3>Clique em "Permitir" na tela final</h3>
+      <p>Você é redirecionado de volta para o app com uma mensagem de confirmação. Na tela de Conexões, aparecem agora as marcas verdes: Agenda, Gmail (ler), Gmail (enviar), Drive, Tasks.</p>
+    </div>
+  </div>
+
+  <div class="nota">
+    <div class="rotulo">Como testar</div>
+    <p>Mande no app: <em>"Olga, o que tem na agenda hoje?"</em> (testa Agenda) · <em>"tem algo urgente no e-mail?"</em> (testa Gmail) · mande uma foto de um boleto (testa Drive — a Estag arquiva). Se qualquer um responder com "não autorizado", refaça a conexão.</p>
+  </div>
+</section>
+
+<section id="cap-8">
+  <header>
+    <span class="numero">08 · Instagram</span>
+    <h2>A MIA só publica se você conectar seu Instagram pela Meta.</h2>
+    <p class="subtitulo">Esse é o passo mais trabalhoso — a Meta exige. Faça uma vez e esquece: o token vale ~60 dias e a MIA te avisa 7 dias antes de vencer.</p>
+  </header>
+
+  <div class="nota dourado">
+    <div class="rotulo">Pré-requisitos</div>
+    <ul>
+      <li>Seu Instagram precisa ser conta <strong>Profissional</strong> (Comercial ou Criador de Conteúdo), não Pessoal. Troca em <em>Instagram → Configurações → Conta → Mudar para conta profissional</em>.</li>
+      <li>Precisa estar <strong>vinculado a uma Página do Facebook</strong>. Se você não tem Página, crie uma gratuita em <code>facebook.com/pages/create</code> e vincule no app do Instagram.</li>
+    </ul>
+  </div>
+
+  <div class="passo">
+    <div class="n">i.</div>
+    <div>
+      <h3>Entre em <code>developers.facebook.com</code> e faça login</h3>
+      <p>Use a mesma conta de Facebook que administra a Página vinculada ao seu Instagram.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">ii.</div>
+    <div>
+      <h3>"Meus apps" → "Criar app"</h3>
+      <p>Tipo: <strong>Outro</strong> → <strong>Empresa</strong>. Nome do app: algo tipo <em>"KM Graph API"</em>. E-mail: o seu.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">iii.</div>
+    <div>
+      <h3>No painel do app, adicione o produto "Instagram"</h3>
+      <p>Procure o cartão <strong>"API da Graph do Instagram"</strong> e clique em "Configurar".</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">iv.</div>
+    <div>
+      <h3>"Gerar tokens de acesso"</h3>
+      <p>Clique em "Adicionar ou remover contas do Instagram". Autorize a Página do Facebook e a conta profissional do Instagram. Depois clique em <strong>"Gerar token"</strong> ao lado do nome da sua conta.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">v.</div>
+    <div>
+      <h3>Copie o token (começa com <code>IGAA…</code>)</h3>
+      <p>É uma string longa, de 100+ caracteres. <strong>Guarde em local seguro</strong> — ele é a chave de acesso ao seu Instagram.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">vi.</div>
+    <div>
+      <h3>No bot do Telegram, mande:</h3>
+      <pre><code>conectar instagram &lt;cole_o_token_aqui&gt;</code></pre>
+      <p>Sem os <code>&lt; &gt;</code>, só o comando e o token. O KM APP descobre o ID da sua conta sozinho pelo token. A MIA responde em segundos: <em>"✅ Conectado como @seuperfil"</em>.</p>
+    </div>
+  </div>
+
+  <div class="passo">
+    <div class="n">vii.</div>
+    <div>
+      <h3>Teste</h3>
+      <p>Mande: <em>"MIA, cria um post sobre produtividade"</em>. Ela sugere legenda e imagem; aprova e manda <em>"publica agora"</em>. Em menos de 1 minuto está no seu feed.</p>
+    </div>
+  </div>
+
+  <div class="nota">
+    <div class="rotulo">Renovação do token</div>
+    <p>O token da Meta expira em <strong>~60 dias</strong>. A MIA te avisa automaticamente 7 dias antes do vencimento, pelo Telegram. Para renovar, basta repetir o passo iv e vi — gerar um novo token e mandar <code>conectar instagram &lt;novo_token&gt;</code>.</p>
+  </div>
+</section>
+
+<section id="cap-9">
+  <header>
+    <span class="numero">09 · Identidade de marca</span>
+    <h2>Logo, cores e tipografia — tudo o que a MIA precisa saber antes de criar.</h2>
+    <p class="subtitulo">Vai na tela "Identidade &amp; Marca" no app. O que você preenche aqui vira regra para toda arte que a MIA renderiza (story, feed, carrossel).</p>
+  </header>
+
+  <h3>Logo</h3>
+  <ul>
+    <li>Mande em <strong>PNG com fundo transparente</strong>, resolução alta (mínimo 1000px no lado maior).</li>
+    <li>Mande três variações se tiver: <strong>escura</strong> (para fundos claros), <strong>clara</strong> (para fundos cinza), <strong>branca</strong> (para fundos escuros).</li>
+    <li>O sistema escolhe automaticamente qual usar em cada arte pela luminosidade do canto onde o logo entra.</li>
+    <li>Se mandar só uma, ele usa aquela em tudo.</li>
+  </ul>
+
+  <h3>Cores da marca</h3>
+  <p>Preencha em hexadecimal (ex.: <code>#37414E</code>). O padrão KM usa:</p>
+  <div class="tabela-wrap">
+    <table>
+      <thead><tr><th>Papel</th><th>Hex</th><th>Onde aparece</th></tr></thead>
+      <tbody>
+        <tr><td>Primária escura</td><td><code>#37414E</code></td><td>fundo de stories, faixas de texto, headlines</td></tr>
+        <tr><td>Acento dourado</td><td><code>#B9964B</code></td><td>palavra em destaque dentro do texto (sempre UMA só)</td></tr>
+        <tr><td>Secundária clara</td><td><code>#C8CFD7</code></td><td>textos de apoio, assinatura, data</td></tr>
+        <tr><td>Branco</td><td><code>#FFFFFF</code></td><td>título principal sobre fundo escuro</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Troque pelas suas se tiver manual próprio. Se não tiver, pode começar com o padrão KM — fica elegante e dá para ajustar depois.</p>
+
+  <h3>Tipografia</h3>
+  <ul>
+    <li><strong>Display (títulos):</strong> Poppins Bold por padrão. Pode trocar por qualquer família disponível no Google Fonts.</li>
+    <li><strong>Corpo (textos de apoio):</strong> Poppins Regular ou Medium.</li>
+  </ul>
+
+  <h3>Assinatura visual</h3>
+  <p>O logo KM entra <strong>em toda arte</strong> no canto inferior-direito, pela regra dura da marca. Ninguém pode desligar isso — é a assinatura. A cor é escolhida pelo fundo automaticamente.</p>
+</section>
+
+<section id="cap-10">
+  <header>
+    <span class="numero">10 · Jeito de falar</span>
+    <h2>Ensine a MIA a escrever como você escreveria.</h2>
+    <p class="subtitulo">Tudo nessa seção vai no painel "Identidade &amp; Marca" → aba "Como a MIA fala". Vale também para como Aldred, Olga, Estag e Tina conversam com você.</p>
+  </header>
+
+  <h3>1. Tratamento</h3>
+  <p>Como a equipe se dirige a você:</p>
+  <ul>
+    <li><strong>"você"</strong> — informal, mais próximo, dia a dia (padrão para a maioria).</li>
+    <li><strong>"senhor" / "senhora"</strong> — formal, se preferir distância profissional.</li>
+    <li><strong>Pelo seu primeiro nome</strong> — <em>"Kauê, agenda da semana…"</em> — tratamento afetivo.</li>
+  </ul>
+
+  <h3>2. Tom</h3>
+  <ul>
+    <li><strong>Direto</strong> — frases curtas, verbo primeiro, zero rodeio. Bom para gestão, decisão rápida.</li>
+    <li><strong>Analítico</strong> — número, comparação, leitura. Bom para financeiro.</li>
+    <li><strong>Suave</strong> — mais pausado, acolhedor. Bom para conteúdo que fala de família ou mentoria.</li>
+    <li><strong>Provocador</strong> — questiona, confronta ideias. Bom para posts de pilar GESTÃO/NEGÓCIOS.</li>
+  </ul>
+  <p>Você pode <strong>misturar</strong>: <em>"Direto no dia a dia; provocador quando escrever para o Instagram"</em>.</p>
+
+  <h3>3. Tamanho das respostas</h3>
+  <ul>
+    <li><strong>Curtas</strong> — 1 a 3 linhas, direto ao fato. Melhor para mensageria.</li>
+    <li><strong>Médias</strong> — 1 parágrafo com contexto. Padrão.</li>
+    <li><strong>Detalhadas</strong> — explicação completa com passos. Só quando você pedir "me explica".</li>
+  </ul>
+
+  <h3>4. Pilares de conteúdo (para a MIA)</h3>
+  <p>São os temas que a MIA circula no seu Instagram. Padrão KM: <strong>GESTÃO · NEGÓCIOS · IA · AUTOMAÇÃO</strong> (máximo 2 posts seguidos do mesmo pilar). Troque pelos seus se forem outros:</p>
+  <pre><code>Exemplo para um nutricionista:
+  SAÚDE INTESTINAL · HÁBITOS · MITOS ALIMENTARES · CASOS DE CLIENTE</code></pre>
+
+  <h3>5. Modelo de legenda</h3>
+  <p>Toda legenda que a MIA escreve segue a mesma estrutura — e você pode customizar cada parte:</p>
+  <ol>
+    <li><strong>Gancho</strong> — primeira linha curta que pare o scroll.</li>
+    <li><strong>Contexto real</strong> — um fato, dado ou história sua ("Em 15 anos liderando 80 pessoas…").</li>
+    <li><strong>3 pontos</strong> — três itens numerados, acionáveis.</li>
+    <li><strong>CTA único</strong> — uma só chamada (comenta, salva, compartilha, manda para alguém).</li>
+    <li><strong>5 hashtags</strong> — exatamente 5: 3 fixas + 2 do pilar do post.</li>
+  </ol>
+
+  <h3>6. Hashtags</h3>
+  <ul>
+    <li><strong>Fixas</strong> (3) — aparecem em todo post. Padrão KM: <code>#gestaoempresarial #empreendedorismo #kauemunchen</code>. Troque pelas suas.</li>
+    <li><strong>Por pilar</strong> (2 adicionais) — você define duas por pilar. Ex. para pilar GESTÃO: <code>#donodeempresa #empresario</code>.</li>
+  </ul>
+
+  <h3>7. CTAs permitidos (catálogo)</h3>
+  <p>A MIA só usa CTAs do seu catálogo. Padrão KM:</p>
+  <ul>
+    <li><em>"Me conta nos comentários: [pergunta]"</em></li>
+    <li><em>"Salva esse post para olhar depois"</em></li>
+    <li><em>"Compartilha com aquele sócio que ainda faz tudo sozinho"</em></li>
+    <li><em>"Marca alguém que precisa ler isso"</em></li>
+  </ul>
+  <p>Adicione ou troque os seus na aba "CTAs" da Identidade de Marca.</p>
+
+  <h3>8. Palavras que você evita</h3>
+  <p>Lista negra opcional — palavras ou expressões que a MIA nunca usa nos seus posts. Ex.: <em>"basicamente", "simplesmente", "é isso aí", emojis em excesso</em>. Melhor manter curto (5–10 palavras) para a MIA realmente respeitar.</p>
+
+  <h3>9. Provas sociais / autoridade</h3>
+  <p>Dados sobre você que a MIA pode citar em qualquer post sem precisar perguntar. Ex. Kauê:</p>
+  <ul>
+    <li><em>15 anos em gestão de empresas</em></li>
+    <li><em>+80 pessoas sob gestão atual</em></li>
+    <li><em>+30 empresas estruturadas na carreira</em></li>
+    <li><em>Operação processa +350 OPs/mês com &lt;1% de reprovação</em></li>
+  </ul>
+</section>
+
+<section id="cap-11">
+  <header>
+    <span class="numero">11 · Ajustes finais</span>
+    <h2>Grade de horários, marcadores, retenção.</h2>
+  </header>
+
+  <h3>Grade editorial da MIA</h3>
+  <p>Em "Ajustes" → "Social Media". Padrão KM: <strong>seg–sex Reel 12h + carrossel/estático 19h</strong>; fim de semana só stories de família. Troque pela grade que faz sentido para o seu público (segunda a sexta ao meio-dia e à noite? só três dias por semana? sábado também?).</p>
+
+  <h3>Marcadores do Google Calendar</h3>
+  <p>A Olga cria cada compromisso em um <strong>marcador</strong> (um calendário dentro do Google) para você ver tudo colorido:</p>
+  <ul>
+    <li><strong>Profissional</strong> — reuniões de trabalho, clientes, vencimentos PJ.</li>
+    <li><strong>Social Media</strong> — todo post agendado entra aqui.</li>
+    <li><strong>Saúde</strong> — consultas, exames, academia.</li>
+    <li><strong>Família</strong> — escola do filho, aniversários, viagens.</li>
+    <li><strong>Financeiro PF / Financeiro PJ</strong> — vencimentos de boletos.</li>
+  </ul>
+  <p>Se um marcador não existir ainda no seu Google Calendar, a Olga cria sozinha na primeira vez que usar.</p>
+
+  <h3>Biblioteca de mídias</h3>
+  <p>Toda imagem ou vídeo que entra no sistema (foto sua, arte gerada, vídeo editado) vai para a <strong>Biblioteca</strong> no app web. Fica 15 dias se não for usado — depois é limpo automaticamente para não ocupar espaço. Posts agendados/publicados mantêm a mídia para sempre.</p>
+
+  <h3>Equipe (opcional)</h3>
+  <p>Você pode convidar colaboradores (secretária, assistente, sócio) para o seu "escritório". Vai em "Equipe" no app → "Convidar". O sistema gera um código, o colaborador abre o bot e manda <code>entrar &lt;código&gt;</code>. Daí a Estag passa a repassar tarefas para ele: <em>"Estag, repassa para Ana: fecha o relatório até sexta"</em>.</p>
+</section>
+
+<section id="faq">
+  <header>
+    <span class="numero">12 · FAQ</span>
+    <h2>Dúvidas e problemas comuns.</h2>
+  </header>
+
+  <div class="faq-controles">
+    <input type="search" id="faqBusca" placeholder="Buscar na FAQ (ex.: token, Instagram, créditos)…" aria-label="Buscar na FAQ">
+  </div>
+
+  <div id="faqLista">
+    <details data-q="instagram meta conectar múltiplas contas">
+      <summary>Posso conectar MAIS DE UMA conta de Instagram?</summary>
+      <p>Por conta do KM APP, só uma de cada vez. Se você gere várias contas (sua pessoal + empresa + marca filha), crie uma conta separada no KM APP para cada — cada uma tem sua própria conexão Meta.</p>
+    </details>
+
+    <details data-q="google conta pessoal trabalho">
+      <summary>Preciso ter conta Google ESPECÍFICA, ou dá para usar minha pessoal?</summary>
+      <p>Dá para usar qualquer uma. Recomendamos uma conta exclusiva do trabalho, para separar sua caixa de entrada profissional da pessoal e para a Estag arquivar documentos corporativos sem misturar com fotos de família no Drive.</p>
+    </details>
+
+    <details data-q="desconectar google instagram revogar">
+      <summary>Posso desconectar o Google ou o Instagram depois?</summary>
+      <p>Sim, a qualquer momento, em "Conexões" → botão "Desconectar". No Google, também dá para revogar diretamente em <code>myaccount.google.com/permissions</code>. No Instagram, em <code>facebook.com/settings → Apps e Sites</code>. Depois disso, as ferramentas correspondentes param — mas o resto do app continua funcionando normal.</p>
+    </details>
+
+    <details data-q="senha esqueci esquecida recuperar">
+      <summary>E se eu esquecer a senha?</summary>
+      <p>Hoje, use o Telegram para entrar: no app, aba "Pelo Telegram", gere um código, mande no bot. Isso te loga sem precisar de senha. Depois, em "Minha conta" → "Trocar senha", defina uma nova.</p>
+    </details>
+
+    <details data-q="token instagram meta invalidou expirou">
+      <summary>O Instagram diz que meu token invalidou. O que faço?</summary>
+      <p>Isso acontece quando você troca sua senha do Instagram, ou quando a Meta encerra a sessão por segurança. Volte em <code>developers.facebook.com</code> → seu app → Instagram → Gerar tokens, pegue um novo e mande <code>conectar instagram &lt;novo_token&gt;</code> no bot. Os posts que estavam agendados ficam em status "erro" até você reconectar — depois é só pedir <em>"MIA, reagenda os posts em erro"</em>.</p>
+    </details>
+
+    <details data-q="story feed foto mia errado">
+      <summary>Mandei uma foto e a MIA criou um post, mas eu queria um story.</summary>
+      <p>Diga <em>"é um story, não um post feed"</em> ou use o modo guiado desde o início: <em>"MIA, quero criar um story"</em> — ela abre o fluxo com botões (foto / vídeo / só texto).</p>
+    </details>
+
+    <details data-q="personas nome assessor mudar renomear">
+      <summary>Como mudar o nome dos assessores (Aldred, Olga, Estag, Tina, MIA)?</summary>
+      <p>Em "Identidade &amp; Marca" → "Personas". Cada agente tem um nome editável. Dê os nomes que fizerem sentido para você.</p>
+    </details>
+
+    <details data-q="créditos acabaram bloqueio recarregar pix">
+      <summary>Os créditos acabaram no meio de um dia importante.</summary>
+      <p>Comprometimentos já agendados (posts, lembretes, publicação) continuam saindo. Novas conversas com a IA ficam bloqueadas até você recarregar em "Créditos" → escolher um pacote → pagar com Pix (cai em segundos). Comandos livres (ver status, pedir recarga, cancelar algo) continuam funcionando sem crédito.</p>
+    </details>
+
+    <details data-q="instagram profissional pessoal comercial criador">
+      <summary>Esqueci se tenho conta profissional no Instagram.</summary>
+      <p>Abra o Instagram → sua foto → menu "☰" → Configurações → Conta. Se aparece "Mudar para conta profissional", você ainda está em pessoal e precisa mudar. Se já está profissional, aparece "Mudar para conta pessoal". A API da Meta só funciona com Profissional.</p>
+    </details>
+
+    <details data-q="chat conversa básico sem google sem instagram">
+      <summary>Posso usar sem Google e sem Instagram, só o chat?</summary>
+      <p>Pode. Aldred (direção), Tina (financeiro) e a conversa geral funcionam sem nenhuma conexão externa. Só a Olga (agenda/e-mail), a Estag (documentos) e a MIA (postar) exigem Google e/ou Instagram para funcionar completos.</p>
+    </details>
+
+    <details data-q="suporte problema reportar bug ajuda contato">
+      <summary>Como falar com você se algo quebrar?</summary>
+      <p>Mande no próprio bot: <em>"problema: [descreva]"</em>. A mensagem cai no painel admin e você recebe retorno. Para questões de pagamento, em "Créditos" → "Falar com suporte".</p>
+    </details>
+  </div>
+</section>
+
+<footer>
+  <div class="assinatura"><strong>KM APP</strong> · manual v1</div>
+  <div>Atualizado em outubro de 2026</div>
+</footer>
+
+</div>
+
+<script>
+  // Busca em tempo real na FAQ: filtra pelos atributos data-q + o conteúdo do summary/body
+  const busca = document.getElementById('faqBusca');
+  const lista = document.getElementById('faqLista');
+  if (busca && lista) {
+    busca.addEventListener('input', () => {
+      const q = busca.value.trim().toLowerCase();
+      lista.querySelectorAll('details').forEach(d => {
+        const texto = ((d.dataset.q || '') + ' ' + d.textContent).toLowerCase();
+        const bate = !q || texto.includes(q);
+        d.classList.toggle('oculto', !bate);
+        if (q && bate) d.open = true;
+        if (!q) d.open = false;
+      });
+    });
+  }
+  // Deep link #faq?q=xxx (não suportado pelo artifact, mas útil se abrirem com âncora + ?q)
+  // E deep link para FAQ aberta: #faq-token etc
+</script>
+</body>
+</html>
