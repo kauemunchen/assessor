@@ -6,7 +6,8 @@ const ler = (chat) => { const r = db.prepare('SELECT estado FROM onboarding WHER
 const salvar = (chat, e) => db.prepare('INSERT INTO onboarding (chat_id, estado) VALUES (?,?) ON CONFLICT(chat_id) DO UPDATE SET estado=excluded.estado, atualizado_em=CURRENT_TIMESTAMP').run(chat, JSON.stringify(e));
 const apagar = (chat) => db.prepare('DELETE FROM onboarding WHERE chat_id=?').run(chat);
 
-const PRIMEIRA = `👋 *Bem-vindo ao KM APP* — seu assessor por IA em Telegram e web.\n\nEu monto sua equipe de assessores (Alfred para gestão, Olga para agenda e documentos, Tina para financeiro, MIA para Instagram), com reuniões, lembretes, posts, contratos e vencimentos resolvidos no chat.\n\nVocê começa com *250 créditos grátis* (1 crédito = 1.000 tokens de IA; story e arte custam 1, carrossel 3, vídeo 5). Posso começar?`;
+const LINK_MANUAL = (() => { const b = process.env.WEBAPP_URL || process.env.PUBLIC_URL || ''; return b ? `${b.replace(/\/$/, '')}/ajuda` : '/ajuda'; })();
+const PRIMEIRA = `👋 *Bem-vindo ao KM APP* — seu assessor por IA em Telegram e web.\n\nSou Aldred, o Diretor. Monto sua equipe: *Olga* (agenda, e-mails, planilhas), *Estag* (documentos, validades), *Tina* (financeiro) e *MIA* (Instagram). Tudo resolvido no chat.\n\nVocê começa com *250 créditos grátis* (1 crédito = 1.000 tokens; story 1, carrossel 3, vídeo 5 — nada expira).\n\n📖 *Manual completo* (45 min do zero ao primeiro post): ${LINK_MANUAL}\n\nPosso começar?`;
 
 export function onboarding(msg) {
   const texto = (msg.texto || '').trim(); const e = ler(msg.chatId);
@@ -38,7 +39,7 @@ export function onboarding(msg) {
     apagar(msg.chatId);
     const nomes = mods.map(x => ({ secretaria: 'Olga (Secretária)', social: 'MIA (Social)', financeiro: 'Tina (Financeiro)' }[x])).join(', ');
     const primeiros = ['Marque uma reunião: *"agenda uma reunião com João quinta 14h"*', 'Peça um resumo do dia: *"agenda de hoje"*', mods.includes('social') ? 'Mande uma foto com uma legenda para a MIA montar um post.' : null, mods.includes('secretaria') ? 'Diga: *"conectar Google"* para plugar sua agenda e e-mail.' : null, 'Veja seus créditos a qualquer momento com *"créditos"*.'].filter(Boolean);
-    return `🎉 *Conta criada no KM APP*, ${e.nome.split(' ')[0]}!\n\nEquipe ligada: ${nomes}\nSaldo: *250 créditos* de boas-vindas (nada expira).\n\n*Primeiros passos:*\n${primeiros.map(p => '• ' + p).join('\n')}\n\nQuando quiser abrir o app web, mande *web* e eu te dou o código de acesso.`;
+    return `🎉 *Conta criada no KM APP*, ${e.nome.split(' ')[0]}!\n\nEquipe ligada: ${nomes}\nSaldo: *250 créditos* de boas-vindas (nada expira).\n\n📖 *Guia completo* (45 min, com Google, Instagram, identidade de marca, tom de voz e FAQ):\n${LINK_MANUAL}\n\n*Primeiros passos no chat:*\n${primeiros.map(p => '• ' + p).join('\n')}\n\nPara abrir o app web, mande *web* e eu te passo o código.`;
   }
   // fallback
   apagar(msg.chatId); return 'Vamos recomeçar. Mande *start*.';

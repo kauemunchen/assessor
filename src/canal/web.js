@@ -77,7 +77,15 @@ export class WebCanal {
       for (const m of ['secretaria', 'social']) db.prepare('INSERT INTO modulos (conta_id, modulo, ligado) VALUES (?,?,1)').run(contaId, m);
       try { const c = await import('../creditos/index.js'); c.concederTrial(contaId); } catch {}
       const tok = crypto.randomBytes(24).toString('hex'); db.prepare('INSERT INTO web_sessoes (token, conta_id, chat_id) VALUES (?,?,?)').run(tok, contaId, chatSinteico);
-      setCookie(res, tok); res.json({ ok: true, token: tok });
+      setCookie(res, tok);
+      // Mensagem de boas-vindas: já cai no histórico do app, para o dono encontrar o manual sem precisar mandar nada antes
+      try {
+        const base = process.env.WEBAPP_URL || process.env.PUBLIC_URL || '';
+        const linkManual = base ? `${base.replace(/\/$/, '')}/ajuda` : '/ajuda';
+        const boasVindas = `👋 Bem-vindo ao KM APP, ${nome.split(' ')[0]}! Sou Aldred, o seu Diretor.\n\nMontei a equipe para você: *Olga* (Secretária), *Estag* (Documentos), *MIA* (Social) e *Tina* (Financeiro). Você começa com *250 créditos grátis* — nada expira.\n\n📖 *Antes de qualquer coisa*, dá uma lida no manual: ele leva você em 45 min do zero até o primeiro post publicado — Telegram, Google (Gmail/Agenda/Drive), Instagram (Meta), identidade de marca, tom de voz da MIA, FAQ. Tudo passo-a-passo:\n\n${linkManual}\n\nQualquer dúvida, é só perguntar aqui. Como posso ajudar?`;
+        this.registrar(contaId, { direcao: 'saida', canal: 'bot', modulo: 'diretor', tipo: 'texto', texto: boasVindas });
+      } catch {}
+      res.json({ ok: true, token: tok });
     });
 
     app.post('/api/login/senha', (req, res) => {
