@@ -120,7 +120,10 @@ export function iniciarRotinas(canal) {
     await dispararLembretes(canal);
     await publicarAgendados(canal).catch(e => console.error('publicarAgendados', e.message));
     const agora = hhmm();
-    for (const u of db.prepare(`SELECT u.chat_id, c.* FROM usuarios u JOIN contas c ON c.id=u.conta_id WHERE u.papel='dono'`).all()) {
+    // UM resumo por conta (não um por usuário dono). Antes: contas com 2 donos — tipicamente web + telegram —
+    // disparavam o resumo 2x e, com o hub resolvendo web→telegram, chegavam 2 mensagens iguais no bot.
+    // Prioridade do chat_id: 'telegram' (ORDER BY canal <> 'telegram') garante entrega direta.
+    for (const u of db.prepare(`SELECT MIN(u.id) as id, (SELECT chat_id FROM usuarios WHERE conta_id=c.id AND papel='dono' ORDER BY canal<>'telegram', id LIMIT 1) as chat_id, c.* FROM usuarios u JOIN contas c ON c.id=u.conta_id WHERE u.papel='dono' GROUP BY c.id`).all()) {
       const cfg = configPersona(u.id, 'diretor');
       if (normHora(cfg.hora_resumo) === agora) resumoDoDia(canal, u, u.chat_id).catch(e => console.error('resumo', e.message));
     }

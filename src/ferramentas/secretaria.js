@@ -35,7 +35,9 @@ export function ferramentas(_conta) {
     { name: 'lancar_na_planilha', description: 'Acrescenta uma ou mais linhas ao final de uma planilha cadastrada. Informe colunas (nomes exatamente como no cabeçalho — veja listar_planilhas) e linhas (valores na mesma ordem das colunas). O sistema encaixa cada valor na coluna certa. Datas em DD/MM/AAAA, valores numéricos sem R$.', parameters: { type: 'OBJECT', properties: { planilha: { type: 'STRING' }, aba: { type: 'STRING' }, colunas: { type: 'ARRAY', items: { type: 'STRING' } }, linhas: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } } }, required: ['planilha', 'colunas', 'linhas'] } },
     { name: 'ler_planilha', description: 'Lê uma planilha cadastrada (últimas linhas ou um intervalo A1 como "A1:F20") para consultar, somar ou conferir.', parameters: { type: 'OBJECT', properties: { planilha: { type: 'STRING' }, aba: { type: 'STRING' }, intervalo: { type: 'STRING' }, max: { type: 'NUMBER' } }, required: ['planilha'] } },
     { name: 'atualizar_planilha', description: 'Altera células específicas (intervalo A1, ex.: "D7" ou "B2:C2") de uma planilha cadastrada. Requer confirmação.', parameters: { type: 'OBJECT', properties: { planilha: { type: 'STRING' }, aba: { type: 'STRING' }, intervalo: { type: 'STRING' }, valores: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } } }, required: ['planilha', 'intervalo', 'valores'] } },
-    { name: 'registrar_retorno', description: 'Registra quem deve resposta a quem', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, assunto: { type: 'STRING' }, direcao: { type: 'STRING', description: 'devo_responder|aguardo_resposta' } }, required: ['pessoa', 'assunto', 'direcao'] } },
+    { name: 'registrar_retorno', description: 'Registra quem deve resposta a quem. Use quando o dono mencionar "preciso de retorno de X sobre Y", "aguardando a Y confirmar Z", "mandei pedir X para o João".', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING' }, assunto: { type: 'STRING' }, direcao: { type: 'STRING', description: 'devo_responder|aguardo_resposta' } }, required: ['pessoa', 'assunto', 'direcao'] } },
+    { name: 'listar_retornos', description: 'Lista os retornos em aberto (quem está devendo resposta, de qual lado). Use para mostrar as pendências, ou antes de fechar_retorno para achar o id certo pelo nome e assunto.', parameters: { type: 'OBJECT', properties: { pessoa: { type: 'STRING', description: 'filtra por nome (parcial, case-insensitive)' } } } },
+    { name: 'fechar_retorno', description: 'Marca um retorno como respondido/confirmado. Use quando o dono disser "Casan confirmou", "ok, deu certo", "a Mariza enviou", "pode marcar como OK". Se tiver só o nome, chame listar_retornos primeiro para achar o id — ou passe `pessoa` e opcional `assunto` que o sistema acha o(s) mais recente(s).', parameters: { type: 'OBJECT', properties: { id: { type: 'NUMBER' }, pessoa: { type: 'STRING' }, assunto: { type: 'STRING' } } } },
   ];
 }
 export const requerConfirmacao = new Set(['cancelar_evento', 'enviar_recado', 'delegar_tarefa', 'enviar_email', 'atualizar_planilha']);
@@ -69,6 +71,25 @@ export async function executar(nome, a, conta, ctx) {
     case 'ler_planilha': return sheets.ler(conta.id, { planilha: a.planilha, aba: a.aba, intervalo: a.intervalo, max: a.max || 50 });
     case 'atualizar_planilha': return sheets.atualizarCelulas(conta.id, { planilha: a.planilha, aba: a.aba, intervalo: a.intervalo, valores: a.valores });
     case 'registrar_retorno': { const r = db.prepare('INSERT INTO retornos (conta_id, pessoa, assunto, direcao) VALUES (?,?,?,?)').run(conta.id, a.pessoa, a.assunto, a.direcao); return { id: r.lastInsertRowid }; }
+    case 'listar_retornos': {
+      const abertos = a.pessoa
+        ? db.prepare("SELECT id, pessoa, assunto, direcao, criado_em FROM retornos WHERE conta_id=? AND status='aberto' AND LOWER(pessoa) LIKE ? ORDER BY id DESC").all(conta.id, `%${String(a.pessoa).toLowerCase()}%`)
+        : db.prepare("SELECT id, pessoa, assunto, direcao, criado_em FROM retornos WHERE conta_id=? AND status='aberto' ORDER BY id DESC").all(conta.id);
+      return abertos;
+    }
+    case 'fechar_retorno': {
+      let ids = [];
+      if (a.id) ids = [a.id];
+      else if (a.pessoa) {
+        const q = a.assunto
+          ? db.prepare("SELECT id FROM retornos WHERE conta_id=? AND status='aberto' AND LOWER(pessoa) LIKE ? AND LOWER(assunto) LIKE ? ORDER BY id DESC").all(conta.id, `%${String(a.pessoa).toLowerCase()}%`, `%${String(a.assunto).toLowerCase()}%`)
+          : db.prepare("SELECT id FROM retornos WHERE conta_id=? AND status='aberto' AND LOWER(pessoa) LIKE ? ORDER BY id DESC").all(conta.id, `%${String(a.pessoa).toLowerCase()}%`);
+        ids = q.map(x => x.id);
+      }
+      if (!ids.length) throw new Error(`Nenhum retorno aberto encontrado${a.pessoa ? ` para "${a.pessoa}"` : ''}${a.assunto ? ` sobre "${a.assunto}"` : ''}. Use listar_retornos para ver os abertos.`);
+      const r = db.prepare(`UPDATE retornos SET status='fechado' WHERE id IN (${ids.map(() => '?').join(',')}) AND status='aberto'`).run(...ids);
+      return { fechados: r.changes, ids };
+    }
     default: throw new Error(`secretaria.${nome}: não implementada`);
   }
 }
