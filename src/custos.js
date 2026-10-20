@@ -1,4 +1,4 @@
-// Custos operacionais do KM APP (o que você paga aos fornecedores) — para medir margem real e o seu consumo pessoal como admin.
+// Custos operacionais do Fiel (o que você paga aos fornecedores) — para medir margem real e o seu consumo pessoal como admin.
 // Tabela custos_cfg guarda as taxas editáveis (preço por 1M tokens de cada modelo, custo do fal, taxas MP, VPS/mês).
 import { db } from './db/index.js';
 

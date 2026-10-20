@@ -175,7 +175,7 @@ export async function executar(nome, a, conta, ctx) {
       if (!docs.length) return { itens: 0, aviso: 'Nenhum documento no período.' };
       const raiz = await drive.pastaRaiz(conta.id);
       const pasta = await drive.obterOuCriarPasta(conta.id, `${a.de} a ${a.ate}`, await drive.obterOuCriarPasta(conta.id, a.empresa, await drive.obterOuCriarPasta(conta.id, 'Dossiês', raiz)));
-      const linhas = [`DOSSIÊ ${a.empresa} — ${a.de} a ${a.ate}`, `Gerado em ${hoje()} pelo Assessor KM`, ''];
+      const linhas = [`DOSSIÊ ${a.empresa} — ${a.de} a ${a.ate}`, `Gerado em ${hoje()} pelo Fiel`, ''];
       for (const d of docs) { try { await drive.copiar(conta.id, d.drive_id, pasta); } catch {} linhas.push(`[${d.tipo}] ${d.data_doc} — ${d.titulo}${d.contraparte ? ` (${d.contraparte})` : ''}${d.resumo ? `\n    ${d.resumo}` : ''}`); }
       await drive.criarTexto(conta.id, { nome: '00_indice.txt', conteudo: linhas.join('\n'), pastaId: pasta });
       return { itens: docs.length, link: await drive.linkPasta(conta.id, pasta), tipos: [...new Set(docs.map(d => d.tipo))] };

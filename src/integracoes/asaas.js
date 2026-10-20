@@ -1,4 +1,4 @@
-// Asaas (Pix / cartão / assinatura mensal) para recarga de créditos do KM APP.
+// Asaas (Pix / cartão / assinatura mensal) para recarga de créditos do Fiel.
 // Env: ASAAS_API_KEY, ASAAS_AMBIENTE=sandbox|producao, ASAAS_WEBHOOK_TOKEN (token configurado no webhook do Asaas).
 import { db } from '../db/index.js';
 import { PACOTES, creditar, PRODUTO } from '../creditos/index.js';

@@ -150,7 +150,7 @@ telas.ajustes = async () => {
       <p class="d" style="margin-top:10px">Últimos 14 dias</p><div style="display:flex;align-items:flex-end;gap:3px;height:60px">${d.uso.por_dia.map(x => `<div title="${x.d}: ${fmtN(x.t)} tokens" style="flex:1;background:var(--ouro);border-radius:3px 3px 0 0;height:${Math.max(3, Math.round((x.t || 0) / maxDia * 60))}px"></div>`).join('') || '<span class="d">—</span>'}</div></div>
     <div class="cartao"><h3>Dados</h3><ul class="lista-s"><li><span>Posts (publicados)</span><b>${d.contagens.posts} (${d.contagens.publicados})</b></li><li><span>Documentos arquivados</span><b>${d.contagens.documentos}</b></li><li><span>Mídias na biblioteca</span><b>${d.contagens.biblioteca}</b></li><li><span>Lembretes pendentes</span><b>${d.contagens.lembretes}</b></li></ul>
       <p class="d" style="margin-top:10px">Servidor: modelos ${esc(d.servidor.modelos.join(' → ') || '—')} · rápido ${esc(d.servidor.rapido || '—')} · fuso ${esc(d.servidor.tz)} · versão ${esc(d.servidor.versao)}</p></div>
-    <div class="cartao"><h3>Backups <button class="btn sec" id="btBackup">Fazer backup agora</button></h3><p class="d">Diário às 04:00 → servidor + Google Drive (Assessor KM/Backups). 10 últimos em cada.</p>
+    <div class="cartao"><h3>Backups <button class="btn sec" id="btBackup">Fazer backup agora</button></h3><p class="d">Diário às 04:00 → servidor + Google Drive (Fiel/Backups). 10 últimos em cada.</p>
       <ul class="lista-s">${d.backups.map(b => `<li><span>${esc(b.nome)}</span><span>${b.mb} MB</span></li>`).join('') || '<li>Nenhum backup local ainda.</li>'}</ul><p class="d" id="bkSaida" style="margin-top:8px"></p></div>
     <div class="cartao" style="grid-column:1/-1"><h3>Últimas interações (log)</h3><div id="logs" class="d">carregando…</div></div>
   </div>`;
@@ -337,13 +337,13 @@ telas.conta = async () => {
   const d = await api('/api/me'); const c = d.conta;
   const corpo = `<div class="grade">
     <div class="cartao"><h3>Dados da conta</h3>
-      <ul class="lista-s"><li><span>Nome</span><b>${esc(c.nome_dono)}</b></li><li><span>Empresa</span><b>${esc(c.empresa || '—')}</b></li><li><span>E-mail</span><b>${esc(c.email || '—')}</b></li><li><span>CPF/CNPJ</span><b>${esc(c.cpf_cnpj || '—')}</b></li><li><span>Plano</span><b>${esc(c.plano || 'trial')}</b></li>${c.admin ? '<li><span>Perfil</span><b>👑 Administrador do KM APP</b></li>' : ''}</ul>
+      <ul class="lista-s"><li><span>Nome</span><b>${esc(c.nome_dono)}</b></li><li><span>Empresa</span><b>${esc(c.empresa || '—')}</b></li><li><span>E-mail</span><b>${esc(c.email || '—')}</b></li><li><span>CPF/CNPJ</span><b>${esc(c.cpf_cnpj || '—')}</b></li><li><span>Plano</span><b>${esc(c.plano || 'trial')}</b></li>${c.admin ? '<li><span>Perfil</span><b>👑 Administrador do Fiel</b></li>' : ''}</ul>
       <p class="d" style="margin-top:10px">Para alterar nome, empresa ou CPF/CNPJ, use a tela <b>Equipe → Conta</b>.</p>
     </div>
     <div class="cartao"><h3>Trocar senha</h3>
       <form id="fSenha"><div class="campo"><label>Senha atual</label><input name="atual" type="password" required></div><div class="campo"><label>Nova senha (mín. 8 caracteres)</label><input name="nova" type="password" minlength="8" required></div><button class="btn prim">Trocar senha</button> <span class="salvo" id="senhaMsg"></span></form>
     </div>
-    <div class="cartao"><h3>Sair</h3><p class="d">Encerra sua sessão neste navegador.</p><button class="btn sec" id="btSair2">Sair do KM APP</button></div>
+    <div class="cartao"><h3>Sair</h3><p class="d">Encerra sua sessão neste navegador.</p><button class="btn sec" id="btSair2">Sair do Fiel</button></div>
   </div>`;
   return { titulo: '👤 Minha conta', sub: 'Seus dados, senha e sessão.', corpo, depois() {
     $('#fSenha').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); $('#senhaMsg').textContent = ''; try { const r = await post('/api/senha', f); $('#senhaMsg').textContent = '✅ senha trocada'; e.target.reset(); } catch { $('#senhaMsg').textContent = ''; } };

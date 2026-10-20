@@ -1,6 +1,7 @@
 {
-  "name": "KM APP",
-  "short_name": "KM APP",
+  "name": "Fiel · Delegue. Fiel resolve.",
+  "short_name": "Fiel",
+  "description": "A equipe que você não precisou contratar.",
   "start_url": "/app/",
   "display": "standalone",
   "background_color": "#FAF5EC",

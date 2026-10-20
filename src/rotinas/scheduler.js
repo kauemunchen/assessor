@@ -144,6 +144,6 @@ async function avisarAdminsInativas() {
     AND (SELECT MAX(criado_em) FROM interacoes WHERE conta_id=c.id) < datetime('now','-60 days')`).all();
   if (!inativas.length) return;
   const admins = db.prepare("SELECT u.chat_id FROM usuarios u JOIN contas c ON c.id=u.conta_id WHERE c.admin=1 AND u.canal='telegram'").all();
-  const texto = `📊 *KM APP · Operação*\n${inativas.length} conta(s) sem interação há 60+ dias:\n` + inativas.slice(0, 10).map(c => `- #${c.id} ${c.nome_dono} (${c.empresa})`).join('\n') + (inativas.length > 10 ? `\n…+ ${inativas.length - 10}` : '') + `\n\nAbra o painel admin → Operação → Limpeza para suspender em lote.`;
+  const texto = `📊 *Fiel · Operação*\n${inativas.length} conta(s) sem interação há 60+ dias:\n` + inativas.slice(0, 10).map(c => `- #${c.id} ${c.nome_dono} (${c.empresa})`).join('\n') + (inativas.length > 10 ? `\n…+ ${inativas.length - 10}` : '') + `\n\nAbra o painel admin → Operação → Limpeza para suspender em lote.`;
   for (const a of admins) { try { getCanal().enviar(null, a.chat_id, texto); } catch {} }
 }

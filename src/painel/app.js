@@ -1,4 +1,4 @@
-// Assessor KM — app web (Conversa). Vanilla JS, sem build.
+// Fiel — app web (Conversa). Vanilla JS, sem build.
 const $ = (s) => document.querySelector(s);
 const tokenLocal = () => new URLSearchParams(location.search).get('token') || localStorage.getItem('akm');
 const api = async (p, o = {}) => { const tk = tokenLocal(); const r = await fetch(p, { credentials: 'same-origin', ...o, headers: { ...(o.headers || {}), ...(tk ? { authorization: 'Bearer ' + tk } : {}) } }); if (r.status === 401) { mostrarLogin(); throw new Error('401'); } return r.json(); };

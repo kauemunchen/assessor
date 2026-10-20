@@ -1,4 +1,4 @@
-/* KM APP · Studio Caloroso — creme quente, coral vivo, serif editorial.
+/* Fiel · Studio Caloroso — creme quente, coral vivo, serif editorial.
    Tokens no :root; classes antigas preservadas para o JS não quebrar. */
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -50,9 +50,11 @@ body{font-family:var(--f-body);background:var(--papel);color:var(--tinta);font-s
 .mini{font-size:12px;font-style:italic;color:var(--tinta-mid)}
 
 /* ============ MARCA (logo) ============ */
-.marca{display:inline-flex;flex-direction:column;align-items:flex-start;gap:5px}
-.marca .logo-img{height:46px;width:auto;max-width:100%;display:block;filter:none}
-.marca .assinatura{height:2px;width:36px;background:var(--coral);border-radius:999px}
+.marca{display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px}
+.marca .logo-img{height:40px;width:auto;max-width:100%;display:block;filter:none;margin-bottom:4px}
+.marca .wordmark{font-family:var(--f-display,"Fraunces",Georgia,serif);font-weight:400;font-size:28px;line-height:1;letter-spacing:-0.015em;color:var(--tinta)}
+.marca .assinatura{font-family:var(--f-corpo,"Inter",sans-serif);font-size:11px;font-weight:400;letter-spacing:0.04em;color:var(--tinta-mid,#4A4D59);font-style:italic;margin-top:2px}
+.marca .assinatura:empty{height:2px;width:36px;background:var(--coral);border-radius:999px;font-size:0}
 #lateral .marca{color:var(--tinta)}
 #lateral .marca .logo-img{filter:drop-shadow(0 1px 0 rgba(255,255,255,.3))}
 @media (prefers-color-scheme:dark){

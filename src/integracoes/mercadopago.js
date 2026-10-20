@@ -1,4 +1,4 @@
-// Mercado Pago (Pix / cartão / boleto / assinatura mensal) para recarga de créditos do KM APP.
+// Mercado Pago (Pix / cartão / boleto / assinatura mensal) para recarga de créditos do Fiel.
 // Env: MERCADOPAGO_ACCESS_TOKEN, MERCADOPAGO_WEBHOOK_SECRET (opcional — valida assinatura HMAC).
 // Mantém a MESMA interface pública de asaas.js (configurado, comprar, cobranca, listarCobrancas, assinaturaAtiva, cancelarAssinatura, confirmarPagamento, rotaWebhook, conferirPendentes, docValido, limparDoc) — as tabelas cobrancas/assinaturas são reaproveitadas, com a coluna asaas_id guardando o id do MP.
 import crypto from 'node:crypto';

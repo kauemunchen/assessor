@@ -1,4 +1,4 @@
-// Painel administrativo do KM APP (/admin): contas, créditos manuais, pacotes/preços, financeiro.
+// Painel administrativo do Fiel (/admin): contas, créditos manuais, pacotes/preços, financeiro.
 // Auth: a mesma sessão web, mas restrita a contas com admin=1 (ou plano='ilimitado').
 import { db } from '../db/index.js';
 import fs from 'node:fs';
@@ -21,7 +21,7 @@ export function rotasAdmin(app) {
   const auth = (req, res, next) => {
     const s = sessao(req); if (!s) return res.status(401).json({ erro: 'não autenticado' });
     const c = db.prepare('SELECT admin, plano FROM contas WHERE id=?').get(s.conta_id);
-    if (!c || !(c.admin === 1 || c.plano === 'ilimitado')) return res.status(403).json({ erro: 'acesso restrito ao administrador do KM APP' });
+    if (!c || !(c.admin === 1 || c.plano === 'ilimitado')) return res.status(403).json({ erro: 'acesso restrito ao administrador do Fiel' });
     req.contaId = s.conta_id; next();
   };
 
@@ -121,7 +121,7 @@ export function rotasAdmin(app) {
     const cond = filtro === 'todas' ? '' : filtro === 'trial' ? "AND c.plano='trial'" : filtro === 'bloqueadas' ? "AND c.status='bloqueada'" : "AND c.status='ativa'";
     const donos = db.prepare(`SELECT u.chat_id FROM usuarios u JOIN contas c ON c.id=u.conta_id WHERE u.papel='dono' AND u.canal='telegram' ${cond}`).all();
     const canal = (await import('./atual.js')).canalAtual();
-    let enviados = 0; for (const d of donos) { try { await canal.enviar(null, d.chat_id, `📣 *KM APP* — ${texto}`); enviados++; } catch {} }
+    let enviados = 0; for (const d of donos) { try { await canal.enviar(null, d.chat_id, `📣 *Fiel* — ${texto}`); enviados++; } catch {} }
     res.json({ ok: true, enviados, total: donos.length });
   });
   // ---------- Custos: quanto você paga de IA + MP + VPS, e qual sua margem ----------

@@ -1,4 +1,4 @@
-// Créditos (KM APP): ledger por conta, tarifas, bloqueio por saldo e alertas.
+// Créditos (Fiel): ledger por conta, tarifas, bloqueio por saldo e alertas.
 // 1 crédito = 1.000 tokens de IA. Render/vídeo/fal têm tarifa fixa. Conta admin (ou plano 'ilimitado') nunca é cobrada nem bloqueada.
 import { db } from '../db/index.js';
 import { canalAtual } from '../canal/atual.js';
@@ -14,7 +14,7 @@ export function prepararCreditos() {
 }
 try { if (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='contas'").get()) prepararCreditos(); } catch {}
 
-export const PRODUTO = 'KM APP';
+export const PRODUTO = 'Fiel';
 export const TRIAL_CREDITOS = Number(process.env.TRIAL_CREDITOS || 250);
 export const TOKENS_POR_CREDITO = 1000;
 /** Tarifas fixas (em créditos) para o que não é medido em tokens. */

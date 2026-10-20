@@ -82,7 +82,7 @@ export class WebCanal {
       try {
         const base = process.env.WEBAPP_URL || process.env.PUBLIC_URL || '';
         const linkManual = base ? `${base.replace(/\/$/, '')}/ajuda` : '/ajuda';
-        const boasVindas = `👋 Bem-vindo ao KM APP, ${nome.split(' ')[0]}! Sou Aldred, o seu Diretor.\n\nMontei a equipe para você: *Olga* (Secretária), *Estag* (Documentos), *MIA* (Social) e *Tina* (Financeiro). Você começa com *250 créditos grátis* — nada expira.\n\n📖 *Antes de qualquer coisa*, dá uma lida no manual: ele leva você em 45 min do zero até o primeiro post publicado — Telegram, Google (Gmail/Agenda/Drive), Instagram (Meta), identidade de marca, tom de voz da MIA, FAQ. Tudo passo-a-passo:\n\n${linkManual}\n\nQualquer dúvida, é só perguntar aqui. Como posso ajudar?`;
+        const boasVindas = `👋 Bem-vindo ao *Fiel*, ${nome.split(' ')[0]}.\n_A equipe que você não precisou contratar._\n\nSou Aldred, o seu Diretor. Montei o time: *Olga* (Secretária — agenda, e-mails, planilhas), *Estag* (Documentos), *Tina* (Financeiro) e *MIA* (Instagram). Você delega — a gente resolve. Nada sai sem seu "sim".\n\nVocê começa com *250 créditos grátis* — nada expira.\n\n📖 *Antes de qualquer coisa*, dá uma lida no manual: ele leva você em 45 min do zero até o primeiro post publicado (Telegram, Google, Instagram, identidade de marca, tom de voz, FAQ):\n\n${linkManual}\n\nQualquer dúvida, é só perguntar aqui. Como posso ajudar?`;
         this.registrar(contaId, { direcao: 'saida', canal: 'bot', modulo: 'diretor', tipo: 'texto', texto: boasVindas });
       } catch {}
       res.json({ ok: true, token: tok });
