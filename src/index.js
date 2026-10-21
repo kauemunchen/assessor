@@ -17,15 +17,18 @@ migrar();
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 const servidor = http.createServer(app);
-// Contador público da landing: interações reais registradas hoje (fuso de São Paulo). Só o total, sem dado de conta.
-let _hoje = { em: 0, total: 0 };
+// Contador público da landing: interações reais (fuso de São Paulo). Só totais, sem dado de conta.
+let _cont = { em: 0, hoje: 0, semana: 0, total: 0 };
 app.get('/api/publico/solucionados-hoje', (_, res) => {
-  if (Date.now() - _hoje.em > 30000) {
-    const r = db.prepare("SELECT COUNT(*) AS n FROM interacoes WHERE date(criado_em, '-3 hours') = date('now', '-3 hours')").get();
-    _hoje = { em: Date.now(), total: r?.n || 0 };
+  if (Date.now() - _cont.em > 30000) {
+    const r = db.prepare(`SELECT
+      SUM(CASE WHEN date(criado_em, '-3 hours') = date('now', '-3 hours') THEN 1 ELSE 0 END) AS hoje,
+      SUM(CASE WHEN date(criado_em, '-3 hours') > date('now', '-3 hours', '-7 days') THEN 1 ELSE 0 END) AS semana,
+      COUNT(*) AS total FROM interacoes`).get();
+    _cont = { em: Date.now(), hoje: r?.hoje || 0, semana: r?.semana || 0, total: r?.total || 0 };
   }
   res.set({ 'Cache-Control': 'public, max-age=30', 'Access-Control-Allow-Origin': '*' });
-  res.json({ total: _hoje.total, data: new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10) });
+  res.json({ hoje: _cont.hoje, semana: _cont.semana, total: _cont.total, data: new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10) });
 });
 // App web (estático) em /app
 app.use('/app', express.static(path.resolve('src/painel'), { index: 'index.html', extensions: ['html'] }));
