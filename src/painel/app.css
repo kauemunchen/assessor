@@ -111,6 +111,15 @@ body{font-family:var(--f-body);background:var(--papel);color:var(--tinta);font-s
 .msg .mod{font-size:12px;font-weight:500;color:var(--tinta-mid);font-family:var(--f-display);font-style:italic;margin-bottom:4px}
 .msg.entrada .mod{color:rgba(255,255,255,.85)}
 .msg img,.msg video{max-width:100%;border-radius:12px;display:block;margin:4px 0 6px;max-height:60vh}
+/* Botões de contato dentro das respostas (WhatsApp prioritário, telefone, e-mail) */
+.msg .link-wa,.msg .link-tel,.msg .link-mail{display:inline-block;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:500;text-decoration:none;margin:2px 4px 2px 0;transition:transform .1s,box-shadow .1s}
+.msg .link-wa{background:#25D366;color:#fff;border:1px solid #1ea952}
+.msg .link-wa:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(37,211,102,.35)}
+.msg .link-tel{background:var(--papel-fundo,#f3ebda);color:var(--tinta,#1C1E26);border:1px solid var(--linha,rgba(28,30,38,.12))}
+.msg .link-tel:hover{background:var(--papel,#faf5ec)}
+.msg .link-mail{background:var(--papel-fundo,#f3ebda);color:var(--tinta,#1C1E26);border:1px solid var(--linha,rgba(28,30,38,.12))}
+.msg .link-mail:hover{background:var(--papel,#faf5ec)}
+.msg.entrada .link-wa,.msg.entrada .link-tel,.msg.entrada .link-mail{filter:brightness(1.1)}
 .msg .album{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
 .msg .album img{margin:0;max-height:none}
 .botoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}

@@ -93,6 +93,11 @@ const esc = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').
 function fmt(t) {
   let s = esc(t);
   s = s.replace(/^\s*#{1,6}\s+(.+)$/gm, '<b>$1</b>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\w)/g, '$1<b>$2</b>').replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  // Links clicáveis: http(s), wa.me (WhatsApp), tel: (chamada), mailto: (e-mail).
+  // WhatsApp e tel ganham ícone contextual na frente, não repetem a URL feia no texto do link.
+  s = s.replace(/\bhttps?:\/\/wa\.me\/(\d+)[^\s<]*/g, (u, num) => `<a href="${u}" target="_blank" rel="noopener" class="link-wa">📱 Abrir WhatsApp</a>`);
+  s = s.replace(/\btel:\+?([\d]+)/g, (u, num) => `<a href="${u}" class="link-tel">☎ Ligar</a>`);
+  s = s.replace(/\bmailto:([^\s<]+)/g, (u, m) => `<a href="${u}" class="link-mail">✉ ${m}</a>`);
   s = s.replace(/(https?:\/\/[^\s<]+)/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u.length > 60 ? u.slice(0, 57) + '…' : u}</a>`);
   return s;
 }
