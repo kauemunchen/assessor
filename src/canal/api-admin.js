@@ -45,7 +45,7 @@ export function rotasAdmin(app) {
   // Lista completa de contas
   app.get('/api/admin/contas', auth, (req, res) => {
     const q = String(req.query.q || '').toLowerCase(); const filtro = req.query.filtro || '';
-    let sql = `SELECT c.id, c.nome_dono, c.empresa, c.plano, c.status, c.admin, c.email, c.cpf_cnpj, c.criado_em,
+    let sql = `SELECT c.id, c.nome_dono, c.empresa, c.plano, c.status, c.admin, c.pesquisa_web, c.email, c.cpf_cnpj, c.criado_em,
       (SELECT COALESCE(SUM(quantidade),0) FROM creditos_mov WHERE conta_id=c.id) saldo,
       (SELECT COALESCE(-SUM(quantidade),0) FROM creditos_mov WHERE conta_id=c.id AND quantidade<0 AND criado_em>=datetime('now','-30 days')) gasto_30d,
       (SELECT MAX(criado_em) FROM interacoes WHERE conta_id=c.id) ultimo_uso,
@@ -93,6 +93,7 @@ export function rotasAdmin(app) {
       if (!b.admin && id === req.contaId) return res.status(400).json({ erro: 'você não pode remover seu próprio acesso de admin' });
       db.prepare('UPDATE contas SET admin=? WHERE id=?').run(b.admin ? 1 : 0, id);
     }
+    if (b.pesquisa_web !== undefined) db.prepare('UPDATE contas SET pesquisa_web=? WHERE id=?').run(b.pesquisa_web ? 1 : 0, id);
     res.json({ ok: true });
   });
 

@@ -35,20 +35,28 @@ export async function classificar(texto, ativos) {
 const agoraBR = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
 
 // Google Search Grounding (Gemini 2.0+): o modelo decide quando pesquisar na web.
-// Liga por conta/padrão via ENV GEMINI_WEB_SEARCH (default: ligado).
-// Opcional: GEMINI_WEB_SEARCH_MODULOS="social,diretor,secretaria" (vazio = todos). Transcrição/OCR não usa, essa função é só para `responder`.
-function montarTools(decls, modulo) {
+// Gate em camadas (precisa passar nas DUAS):
+//   1) por CONTA — coluna contas.pesquisa_web (0=desligado, 1=ligado). Default 0.
+//      Admin libera via painel admin ou tabela. É a chave principal.
+//   2) por ENV (global, kill-switch) — GEMINI_WEB_SEARCH=0 desliga pra todo mundo. Default 1.
+//      GEMINI_WEB_SEARCH_MODULOS="social,diretor" limita a esses assessores (vazio = todos).
+// Transcrição/OCR nunca usa, essa função é só para `responder`.
+function montarTools(decls, modulo, conta) {
   const tools = [];
   if (decls && decls.length) tools.push({ functionDeclarations: decls });
-  const ligado = (process.env.GEMINI_WEB_SEARCH ?? '1') !== '0';
+  const envLigado = (process.env.GEMINI_WEB_SEARCH ?? '1') !== '0';
   const filtro = (process.env.GEMINI_WEB_SEARCH_MODULOS || '').trim();
-  const permite = !filtro || filtro.split(',').map(x => x.trim()).includes(modulo);
-  if (ligado && permite) tools.push({ googleSearch: {} });
+  const envPermite = !filtro || filtro.split(',').map(x => x.trim()).includes(modulo);
+  const contaLiberou = conta?.pesquisa_web === 1 || conta?.admin === 1 || conta?.plano === 'ilimitado';
+  if (envLigado && envPermite && contaLiberou) tools.push({ googleSearch: {} });
   return tools.length ? tools : undefined;
 }
 
 export async function responder({ prompt, conta, modulo, msg, ativos = [], profundidade = 0 }) {
   const decls = ferramentasDe(modulo, conta, profundidade === 0 ? ativos : []);
+  // Pesquisa web disponível para esta conta? (controla tanto a tool quanto o bloco no prompt).
+  const temBuscaWeb = (process.env.GEMINI_WEB_SEARCH ?? '1') !== '0' && (conta?.pesquisa_web === 1 || conta?.admin === 1 || conta?.plano === 'ilimitado');
+  const blocoBusca = temBuscaWeb ? `\n\nPESQUISA NA WEB: você tem acesso à Google Search quando precisa de informação atual ou externa. USE sempre que a resposta depender de: fato recente (notícia, resultado, cotação), dado sobre pessoa/empresa que não está nos documentos do dono (endereço, telefone, LinkedIn, site), tendência atual (hashtags, assuntos em alta, concorrentes), verificação de preços de mercado, previsão do tempo. NÃO use para: dados que estão no histórico ou em documentos do dono (busque com as ferramentas), opiniões/estratégias (responda do seu conhecimento), tarefas puramente operacionais (agendar, lançar, publicar). Quando usar pesquisa, sempre cite a fonte entre parênteses no fim da linha relevante, ex.: "Dólar fechou em R$ 5,32 (fonte: BC)". Nunca invente dados — se não achar na pesquisa, diga "não encontrei isso agora".` : '';
   const systemInstruction = `${prompt}\n\nAGORA: ${agoraBR()} (America/Sao_Paulo). Datas relativas ("amanhã", "quinta") são calculadas a partir daqui e passadas às ferramentas no formato YYYY-MM-DDTHH:MM.
 
 Os prefixos [módulo] no histórico são marcação interna: NUNCA os escreva nas suas respostas.
@@ -57,14 +65,15 @@ EQUIPE: ${modulo === 'diretor' ? 'você coordena e tem as ferramentas de todos o
 
 CONFIRMAÇÕES: ações sensíveis (e-mail, cancelar, recado, publicar) são confirmadas pelo SISTEMA quando você chama a ferramenta. Nunca escreva uma "proposta" ou "prévia" em texto e espere um sim — chame a ferramenta de uma vez; o dono confirma uma única vez.
 
-VERDADE: só prometa o que suas ferramentas fazem. Comandos de conexão/configuração ("conectar google", "conectar instagram …", "ativa …", tokens, chaves) são do SISTEMA, não seus: se um chegar até você, responda só "Esse comando não foi reconhecido; confira o formato: conectar instagram <token>" — NUNCA diga que conectou, recebeu token ou reagendou algo sem ter chamado a ferramenta. Se não houver ferramenta para algo, diga "ainda não consigo fazer X" em uma linha. Nunca invente painéis, links, integrações ou etapas externas.
-
-PESQUISA NA WEB: você tem acesso à Google Search quando precisa de informação atual ou externa. USE sempre que a resposta depender de: fato recente (notícia, resultado, cotação), dado sobre pessoa/empresa que não está nos documentos do dono (endereço, telefone, LinkedIn, site), tendência atual (hashtags, assuntos em alta, concorrentes), verificação de preços de mercado, previsão do tempo. NÃO use para: dados que estão no histórico ou em documentos do dono (busque com as ferramentas), opiniões/estratégias (responda do seu conhecimento), tarefas puramente operacionais (agendar, lançar, publicar). Quando usar pesquisa, sempre cite a fonte entre parênteses no fim da linha relevante, ex.: "Dólar fechou em R$ 5,32 (fonte: BC)". Nunca invente dados — se não achar na pesquisa, diga "não encontrei isso agora".
+VERDADE: só prometa o que suas ferramentas fazem. Comandos de conexão/configuração ("conectar google", "conectar instagram …", "ativa …", tokens, chaves) são do SISTEMA, não seus: se um chegar até você, responda só "Esse comando não foi reconhecido; confira o formato: conectar instagram <token>" — NUNCA diga que conectou, recebeu token ou reagendou algo sem ter chamado a ferramenta. Se não houver ferramenta para algo, diga "ainda não consigo fazer X" em uma linha. Nunca invente painéis, links, integrações ou etapas externas.${blocoBusca}
 
 CONTEXTO: as mensagens anteriores desta conversa estão no histórico (respostas de outros assessores vêm marcadas com [módulo]). Use-as: se o dono responder "aprovar", "agenda", "ajusta", "sim", refere-se ao que foi proposto por último.
 
 FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas, sem linhas ---. Negrito só com *uma palavra*. Listas com "-" e no máximo 5 itens. Resposta "curta" = até 6 linhas; "média" = até 12; "completa" = até 25. Vá direto ao ponto, sem introdução nem fechamento.`;
-  let m = modelo({ systemInstruction, tools: montarTools(decls, modulo) });
+  const toolsConfig = montarTools(decls, modulo, conta);
+  // Quando mistura functionDeclarations + googleSearch (built-in), Gemini exige esta flag.
+  const extraCfg = temBuscaWeb && decls?.length ? { toolConfig: { includeServerSideToolInvocations: true } } : {};
+  let m = modelo({ systemInstruction, tools: toolsConfig, ...extraCfg });
   const corta = (t, n = 1800) => (t || '').length > n ? (t || '').slice(0, n) + ' […]' : (t || '');
   const contents = [];
   for (const h of historicoRecente(conta.id, 8)) {
@@ -80,8 +89,8 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
     catch (e) {
       // Fallback: alguns modelos no fallback chain não aceitam googleSearch + functionDeclarations na mesma chamada.
       // Nesse caso, derruba a busca web para esta conversa e segue com function calling puro.
-      if (/googleSearch|google_search|tool.*only.*one|cannot.*combine|not.*supported.*together/i.test(String(e?.message || ''))) {
-        console.warn('[ia] googleSearch não suportado neste request — degradando sem busca web');
+      if (/googleSearch|google_search|tool.*only.*one|cannot.*combine|not.*supported.*together|include_server_side_tool_invocations/i.test(String(e?.message || ''))) {
+        console.warn('[ia] googleSearch não suportado neste request — degradando sem busca web:', String(e?.message).slice(0, 160));
         m = modelo({ systemInstruction, tools: decls.length ? [{ functionDeclarations: decls }] : undefined });
         r = await m.generateContent({ contents });
       } else { throw e; }

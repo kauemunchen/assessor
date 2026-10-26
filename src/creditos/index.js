@@ -8,7 +8,7 @@ export function prepararCreditos() {
     id INTEGER PRIMARY KEY, conta_id INTEGER NOT NULL, tipo TEXT NOT NULL, quantidade REAL NOT NULL,
     motivo TEXT, modulo TEXT, ref TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP
   ); CREATE INDEX IF NOT EXISTS ix_creditos_conta ON creditos_mov (conta_id, criado_em)`);
-  for (const [c, def] of [['plano', "TEXT DEFAULT 'trial'"], ['status', "TEXT DEFAULT 'ativa'"], ['admin', 'INTEGER DEFAULT 0'], ['creditos_alerta', 'TEXT'], ['email', 'TEXT']]) { try { db.exec(`ALTER TABLE contas ADD COLUMN ${c} ${def}`); } catch {} }
+  for (const [c, def] of [['plano', "TEXT DEFAULT 'trial'"], ['status', "TEXT DEFAULT 'ativa'"], ['admin', 'INTEGER DEFAULT 0'], ['creditos_alerta', 'TEXT'], ['email', 'TEXT'], ['pesquisa_web', 'INTEGER DEFAULT 0']]) { try { db.exec(`ALTER TABLE contas ADD COLUMN ${c} ${def}`); } catch {} }
   // Primeira conta do banco (a do Kauê) vira admin/ilimitada se ainda não houver nenhum admin.
   if (!db.prepare('SELECT id FROM contas WHERE admin=1').get()) { const p = db.prepare('SELECT id FROM contas ORDER BY id LIMIT 1').get(); if (p) db.prepare("UPDATE contas SET admin=1, plano='ilimitado' WHERE id=?").run(p.id); }
 }
