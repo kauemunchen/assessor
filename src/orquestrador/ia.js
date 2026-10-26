@@ -34,9 +34,22 @@ export async function classificar(texto, ativos) {
 
 const agoraBR = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
 
+// Google Search Grounding (Gemini 2.0+): o modelo decide quando pesquisar na web.
+// Liga por conta/padrão via ENV GEMINI_WEB_SEARCH (default: ligado).
+// Opcional: GEMINI_WEB_SEARCH_MODULOS="social,diretor,secretaria" (vazio = todos). Transcrição/OCR não usa, essa função é só para `responder`.
+function montarTools(decls, modulo) {
+  const tools = [];
+  if (decls && decls.length) tools.push({ functionDeclarations: decls });
+  const ligado = (process.env.GEMINI_WEB_SEARCH ?? '1') !== '0';
+  const filtro = (process.env.GEMINI_WEB_SEARCH_MODULOS || '').trim();
+  const permite = !filtro || filtro.split(',').map(x => x.trim()).includes(modulo);
+  if (ligado && permite) tools.push({ googleSearch: {} });
+  return tools.length ? tools : undefined;
+}
+
 export async function responder({ prompt, conta, modulo, msg, ativos = [], profundidade = 0 }) {
   const decls = ferramentasDe(modulo, conta, profundidade === 0 ? ativos : []);
-  const m = modelo({ systemInstruction: `${prompt}\n\nAGORA: ${agoraBR()} (America/Sao_Paulo). Datas relativas ("amanhã", "quinta") são calculadas a partir daqui e passadas às ferramentas no formato YYYY-MM-DDTHH:MM.
+  const systemInstruction = `${prompt}\n\nAGORA: ${agoraBR()} (America/Sao_Paulo). Datas relativas ("amanhã", "quinta") são calculadas a partir daqui e passadas às ferramentas no formato YYYY-MM-DDTHH:MM.
 
 Os prefixos [módulo] no histórico são marcação interna: NUNCA os escreva nas suas respostas.
 
@@ -46,10 +59,12 @@ CONFIRMAÇÕES: ações sensíveis (e-mail, cancelar, recado, publicar) são con
 
 VERDADE: só prometa o que suas ferramentas fazem. Comandos de conexão/configuração ("conectar google", "conectar instagram …", "ativa …", tokens, chaves) são do SISTEMA, não seus: se um chegar até você, responda só "Esse comando não foi reconhecido; confira o formato: conectar instagram <token>" — NUNCA diga que conectou, recebeu token ou reagendou algo sem ter chamado a ferramenta. Se não houver ferramenta para algo, diga "ainda não consigo fazer X" em uma linha. Nunca invente painéis, links, integrações ou etapas externas.
 
+PESQUISA NA WEB: você tem acesso à Google Search quando precisa de informação atual ou externa. USE sempre que a resposta depender de: fato recente (notícia, resultado, cotação), dado sobre pessoa/empresa que não está nos documentos do dono (endereço, telefone, LinkedIn, site), tendência atual (hashtags, assuntos em alta, concorrentes), verificação de preços de mercado, previsão do tempo. NÃO use para: dados que estão no histórico ou em documentos do dono (busque com as ferramentas), opiniões/estratégias (responda do seu conhecimento), tarefas puramente operacionais (agendar, lançar, publicar). Quando usar pesquisa, sempre cite a fonte entre parênteses no fim da linha relevante, ex.: "Dólar fechou em R$ 5,32 (fonte: BC)". Nunca invente dados — se não achar na pesquisa, diga "não encontrei isso agora".
+
 CONTEXTO: as mensagens anteriores desta conversa estão no histórico (respostas de outros assessores vêm marcadas com [módulo]). Use-as: se o dono responder "aprovar", "agenda", "ajusta", "sim", refere-se ao que foi proposto por último.
 
-FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas, sem linhas ---. Negrito só com *uma palavra*. Listas com "-" e no máximo 5 itens. Resposta "curta" = até 6 linhas; "média" = até 12; "completa" = até 25. Vá direto ao ponto, sem introdução nem fechamento.`,
-    tools: decls.length ? [{ functionDeclarations: decls }] : undefined });
+FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas, sem linhas ---. Negrito só com *uma palavra*. Listas com "-" e no máximo 5 itens. Resposta "curta" = até 6 linhas; "média" = até 12; "completa" = até 25. Vá direto ao ponto, sem introdução nem fechamento.`;
+  let m = modelo({ systemInstruction, tools: montarTools(decls, modulo) });
   const corta = (t, n = 1800) => (t || '').length > n ? (t || '').slice(0, n) + ' […]' : (t || '');
   const contents = [];
   for (const h of historicoRecente(conta.id, 8)) {
@@ -60,7 +75,17 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
   contents.push({ role: 'user', parts: [{ text: msg.texto }] });
   let ultimoErro = null, assinaturaAnterior = ''; const consultados = new Set(); let ultimoResultado = null;
   for (let i = 0; i < 6; i++) {
-    const r = await m.generateContent({ contents });
+    let r;
+    try { r = await m.generateContent({ contents }); }
+    catch (e) {
+      // Fallback: alguns modelos no fallback chain não aceitam googleSearch + functionDeclarations na mesma chamada.
+      // Nesse caso, derruba a busca web para esta conversa e segue com function calling puro.
+      if (/googleSearch|google_search|tool.*only.*one|cannot.*combine|not.*supported.*together/i.test(String(e?.message || ''))) {
+        console.warn('[ia] googleSearch não suportado neste request — degradando sem busca web');
+        m = modelo({ systemInstruction, tools: decls.length ? [{ functionDeclarations: decls }] : undefined });
+        r = await m.generateContent({ contents });
+      } else { throw e; }
+    }
     const cand = r.response.candidates?.[0];
     const parts = cand?.content?.parts || [];
     const calls = parts.filter(p => p.functionCall).map(p => p.functionCall);
