@@ -15,6 +15,8 @@ export function prepararCreditos() {
 try { if (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='contas'").get()) prepararCreditos(); } catch {}
 
 export const PRODUTO = 'Fiel';
+export const SUPORTE_TELEFONE = '(47) 93388-3929';
+export const SUPORTE_EMAIL = 'ola@usefiel.com';
 export const TRIAL_CREDITOS = Number(process.env.TRIAL_CREDITOS || 250);
 export const TOKENS_POR_CREDITO = 1000;
 /** Tarifas fixas (em créditos) para o que não é medido em tokens. */

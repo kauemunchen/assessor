@@ -176,7 +176,7 @@ async function fluxoCompra(msg, conta, t, orig) {
     const txt = `🛒 *${c.PRODUTO} · Recarga*\n` + c.PACOTES.map(p => `- ${p.nome}: ${p.creditos.toLocaleString('pt-BR')} créditos · R$ ${p.preco}${p.tipo === 'mensal' ? '/mês' : ''}`).join('\n') + '\n\nQual você quer?';
     return { texto: txt, botoes: [c.PACOTES.filter(p => p.tipo === 'prepago').map(p => ({ t: p.nome, d: `comprar ${p.id}` })), c.PACOTES.filter(p => p.tipo === 'mensal').map(p => ({ t: p.nome.replace(' (mensal)', ' mensal'), d: `comprar ${p.id}` }))] };
   }
-  if (!as.configurado()) return `O pagamento online ainda não está ativo neste servidor. Fale com o suporte do ${c.PRODUTO}.`;
+  if (!as.configurado()) return `O pagamento online ainda não está ativo neste servidor. Fale com o suporte do ${c.PRODUTO}: ${c.SUPORTE_EMAIL} · ${c.SUPORTE_TELEFONE}.`;
   // 2) pacote escolhido → forma
   if (pacTxt) {
     const pacote = normPac(pacTxt); const resto = mp[1].replace(PAC_RX, ' ');

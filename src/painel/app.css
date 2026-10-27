@@ -302,3 +302,7 @@ details.menu-mais[open] summary .seta{transform:rotate(90deg);color:var(--coral)
 .marca-login .endosso:hover b{color:var(--coral)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo-fiel{content:url("/app/fiel-logo-branco.png")}}
 :root[data-theme="dark"] .logo-fiel{content:url("/app/fiel-logo-branco.png")}
+
+.suporte-login{margin:18px 0 0;font-size:12px;color:var(--tinta-dim)}
+.suporte-login a{color:var(--tinta-mid);text-decoration:none;font-weight:600}
+.suporte-login a:hover{color:var(--coral)}
