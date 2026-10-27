@@ -306,3 +306,7 @@ details.menu-mais[open] summary .seta{transform:rotate(90deg);color:var(--coral)
 .suporte-login{margin:18px 0 0;font-size:12px;color:var(--tinta-dim)}
 .suporte-login a{color:var(--tinta-mid);text-decoration:none;font-weight:600}
 .suporte-login a:hover{color:var(--coral)}
+/* Suporte no sidebar do app logado — mesmo estilo do login, mais compacto */
+.suporte-sb{margin:12px 12px 0;font-size:11px;color:var(--tinta-dim);text-align:center;line-height:1.5}
+.suporte-sb a{color:var(--tinta-mid);text-decoration:none;font-weight:600}
+.suporte-sb a:hover{color:var(--coral)}

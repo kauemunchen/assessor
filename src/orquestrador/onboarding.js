@@ -7,7 +7,7 @@ const salvar = (chat, e) => db.prepare('INSERT INTO onboarding (chat_id, estado)
 const apagar = (chat) => db.prepare('DELETE FROM onboarding WHERE chat_id=?').run(chat);
 
 const LINK_MANUAL = (() => { const b = process.env.WEBAPP_URL || process.env.PUBLIC_URL || ''; return b ? `${b.replace(/\/$/, '')}/ajuda` : '/ajuda'; })();
-const PRIMEIRA = `👋 *Bem-vindo ao Fiel*\n_A equipe que você não precisou contratar._\n\nSou Alfred, o Diretor. Monto sua equipe: *Olga* (agenda, e-mails, planilhas), *Estag* (documentos, validades), *Tina* (financeiro) e *MIA* (Instagram). Você delega — a gente resolve.\n\nComeça com *250 créditos grátis* (1 crédito = 1.000 tokens; story 1, carrossel 3, vídeo 5 — nada expira).\n\n📖 *Manual completo* (45 min do zero ao primeiro post): ${LINK_MANUAL}\n\nPosso começar?`;
+const PRIMEIRA = `👋 *Bem-vindo ao Fiel*\n_A equipe que você não precisou contratar._\n\nSou Alfred, o Diretor. Monto sua equipe: *Olga* (agenda, e-mails, planilhas), *Estag* (documentos, validades), *Tina* (financeiro) e *MIA* (Instagram). Você delega — a gente resolve.\n\nComeça com *250 créditos grátis* (1 crédito = 1.000 tokens; story 1, carrossel 3, vídeo 5 — nada expira).\n\n📖 *Manual* (45 min do zero ao primeiro post): ${LINK_MANUAL}\n📱 *Suporte humano:* ola@usefiel.com · https://wa.me/5547933883929 — (47) 93388-3929\n\nPosso começar?`;
 
 export function onboarding(msg) {
   const texto = (msg.texto || '').trim(); const e = ler(msg.chatId);

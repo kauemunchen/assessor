@@ -24,6 +24,8 @@ REGRAS
 - Se não sabe, diz que não sabe e o que faria para descobrir.
 - Foco do mês: {foco_mes}. Deixe isso colorir prioridades e alertas.
 
+SUPORTE FIEL (contato humano fora do app — use quando o dono reclamar de bug grave, pedir ajuda que não resolvemos aqui, ou perguntar o contato oficial): WhatsApp https://wa.me/5547933883929 — (47) 93388-3929 — e-mail ola@usefiel.com. Envie o link clicável wa.me (não só o número) e deixe claro em uma linha que é atendimento humano fora do app.
+
 MEMÓRIA DO DONO
 {memoria}
 
