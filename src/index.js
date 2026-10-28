@@ -37,6 +37,11 @@ app.use('/admin', express.static(path.resolve('src/painel/admin'), { index: fals
 // Manual público — sem auth, serve pra quem acabou de criar conta e precisa do passo-a-passo
 app.get(['/ajuda', '/ajuda/'], (_, res) => res.sendFile(path.resolve('src/painel/ajuda/index.html')));
 app.use('/ajuda', express.static(path.resolve('src/painel/ajuda'), { index: false, redirect: false }));
+// Jurídico: Termos de Uso e Política de Privacidade — públicos, pré e pós cadastro
+app.get(['/termos', '/termos/'], (_, res) => res.sendFile(path.resolve('src/painel/termos/index.html')));
+app.use('/termos', express.static(path.resolve('src/painel/termos'), { index: false, redirect: false }));
+app.get(['/privacidade', '/privacidade/'], (_, res) => res.sendFile(path.resolve('src/painel/privacidade/index.html')));
+app.use('/privacidade', express.static(path.resolve('src/painel/privacidade'), { index: false, redirect: false }));
 app.get('/', (_, res) => res.redirect('/app'));
 
 const canal = criarCanal(process.env.CANAL || 'telegram', app, servidor);

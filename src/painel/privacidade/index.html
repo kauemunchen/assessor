@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FAF5EC">
+<title>Política de Privacidade · Fiel</title>
+<link rel="icon" href="/app/favicon.png" type="image/png">
+<meta name="description" content="Política de Privacidade do Fiel — quais dados tratamos, para quê, com quem compartilhamos e como você exerce seus direitos LGPD.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root { --papel:#FAF5EC;--papel-fundo:#F3EBDA;--tinta:#1C1E26;--tinta-mid:#4A4D59;--tinta-fraca:#7A7D87;--coral:#E85D4A;--sage:#6E8367;--linha:rgba(28,30,38,0.12);--cartao:#FFFFFF;--f-display:"Fraunces","Iowan Old Style",Georgia,serif;--f-corpo:"Inter",-apple-system,sans-serif;--f-mono:ui-monospace,"SF Mono",Menlo,monospace;color-scheme:light; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]){--papel:#16181F;--papel-fundo:#0F1116;--tinta:#ECEAE3;--tinta-mid:#B2B4BE;--tinta-fraca:#70737D;--coral:#F27A69;--sage:#93A98A;--linha:rgba(236,234,227,0.14);--cartao:#1E2029;color-scheme:dark;} }
+  *{box-sizing:border-box} html,body{background:var(--papel);color:var(--tinta);font-family:var(--f-corpo);font-size:16px;line-height:1.65;margin:0}
+  body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:72px;padding-bottom:48px}
+  a{color:var(--coral);text-decoration:none;border-bottom:1px solid currentColor} a:hover{opacity:.75}
+  code{font-family:var(--f-mono);font-size:.88em;background:var(--papel-fundo);padding:1px 6px;border-radius:4px;color:var(--tinta);border:1px solid var(--linha)}
+  .barra{position:fixed;top:0;left:0;right:0;height:56px;background:var(--papel);border-bottom:1px solid var(--linha);display:flex;align-items:center;justify-content:space-between;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:100;backdrop-filter:blur(8px)}
+  .barra .ident{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;color:var(--tinta-fraca);text-transform:uppercase}
+  .barra a.btn{font-family:var(--f-corpo);font-size:13px;font-weight:500;color:var(--tinta);border:1px solid var(--linha);padding:7px 14px;border-radius:999px;background:var(--cartao);text-decoration:none}
+  .barra a.btn:hover{border-color:var(--coral);color:var(--coral);opacity:1}
+  @media (max-width:540px){.barra .ident{display:none}}
+  .wrap{max-width:760px;margin:0 auto}
+  .capa{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--linha)}
+  .capa .marca{font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;color:var(--tinta-fraca);text-transform:uppercase;margin-bottom:16px}
+  .capa h1{font-family:var(--f-display);font-weight:400;font-size:clamp(32px,5vw,48px);line-height:1.1;letter-spacing:-.02em;margin:0 0 12px;text-wrap:balance}
+  .capa .meta{display:flex;flex-wrap:wrap;gap:12px 24px;font-family:var(--f-mono);font-size:12px;letter-spacing:.04em;color:var(--tinta-fraca);margin-top:16px}
+  .capa .meta strong{color:var(--tinta);font-weight:500}
+  h2{font-family:var(--f-display);font-weight:400;font-size:24px;line-height:1.2;letter-spacing:-.01em;margin:48px 0 14px}
+  h2 .n{color:var(--coral);font-style:italic;font-weight:400;margin-right:10px;font-size:20px}
+  h3{font-family:var(--f-display);font-weight:500;font-size:18px;margin:28px 0 10px}
+  p{margin:0 0 14px;max-width:68ch;text-wrap:pretty}
+  ul,ol{max-width:68ch;padding-left:22px;margin:0 0 14px} li{margin-bottom:6px} li::marker{color:var(--tinta-fraca)}
+  .destaque{background:var(--cartao);border-left:3px solid var(--coral);padding:16px 20px;border-radius:0 10px 10px 0;margin:20px 0;box-shadow:0 1px 2px rgba(28,30,38,.04)}
+  .destaque .rotulo{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;color:var(--coral);text-transform:uppercase;margin-bottom:6px}
+  .destaque p:last-child{margin-bottom:0}
+  .empresa{background:var(--papel-fundo);border:1px solid var(--linha);border-radius:12px;padding:18px 22px;margin:20px 0;font-size:14px}
+  .empresa .r{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;color:var(--tinta-fraca);text-transform:uppercase;margin-bottom:4px}
+  .empresa b{color:var(--tinta)}
+  table{border-collapse:collapse;width:100%;margin:12px 0 20px;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--linha);vertical-align:top}
+  th{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-fraca);font-weight:500;background:var(--papel-fundo)}
+  td b{color:var(--tinta)}
+  footer{margin-top:72px;padding-top:24px;border-top:1px solid var(--linha);font-size:13px;color:var(--tinta-fraca);display:flex;flex-wrap:wrap;gap:16px 32px;justify-content:space-between}
+  footer .assinatura{font-family:var(--f-display);font-style:italic} footer .assinatura strong{font-style:normal;color:var(--tinta);font-weight:500;font-family:var(--f-corpo);letter-spacing:.1em;text-transform:uppercase;font-size:12px}
+</style>
+</head>
+<body>
+<nav class="barra" aria-label="Barra">
+  <a href="/app" class="btn">← Voltar ao app</a>
+  <div class="ident">Fiel · Política de Privacidade</div>
+  <a href="/termos" class="btn">Termos de Uso →</a>
+</nav>
+<div class="wrap">
+
+<header class="capa">
+  <div class="marca">Fiel · Política de Privacidade · LGPD</div>
+  <h1>Que dados tratamos, para quê, com quem — e como você comanda.</h1>
+  <p>Em claro: o que coletamos, com qual base legal, por quanto tempo guardamos, com quem compartilhamos e como você exerce seus direitos como titular, nos termos da Lei 13.709/2018 (LGPD).</p>
+  <div class="meta">
+    <span>Versão · <strong>1.0</strong></span>
+    <span>Vigente desde · <strong>28/10/2026</strong></span>
+    <span>DPO · <strong><a href="mailto:privacidade@usefiel.com">privacidade@usefiel.com</a></strong></span>
+  </div>
+</header>
+
+<section class="empresa">
+  <div class="r">Controlador dos dados</div>
+  <p style="margin:0"><b>KAUE WESLEY MUNCHEN</b> — Microempreendedor Individual (MEI)<br>
+  CNPJ <b>65.356.258/0001-70</b><br>
+  Endereço: Rua Professor Irmão Geraldino, 117, Sala 03, Vila Lalau — Jaraguá do Sul/SC — CEP 89256-310<br>
+  Encarregado (DPO): <a href="mailto:privacidade@usefiel.com">privacidade@usefiel.com</a><br>
+  Suporte: <a href="mailto:ola@usefiel.com">ola@usefiel.com</a> · <a href="https://wa.me/5547933883929" target="_blank" rel="noopener">(47) 93388-3929</a></p>
+</section>
+
+<section>
+<h2><span class="n">1.</span>Resumo em uma linha</h2>
+<p>Coletamos o <strong>mínimo</strong> necessário para operar o Fiel, <strong>não vendemos</strong> seus dados, não usamos suas conversas para treinar modelos de IA, e você <strong>pode exportar ou apagar tudo</strong> quando quiser escrevendo para o DPO.</p>
+</section>
+
+<section>
+<h2><span class="n">2.</span>Que dados tratamos</h2>
+<table>
+  <thead><tr><th>Categoria</th><th>O que inclui</th><th>Como chega</th></tr></thead>
+  <tbody>
+    <tr><td><b>Cadastro</b></td><td>Nome, e-mail, telefone, CPF ou CNPJ, senha (hash bcrypt), empresa, aceite dos Termos</td><td>Formulário no site</td></tr>
+    <tr><td><b>Uso</b></td><td>Conversas com os agentes, histórico de ações, mídias enviadas, posts gerados, créditos consumidos, acessos (data, hora, IP)</td><td>Interação no app</td></tr>
+    <tr><td><b>Integrações</b></td><td>Tokens OAuth do Google (Calendar, Gmail, Drive, Tasks), tokens de página do Instagram (Meta), ID de conta Mercado Pago</td><td>Você autoriza no fluxo OAuth do próprio provedor</td></tr>
+    <tr><td><b>Pagamento</b></td><td>Valor, data, forma (Pix / cartão / mensal), ID da transação Mercado Pago. <b>Não guardamos número de cartão.</b></td><td>Webhook Mercado Pago</td></tr>
+    <tr><td><b>Técnicos</b></td><td>IP de acesso, user-agent, logs do servidor, erros, cookies de sessão (<code>sid</code>, httpOnly)</td><td>Automático na navegação</td></tr>
+    <tr><td><b>Comunicações</b></td><td>E-mails enviados por você, posts, documentos — <em>processados</em> para gerar resposta, não copiados para outros fins</td><td>Durante a tarefa</td></tr>
+  </tbody>
+</table>
+<p>Dados de <strong>terceiros</strong> (nomes de clientes, e-mails recebidos, contatos de agenda) permanecem na conta do próprio usuário em Google/Meta. O Fiel só os acessa durante a execução da tarefa autorizada e <strong>não os copia</strong> para seus bancos, salvo o estritamente necessário para o funcionamento da tarefa (p.ex. ID do evento criado).</p>
+</section>
+
+<section>
+<h2><span class="n">3.</span>Para quê — finalidades e bases legais (art. 7º LGPD)</h2>
+<table>
+  <thead><tr><th>Finalidade</th><th>Base legal</th></tr></thead>
+  <tbody>
+    <tr><td>Criar e manter sua conta, autenticar acessos, prestar o serviço</td><td>Execução de contrato (art. 7º, V)</td></tr>
+    <tr><td>Processar pagamentos e emitir notas quando aplicável</td><td>Obrigação legal/regulatória + execução de contrato</td></tr>
+    <tr><td>Acessar seus Google/Meta via OAuth para executar as tarefas que você pedir</td><td>Consentimento específico (art. 7º, I) — revogável no painel do Google/Meta</td></tr>
+    <tr><td>Suporte técnico, prevenção de fraude, segurança</td><td>Legítimo interesse (art. 7º, IX)</td></tr>
+    <tr><td>Melhoria do produto a partir de <strong>métricas agregadas e anonimizadas</strong></td><td>Legítimo interesse — nunca com dados pessoais identificáveis</td></tr>
+    <tr><td>Enviar comunicados operacionais (recibo, aviso de mudança nos Termos)</td><td>Execução de contrato</td></tr>
+    <tr><td>Enviar e-mails de marketing <em>somente se você optar</em></td><td>Consentimento, com opt-out em todo e-mail</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<h2><span class="n">4.</span>Com quem compartilhamos — operadores</h2>
+<p>Para funcionar, o Fiel usa serviços de terceiros que atuam como <strong>operadores</strong> (art. 5º, VII LGPD). Eles tratam dados apenas conforme nossas instruções e seus próprios termos:</p>
+<table>
+  <thead><tr><th>Operador</th><th>Finalidade</th><th>Dados que recebe</th></tr></thead>
+  <tbody>
+    <tr><td><b>Hostinger</b> (Brasil)</td><td>Hospedagem do servidor VPS</td><td>Todos os dados em repouso + logs</td></tr>
+    <tr><td><b>Google</b> — Gemini API</td><td>Processar linguagem natural, gerar respostas da IA</td><td>Textos das suas conversas no momento do processamento. Google não usa dados do Gemini API para treinar modelos.</td></tr>
+    <tr><td><b>Google</b> — OAuth (Calendar/Gmail/Drive/Tasks)</td><td>Executar tarefas que você autorizou (criar evento, ler e-mail)</td><td>Tokens OAuth que você concedeu</td></tr>
+    <tr><td><b>Meta / Instagram Graph API</b></td><td>Publicar posts, stories, reels na sua página</td><td>Token de página + mídias que você aprovou publicar</td></tr>
+    <tr><td><b>Mercado Pago</b></td><td>Processar pagamentos (Pix, cartão, mensalidades)</td><td>Nome, e-mail, CPF/CNPJ, valor, forma de pagamento</td></tr>
+    <tr><td><b>Cloudinary</b></td><td>Armazenar e servir mídias geradas (posts, stories)</td><td>Imagens e vídeos criados no app</td></tr>
+    <tr><td><b>fal.ai</b></td><td>Renderização de imagens e vídeos por IA (quando solicitado)</td><td>Prompt da imagem/vídeo e, se aplicável, imagem de referência</td></tr>
+    <tr><td><b>Telegram</b></td><td>Entregar mensagens do bot ao usuário que escolhe esse canal</td><td>Chat ID + conteúdo da conversa pelo canal Telegram</td></tr>
+  </tbody>
+</table>
+<p><strong>Transferência internacional:</strong> alguns operadores (Google, Meta, Cloudinary, fal.ai) processam dados em servidores fora do Brasil. Essa transferência ocorre com base no art. 33 da LGPD (execução de contrato ou consentimento específico ao autorizar o OAuth do provedor).</p>
+<p>Não vendemos seus dados a nenhum terceiro. Não compartilhamos com empresas de publicidade.</p>
+</section>
+
+<section>
+<h2><span class="n">5.</span>Por quanto tempo guardamos</h2>
+<ul>
+  <li><strong>Dados de cadastro:</strong> enquanto a conta estiver ativa + 5 anos após o encerramento (Código Civil, prazo prescricional).</li>
+  <li><strong>Conversas e histórico de uso:</strong> enquanto a conta estiver ativa. No encerramento, o usuário pode solicitar exportação; eliminamos em até 60 dias.</li>
+  <li><strong>Pagamentos:</strong> 5 anos (obrigação fiscal).</li>
+  <li><strong>Logs de acesso técnico:</strong> 6 meses (Marco Civil da Internet, art. 15).</li>
+  <li><strong>Tokens OAuth:</strong> enquanto você mantiver a autorização; revogue a qualquer momento em <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a> ou em <a href="https://www.facebook.com/settings?tab=business_tools" target="_blank" rel="noopener">Meta Business Tools</a>.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="n">6.</span>Seus direitos como titular (art. 18 LGPD)</h2>
+<p>Você pode exigir, a qualquer momento e gratuitamente:</p>
+<ul>
+  <li><b>Confirmação</b> de que tratamos seus dados;</li>
+  <li><b>Acesso</b> aos dados que mantemos sobre você;</li>
+  <li><b>Correção</b> de dados incompletos, inexatos ou desatualizados;</li>
+  <li><b>Anonimização, bloqueio ou eliminação</b> de dados desnecessários, excessivos ou tratados sem base legal;</li>
+  <li><b>Portabilidade</b> dos dados a outro fornecedor;</li>
+  <li><b>Eliminação</b> dos dados tratados com seu consentimento, salvo nas hipóteses de guarda legal;</li>
+  <li><b>Informação</b> sobre com quem compartilhamos (este documento já atende);</li>
+  <li><b>Informação</b> sobre a possibilidade de não consentir e as consequências;</li>
+  <li><b>Revogação</b> de consentimento.</li>
+</ul>
+<div class="destaque">
+  <div class="rotulo">Como exercer</div>
+  <p>Escreva para o Encarregado (DPO): <a href="mailto:privacidade@usefiel.com">privacidade@usefiel.com</a>. Respondemos em até <strong>15 dias</strong>. Para confirmar sua identidade, podemos pedir alguns dados cadastrais.</p>
+  <p>Caso não concorde com nossa resposta, você pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD): <a href="https://www.gov.br/anpd" target="_blank" rel="noopener">gov.br/anpd</a>.</p>
+</div>
+</section>
+
+<section>
+<h2><span class="n">7.</span>Segurança</h2>
+<ul>
+  <li>Senhas armazenadas com <code>bcrypt</code> (nunca em texto claro).</li>
+  <li>Comunicação <strong>HTTPS/TLS 1.3</strong> em todas as requisições (Let's Encrypt via Traefik).</li>
+  <li>Tokens OAuth e credenciais sensíveis em variáveis de ambiente do servidor, nunca no código-fonte.</li>
+  <li>Webhook do Mercado Pago validado por HMAC-SHA256.</li>
+  <li>Banco de dados restrito ao servidor da aplicação, sem porta exposta na internet.</li>
+  <li>Backups diários com retenção de 30 dias.</li>
+  <li>Sessões por cookie <code>httpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>.</li>
+</ul>
+<p>Em caso de <strong>incidente de segurança</strong> que possa gerar risco ou dano relevante aos titulares, comunicaremos à ANPD e aos afetados em prazo razoável, conforme art. 48 da LGPD.</p>
+</section>
+
+<section>
+<h2><span class="n">8.</span>Cookies</h2>
+<p>Usamos cookies <strong>estritamente necessários</strong> para a sessão autenticada (<code>sid</code>). Não usamos cookies de rastreamento publicitário, não integramos Google Analytics, Facebook Pixel ou similares no produto autenticado.</p>
+</section>
+
+<section>
+<h2><span class="n">9.</span>IA e suas conversas</h2>
+<p>Os textos das suas conversas são processados pela API do Google Gemini para gerar as respostas da equipe (Alfred, Olga, Estag, Tina, MIA). Conforme <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">os termos do Google Gemini API para desenvolvedores pagantes</a>, o Google <strong>não usa esses dados para treinar seus modelos</strong>.</p>
+<p>O Fiel <strong>também não</strong> usa suas conversas para treinar modelos. Elas servem para gerar sua resposta e ficam gravadas no histórico da sua conta para que você consulte depois.</p>
+</section>
+
+<section>
+<h2><span class="n">10.</span>Crianças e adolescentes</h2>
+<p>O Fiel é um produto para <strong>maiores de 18 anos</strong>. Não coletamos deliberadamente dados de menores. Se você for pai/mãe/responsável e identificar cadastro de um menor em nome próprio, escreva para o DPO para remoção imediata.</p>
+</section>
+
+<section>
+<h2><span class="n">11.</span>Mudanças nesta política</h2>
+<p>Alterações materiais serão comunicadas por e-mail e dentro do app com antecedência mínima de 15 dias. Versões anteriores ficam arquivadas e podem ser solicitadas ao DPO.</p>
+</section>
+
+<section>
+<h2><span class="n">12.</span>Contato</h2>
+<ul>
+  <li>Encarregado pelo tratamento (DPO): <a href="mailto:privacidade@usefiel.com">privacidade@usefiel.com</a></li>
+  <li>Suporte geral: <a href="mailto:ola@usefiel.com">ola@usefiel.com</a> · <a href="https://wa.me/5547933883929" target="_blank" rel="noopener">(47) 93388-3929</a></li>
+  <li>Autoridade Nacional de Proteção de Dados: <a href="https://www.gov.br/anpd" target="_blank" rel="noopener">gov.br/anpd</a></li>
+</ul>
+</section>
+
+<footer>
+  <div class="assinatura"><strong>Fiel</strong> · Política de Privacidade v1.0</div>
+  <div>Vigente desde 28/10/2026</div>
+  <div><a href="/termos">Termos de Uso</a> · <a href="/ajuda">Manual</a> · <a href="/app">Voltar ao app</a></div>
+</footer>
+
+</div>
+</body>
+</html>

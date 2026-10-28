@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FAF5EC">
+<title>Termos de Uso · Fiel</title>
+<link rel="icon" href="/app/favicon.png" type="image/png">
+<meta name="description" content="Termos de Uso do Fiel — direitos e deveres de quem usa a plataforma e da empresa que a fornece.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root { --papel:#FAF5EC;--papel-fundo:#F3EBDA;--tinta:#1C1E26;--tinta-mid:#4A4D59;--tinta-fraca:#7A7D87;--coral:#E85D4A;--sage:#6E8367;--linha:rgba(28,30,38,0.12);--cartao:#FFFFFF;--f-display:"Fraunces","Iowan Old Style",Georgia,serif;--f-corpo:"Inter",-apple-system,sans-serif;--f-mono:ui-monospace,"SF Mono",Menlo,monospace;color-scheme:light; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]){--papel:#16181F;--papel-fundo:#0F1116;--tinta:#ECEAE3;--tinta-mid:#B2B4BE;--tinta-fraca:#70737D;--coral:#F27A69;--sage:#93A98A;--linha:rgba(236,234,227,0.14);--cartao:#1E2029;color-scheme:dark;} }
+  *{box-sizing:border-box} html,body{background:var(--papel);color:var(--tinta);font-family:var(--f-corpo);font-size:16px;line-height:1.65;margin:0}
+  body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:72px;padding-bottom:48px}
+  a{color:var(--coral);text-decoration:none;border-bottom:1px solid currentColor} a:hover{opacity:.75}
+  code{font-family:var(--f-mono);font-size:.88em;background:var(--papel-fundo);padding:1px 6px;border-radius:4px;color:var(--tinta);border:1px solid var(--linha)}
+  .barra{position:fixed;top:0;left:0;right:0;height:56px;background:var(--papel);border-bottom:1px solid var(--linha);display:flex;align-items:center;justify-content:space-between;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:100;backdrop-filter:blur(8px)}
+  .barra .ident{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;color:var(--tinta-fraca);text-transform:uppercase}
+  .barra a.btn{font-family:var(--f-corpo);font-size:13px;font-weight:500;color:var(--tinta);border:1px solid var(--linha);padding:7px 14px;border-radius:999px;background:var(--cartao);text-decoration:none}
+  .barra a.btn:hover{border-color:var(--coral);color:var(--coral);opacity:1}
+  @media (max-width:540px){.barra .ident{display:none}}
+  .wrap{max-width:760px;margin:0 auto}
+  .capa{margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid var(--linha)}
+  .capa .marca{font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;color:var(--tinta-fraca);text-transform:uppercase;margin-bottom:16px}
+  .capa h1{font-family:var(--f-display);font-weight:400;font-size:clamp(32px,5vw,48px);line-height:1.1;letter-spacing:-.02em;margin:0 0 12px;text-wrap:balance}
+  .capa .meta{display:flex;flex-wrap:wrap;gap:12px 24px;font-family:var(--f-mono);font-size:12px;letter-spacing:.04em;color:var(--tinta-fraca);margin-top:16px}
+  .capa .meta strong{color:var(--tinta);font-weight:500}
+  h2{font-family:var(--f-display);font-weight:400;font-size:24px;line-height:1.2;letter-spacing:-.01em;margin:48px 0 14px}
+  h2 .n{color:var(--coral);font-style:italic;font-weight:400;margin-right:10px;font-size:20px}
+  h3{font-family:var(--f-display);font-weight:500;font-size:18px;margin:28px 0 10px}
+  p{margin:0 0 14px;max-width:68ch;text-wrap:pretty}
+  ul,ol{max-width:68ch;padding-left:22px;margin:0 0 14px} li{margin-bottom:6px} li::marker{color:var(--tinta-fraca)}
+  .destaque{background:var(--cartao);border-left:3px solid var(--coral);padding:16px 20px;border-radius:0 10px 10px 0;margin:20px 0;box-shadow:0 1px 2px rgba(28,30,38,.04)}
+  .destaque .rotulo{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;color:var(--coral);text-transform:uppercase;margin-bottom:6px}
+  .destaque p:last-child{margin-bottom:0}
+  .empresa{background:var(--papel-fundo);border:1px solid var(--linha);border-radius:12px;padding:18px 22px;margin:20px 0;font-size:14px}
+  .empresa .r{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;color:var(--tinta-fraca);text-transform:uppercase;margin-bottom:4px}
+  .empresa b{color:var(--tinta)}
+  footer{margin-top:72px;padding-top:24px;border-top:1px solid var(--linha);font-size:13px;color:var(--tinta-fraca);display:flex;flex-wrap:wrap;gap:16px 32px;justify-content:space-between}
+  footer .assinatura{font-family:var(--f-display);font-style:italic} footer .assinatura strong{font-style:normal;color:var(--tinta);font-weight:500;font-family:var(--f-corpo);letter-spacing:.1em;text-transform:uppercase;font-size:12px}
+</style>
+</head>
+<body>
+<nav class="barra" aria-label="Barra">
+  <a href="/app" class="btn">← Voltar ao app</a>
+  <div class="ident">Fiel · Termos de Uso</div>
+  <a href="/privacidade" class="btn">Política de Privacidade →</a>
+</nav>
+<div class="wrap">
+
+<header class="capa">
+  <div class="marca">Fiel · Termos de Uso</div>
+  <h1>Direitos e deveres de quem usa o Fiel.</h1>
+  <p>Este é o contrato que rege o uso da plataforma Fiel. Ao criar sua conta, você declara ter lido e aceito estes Termos integralmente.</p>
+  <div class="meta">
+    <span>Versão · <strong>1.0</strong></span>
+    <span>Vigente desde · <strong>28/10/2026</strong></span>
+    <span>Jurisdição · <strong>Jaraguá do Sul / SC — Brasil</strong></span>
+  </div>
+</header>
+
+<section class="empresa">
+  <div class="r">Provedora do serviço (Fiel)</div>
+  <p style="margin:0"><b>KAUE WESLEY MUNCHEN</b> — Microempreendedor Individual (MEI)<br>
+  CNPJ <b>65.356.258/0001-70</b> · Nome Empresarial 65.356.258 KAUE WESLEY MUNCHEN<br>
+  Endereço: Rua Professor Irmão Geraldino, 117, Sala 03, Vila Lalau — Jaraguá do Sul/SC — CEP 89256-310<br>
+  Atividade principal (CNAE 8219-9/99): Preparação de documentos e serviços especializados de apoio administrativo<br>
+  Contato: <a href="mailto:ola@usefiel.com">ola@usefiel.com</a> · <a href="https://wa.me/5547933883929" target="_blank" rel="noopener">(47) 93388-3929</a></p>
+</section>
+
+<section>
+<h2><span class="n">1.</span>Objeto</h2>
+<p>O Fiel é uma plataforma de software que oferece <strong>assessoria operacional por meio de agentes de inteligência artificial</strong> (Alfred, Olga, Estag, Tina, MIA e demais que vierem a ser disponibilizados), acessível via web (usefiel.com), Telegram e PWA, para apoiar empresários e profissionais autônomos na gestão de suas atividades: agenda, e-mails, documentos, financeiro, redes sociais e demais rotinas administrativas.</p>
+<p>O Fiel é uma <strong>ferramenta auxiliar</strong>. Toda decisão, publicação, envio, pagamento ou arquivamento ocorre a pedido e sob responsabilidade do usuário.</p>
+</section>
+
+<section>
+<h2><span class="n">2.</span>Aceite</h2>
+<p>Ao criar uma conta, marcar o aceite dos Termos no cadastro, usar qualquer funcionalidade do Fiel ou efetuar qualquer pagamento, o usuário manifesta sua concordância integral com estes Termos e com a Política de Privacidade, formando contrato jurídico com a Provedora.</p>
+<p>O usuário declara ter <strong>18 anos ou mais</strong>, capacidade civil plena e, quando o cadastro for em nome de pessoa jurídica, poderes para contratar por ela.</p>
+</section>
+
+<section>
+<h2><span class="n">3.</span>Cadastro e conta</h2>
+<ul>
+  <li>O cadastro exige nome, e-mail válido, CPF ou CNPJ (com dígito verificador), senha de no mínimo 8 caracteres e aceite destes Termos e da Política de Privacidade.</li>
+  <li>É <strong>obrigação do usuário</strong> fornecer informações verdadeiras, mantê-las atualizadas, zelar pela confidencialidade da sua senha e responder por todo acesso feito com suas credenciais.</li>
+  <li>Uma conta por CPF/CNPJ. Contas múltiplas, revendas não autorizadas ou uso compartilhado sem autorização estão vedados.</li>
+  <li>O usuário é responsável pelas pessoas que ele mesmo convidar para sua equipe no Fiel.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="n">4.</span>Como o Fiel funciona</h2>
+<p>O serviço opera por meio de agentes de IA que executam ferramentas (ler e-mail, criar evento, publicar post, lançar valor, arquivar documento, consultar web etc.) a partir de comandos do usuário. Toda <strong>ação externa sensível</strong> (envio de e-mail, publicação, cobrança, exclusão, agendamento) só é executada após <strong>confirmação explícita</strong> do usuário.</p>
+<p>Os dados do usuário (agenda, e-mail, documentos) permanecem <strong>nas contas do próprio usuário</strong> em serviços de terceiros (Google, Meta, Mercado Pago). O Fiel acessa esses serviços apenas com autorização OAuth concedida pelo usuário, podendo ser revogada a qualquer momento no painel do próprio provedor (Google, Meta).</p>
+</section>
+
+<section>
+<h2><span class="n">5.</span>Responsabilidades do usuário</h2>
+<ul>
+  <li><strong>Veracidade.</strong> Garantir que todos os dados cadastrais e informações fornecidas aos agentes sejam verdadeiros, atualizados e de posse legítima.</li>
+  <li><strong>Legalidade do conteúdo.</strong> Responder exclusivamente pelo conteúdo que publica no Instagram, envia por e-mail ou mensagens via Fiel — incluindo respeito a direitos autorais, direitos de imagem, publicidade sinalizada quando aplicável, LGPD e demais normas aplicáveis.</li>
+  <li><strong>Revisão de respostas da IA.</strong> Verificar criticamente qualquer texto, legenda, dado, cálculo ou sugestão gerada pelos agentes antes de aprovar, publicar ou usar. A IA pode errar.</li>
+  <li><strong>Decisão final.</strong> O usuário é o único decisor sobre publicar, enviar, pagar, agendar ou arquivar — a plataforma apenas prepara e executa o que foi aprovado.</li>
+  <li><strong>Credenciais de terceiros.</strong> Guardar e renovar seus próprios tokens Google e Instagram quando solicitado. A Provedora não armazena senhas de terceiros em texto claro, apenas tokens OAuth.</li>
+  <li><strong>Obrigações fiscais e trabalhistas.</strong> Pagar impostos, emitir notas fiscais, cumprir CLT e demais obrigações legais sobre atividades operacionalizadas ou agendadas via Fiel.</li>
+  <li><strong>Equipe convidada.</strong> Responder pelas pessoas que o próprio usuário adicionar à sua equipe no Fiel.</li>
+  <li><strong>Uso lícito.</strong> Não usar o Fiel para spam, fraude, discurso de ódio, perseguição, desinformação, concorrência desleal, violação de propriedade intelectual, qualquer atividade ilegal ou que viole termos de uso de terceiros (Instagram/Meta, Google, Mercado Pago).</li>
+  <li><strong>Pagamento.</strong> Honrar com os valores dos pacotes/créditos contratados.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="n">6.</span>Responsabilidades da Provedora</h2>
+<ul>
+  <li>Manter o serviço disponível em caráter de <em>melhor esforço</em>, sem garantia de disponibilidade ininterrupta (sem SLA formal nos planos atuais).</li>
+  <li>Zelar pela segurança dos dados do usuário segundo boas práticas de mercado e conforme a Política de Privacidade.</li>
+  <li>Prestar suporte humano via <a href="https://wa.me/5547933883929" target="_blank" rel="noopener">WhatsApp (47) 93388-3929</a> e <a href="mailto:ola@usefiel.com">ola@usefiel.com</a> em horário comercial.</li>
+  <li>Notificar com antecedência razoável mudanças materiais nestes Termos.</li>
+  <li>Cumprir a LGPD no tratamento dos dados pessoais que recebe para operar o serviço.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="n">7.</span>Limitações de responsabilidade</h2>
+<div class="destaque">
+  <div class="rotulo">Cláusula importante — leia com atenção</div>
+  <p>A Provedora <strong>não se responsabiliza</strong>, em nenhuma hipótese, por:</p>
+  <ul>
+    <li>Conteúdo publicado em redes sociais do usuário, resultado comercial, engajamento, bloqueios de conta, suspensões ou banimentos aplicados por Meta/Instagram, Google, Mercado Pago ou qualquer terceiro;</li>
+    <li>Decisões tomadas pelo usuário com base em sugestões, textos ou dados produzidos pelos agentes de IA — a IA é apoio, nunca substitui o critério humano;</li>
+    <li>Perdas, danos ou lucros cessantes decorrentes de indisponibilidade, falha, erro, atraso ou interrupção do Fiel ou de qualquer serviço de terceiros usado pelo Fiel (Google, Meta, OpenAI, Google AI/Gemini, Mercado Pago, Cloudinary, fal.ai e outros);</li>
+    <li>Perda ou invalidação de tokens de terceiros (Google OAuth, Instagram) por motivos alheios ao Fiel (troca de senha, encerramento de sessão pela Meta/Google, suspensão da conta);</li>
+    <li>Conteúdo armazenado pelo usuário em seu próprio Google Drive — a Provedora apenas organiza por solicitação, não é hospedeira dos documentos;</li>
+    <li>Danos indiretos, incidentais, punitivos ou consequenciais, incluindo mas não se limitando a lucro cessante, perda de clientes, danos à reputação ou danos morais;</li>
+    <li>Erros de informação devolvida pelos agentes de IA, inclusive quando usarem pesquisa na web — o usuário deve <strong>verificar fontes</strong> antes de agir;</li>
+    <li>Conteúdo de terceiros acessado via links que aparecerem nas respostas dos agentes;</li>
+    <li>Mal uso da plataforma pelo próprio usuário ou pelas pessoas que ele adicionou à sua equipe.</li>
+  </ul>
+  <p>Em qualquer hipótese de responsabilidade da Provedora reconhecida judicialmente, esta ficará <strong>limitada ao valor efetivamente pago pelo usuário à Provedora nos 3 (três) meses anteriores ao evento gerador do dano</strong>.</p>
+</div>
+</section>
+
+<section>
+<h2><span class="n">8.</span>Créditos, pagamento e reembolso</h2>
+<ul>
+  <li>O uso dos agentes de IA consome <strong>créditos</strong> (1 crédito = 1.000 tokens de IA; render de imagem/vídeo têm tarifas fixas descritas no app).</li>
+  <li>Novas contas recebem <strong>250 créditos de boas-vindas (trial)</strong>. Créditos adquiridos em pacote pré-pago <strong>não expiram</strong>.</li>
+  <li>Pagamentos são processados via Mercado Pago. A Provedora não armazena dados de cartão.</li>
+  <li>Planos mensais podem ser cancelados a qualquer momento pelo próprio usuário. Não há reembolso proporcional de mensalidade em curso — o acesso permanece até o fim do ciclo pago.</li>
+  <li>Pacotes pré-pagos não têm reembolso após 7 (sete) dias corridos do pagamento ou após qualquer consumo de crédito, o que ocorrer primeiro, salvo determinação legal em contrário.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="n">9.</span>Dados pessoais e privacidade</h2>
+<p>O tratamento de dados pessoais é regido pela <a href="/privacidade">Política de Privacidade</a>, parte integrante destes Termos. O usuário autoriza o tratamento dos dados cadastrais e operacionais nos termos e finalidades descritos lá.</p>
+</section>
+
+<section>
+<h2><span class="n">10.</span>Propriedade intelectual</h2>
+<ul>
+  <li>O <strong>software do Fiel</strong>, marca, identidade visual, código-fonte, interface e documentação são de propriedade exclusiva da Provedora.</li>
+  <li>O <strong>conteúdo gerado pelo usuário</strong> (textos, posts, documentos, imagens enviadas) permanece de propriedade do usuário. A Provedora recebe licença não-exclusiva, apenas para processar o conteúdo e devolver o resultado solicitado.</li>
+  <li>O usuário concede à Provedora o direito de usar <strong>métricas agregadas e anonimizadas</strong> de uso para melhorar o serviço.</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="n">11.</span>Suspensão e encerramento</h2>
+<p>A Provedora pode suspender ou encerrar a conta, sem reembolso, em caso de uso ilícito, fraude, inadimplência, violação destes Termos ou solicitação de autoridade competente. O usuário pode encerrar sua conta a qualquer momento solicitando pelo suporte oficial.</p>
+</section>
+
+<section>
+<h2><span class="n">12.</span>Modificações</h2>
+<p>Estes Termos podem ser atualizados. Alterações materiais serão comunicadas por e-mail ou dentro do próprio app com antecedência mínima de 15 dias. O uso continuado após a vigência da nova versão implica aceite.</p>
+</section>
+
+<section>
+<h2><span class="n">13.</span>Lei aplicável e foro</h2>
+<p>Estes Termos são regidos pela legislação brasileira. Fica eleito o <strong>foro da Comarca de Jaraguá do Sul/SC</strong>, com renúncia a qualquer outro, por mais privilegiado que seja, para dirimir controvérsias decorrentes deste contrato.</p>
+</section>
+
+<footer>
+  <div class="assinatura"><strong>Fiel</strong> · Termos de Uso v1.0</div>
+  <div>Vigente desde 28/10/2026</div>
+  <div><a href="/privacidade">Política de Privacidade</a> · <a href="/ajuda">Manual</a> · <a href="/app">Voltar ao app</a></div>
+</footer>
+
+</div>
+</body>
+</html>
