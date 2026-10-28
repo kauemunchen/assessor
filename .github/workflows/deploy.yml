@@ -1,0 +1,45 @@
+# Deploy automático: todo push na main puxa o código no VPS e reinicia o container.
+# Secrets necessários no repo (Settings → Secrets and variables → Actions):
+#   VPS_HOST     — IP ou DNS do servidor (ex.: 191.252.198.149)
+#   VPS_PORT     — porta SSH (ex.: 22 ou 65002)
+#   VPS_USER     — usuário SSH (ex.: root)
+#   VPS_SSH_KEY  — chave privada no formato OpenSSH (conteúdo do id_ed25519)
+#   VPS_PATH     — caminho do projeto no servidor (ex.: /docker/assessor)
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy no VPS por SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.VPS_PATH }}"
+            echo "==> git pull"
+            git fetch --all --prune
+            git reset --hard origin/main
+            echo "==> docker compose up -d --build"
+            docker compose up -d --build assessor
+            echo "==> status"
+            docker compose ps assessor
+            echo "==> últimas 30 linhas de log"
+            docker compose logs --tail=30 assessor || true
+            echo "==> deploy ok"
