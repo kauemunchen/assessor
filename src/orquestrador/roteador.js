@@ -124,8 +124,13 @@ export async function tratarMensagem(msg, canal) {
   if (!msg.texto?.trim()) return 'Recebi uma mensagem vazia.';
 
   // confirmação de ação pendente
+  // Pendência só vale por 30 min; mais antiga é descartada (nunca executar ação esquecida por engano).
+  db.prepare("DELETE FROM pendencias WHERE chat_id=? AND criado_em < datetime('now','-30 minutes')").run(msg.chatId);
   const pend = db.prepare('SELECT * FROM pendencias WHERE chat_id=? ORDER BY id DESC LIMIT 1').get(msg.chatId);
-  if (pend && /^(sim|ok|confirmo|pode|vai|isso|confirmado)\b/i.test(msg.texto.trim())) {
+  // "Sim" só quando a mensagem é SÓ a confirmação ("pode", "iniciar", "bora"…). "Pode fazer de 201 a 300" é pedido novo.
+  const SIM = /^[✅👍\s]*(sim|s|ok|okay|confirmo|confirmado|confirma|pode|pode sim|pode ir|pode seguir|pode mandar|pode fazer|vai|isso|isso mesmo|iniciar|inicia|inicie|come[cç]a|manda|manda ver|bora|fechado|claro|positivo|segue|prossiga|aprovado|aprovo|👍|✅)[\s!.,👍✅]*$/i;
+  const NAO = /^[❌\s]*(n[aã]o|nao|n|cancela|cancelar|deixa|deixa pra l[aá]|esquece|para|parar|negativo|❌)[\s!.,❌]*$/i;
+  if (pend && SIM.test(msg.texto.trim())) {
     db.prepare('DELETE FROM pendencias WHERE id=?').run(pend.id);
     const acoes = pend.ferramenta === '__lote__' ? JSON.parse(pend.args) : [{ name: pend.ferramenta, args: JSON.parse(pend.args) }];
     const resultados = [];
@@ -140,7 +145,7 @@ export async function tratarMensagem(msg, canal) {
     try { const resposta = await responder({ prompt, conta, modulo: pend.modulo, msg: { ...msg, texto }, ativos: ativosC }); await memoria.registrarInteracao(conta.id, pend.modulo, { ...msg, texto: 'sim (confirmação)' }, resposta); return resposta; }
     catch (e) { return resultados.map(r => r.ok ? `✅ ${r.acao}` : `❌ ${r.acao}: ${r.erro}`).join('\n'); }
   }
-  if (pend && /^(n[aã]o|cancela|deixa)\b/i.test(msg.texto.trim())) {
+  if (pend && NAO.test(msg.texto.trim())) {
     db.prepare('DELETE FROM pendencias WHERE id=?').run(pend.id);
     const acoes = pend.ferramenta === '__lote__' ? JSON.parse(pend.args) : [{ name: pend.ferramenta, args: JSON.parse(pend.args) }];
     const { descreverAcao } = await import('./ia.js');

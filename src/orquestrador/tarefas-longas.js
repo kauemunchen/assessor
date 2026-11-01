@@ -7,8 +7,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS tarefas_longas (
   total_lotes INTEGER NOT NULL, lote_atual INTEGER DEFAULT 0, status TEXT DEFAULT 'ativa', falhas INTEGER DEFAULT 0, progresso TEXT DEFAULT '',
   ultimo_resultado TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP, atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP, proxima_em TEXT DEFAULT CURRENT_TIMESTAMP, concluido_em TEXT);
   CREATE INDEX IF NOT EXISTS ix_tarefas_longas ON tarefas_longas (status, proxima_em)`);
+for (const [c, d] of [['aviso_pendente', 'TEXT'], ['aviso_tentativas', 'INTEGER DEFAULT 0']]) { try { db.exec(`ALTER TABLE tarefas_longas ADD COLUMN ${c} ${d}`); } catch {} }
 // Se o container reiniciou no meio de um lote, devolve a tarefa para a fila.
 db.prepare("UPDATE tarefas_longas SET status='ativa' WHERE status='rodando'").run();
+const LIMITE_LOTE_MS = 18 * 60 * 1000;   // um lote nunca prende a fila por mais que isso
+const MAX_ABERTAS = 5;                    // por conta (1 rodando + fila)
 
 export const MAX_LOTES = 40;
 const INTERVALO_S = 15;           // pausa entre lotes (respiro para APIs e para o modelo)
@@ -18,14 +21,17 @@ export function criarTarefa(conta, chatId, modulo, { objetivo, instrucao_lote, t
   const total = Math.max(1, Math.min(MAX_LOTES, Math.round(Number(total_lotes) || 1)));
   if (!objetivo || !instrucao_lote) throw new Error('informe objetivo e instrução por lote');
   const abertas = db.prepare("SELECT COUNT(*) n FROM tarefas_longas WHERE conta_id=? AND status IN ('ativa','rodando')").get(conta.id).n;
-  if (abertas >= 3) throw new Error('já existem 3 tarefas em andamento nesta conta; espere terminar ou cancele uma');
+  if (abertas >= MAX_ABERTAS) throw new Error(`já existem ${MAX_ABERTAS} tarefas na fila desta conta; espere terminar ou cancele uma`);
   const id = Number(db.prepare('INSERT INTO tarefas_longas (conta_id, chat_id, modulo, objetivo, instrucao_lote, total_lotes) VALUES (?,?,?,?,?,?)').run(conta.id, chatId || null, modulo, String(objetivo).slice(0, 1500), String(instrucao_lote).slice(0, 1500), total).lastInsertRowid);
   setTimeout(() => tick().catch(() => {}), 2000);
-  return { id, total_lotes: total, status: 'ativa', aviso: `Tarefa #${id} criada: ${total} lote(s) em segundo plano. Aviso quando terminar.` };
+  // Tarefas da mesma conta rodam UMA de cada vez, em ordem (evita duas gravando na mesma aba ao mesmo tempo)
+  const antes = db.prepare("SELECT id FROM tarefas_longas WHERE conta_id=? AND status IN ('ativa','rodando') AND id<? ORDER BY id").all(conta.id, id).map(x => x.id);
+  return { id, total_lotes: total, status: antes.length ? 'na fila' : 'ativa', fila_antes: antes,
+    aviso: antes.length ? `Tarefa #${id} entrou na fila: começa sozinha quando a tarefa #${antes.join(', #')} terminar (${total} lote(s)). Aviso quando concluir.` : `Tarefa #${id} iniciada: ${total} lote(s) em segundo plano. Aviso quando concluir.` };
 }
 export function listarTarefas(contaId) {
   return db.prepare("SELECT id, objetivo, total_lotes, lote_atual, status, falhas, ultimo_resultado, criado_em, concluido_em FROM tarefas_longas WHERE conta_id=? ORDER BY id DESC LIMIT 10").all(contaId)
-    .map(t => ({ ...t, andamento: `${t.lote_atual}/${t.total_lotes} lotes` }));
+    .map(t => ({ ...t, status: t.status === 'ativa' && db.prepare("SELECT 1 FROM tarefas_longas WHERE conta_id=? AND status IN ('ativa','rodando') AND id<?").get(contaId, t.id) ? 'na fila' : t.status, andamento: `${t.lote_atual}/${t.total_lotes} lotes` }));
 }
 export function cancelarTarefa(contaId, id) {
   const r = db.prepare("UPDATE tarefas_longas SET status='cancelada', atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND conta_id=? AND status IN ('ativa','rodando','pausada')").run(Number(id), contaId);
@@ -39,12 +45,20 @@ export function retomarTarefa(contaId, id) {
   return { ok: true, id: Number(id), status: 'ativa' };
 }
 
+/** Entrega um aviso ao dono. Se não chegar (Telegram fora, rede), guarda e tenta de novo a cada ciclo da fila. */
 async function avisar(t, texto) {
+  let ok = false;
   try {
-    const { canalAtual } = await import('../canal/atual.js'); const c = canalAtual(); if (!c) return;
+    const { canalAtual } = await import('../canal/atual.js'); const c = canalAtual();
     const destino = t.chat_id || db.prepare("SELECT chat_id FROM usuarios WHERE conta_id=? AND papel='dono' ORDER BY canal<>'telegram', id LIMIT 1").get(t.conta_id)?.chat_id;
-    if (destino) await c.enviar(null, destino, texto);
+    if (c && destino) { const r = await c.enviar(null, destino, texto); ok = r == null || r.ok !== false; }
   } catch (e) { console.error('[tarefas] aviso falhou', e.message); }
+  if (ok) db.prepare('UPDATE tarefas_longas SET aviso_pendente=NULL, aviso_tentativas=0 WHERE id=?').run(t.id);
+  else { db.prepare('UPDATE tarefas_longas SET aviso_pendente=?, aviso_tentativas=aviso_tentativas+1 WHERE id=?').run(texto, t.id); console.warn(`[tarefas] aviso da #${t.id} não entregue — vou tentar de novo`); }
+  return ok;
+}
+async function reenviarAvisos() {
+  for (const t of db.prepare("SELECT * FROM tarefas_longas WHERE aviso_pendente IS NOT NULL AND aviso_tentativas < 30 ORDER BY id LIMIT 5").all()) await avisar(t, t.aviso_pendente);
 }
 
 let rodando = false;
@@ -52,7 +66,13 @@ let rodando = false;
 export async function tick({ responderFn } = {}) {
   if (rodando) return; rodando = true;
   try {
-    const t = db.prepare("SELECT * FROM tarefas_longas WHERE status='ativa' AND proxima_em <= CURRENT_TIMESTAMP ORDER BY atualizado_em LIMIT 1").get();
+    await reenviarAvisos();
+    // Vigia: lote marcado como "rodando" há muito tempo (travou) volta para a fila contando como falha.
+    db.prepare("UPDATE tarefas_longas SET status='ativa', falhas=falhas+1, ultimo_resultado='ERRO: lote travou e foi reiniciado' WHERE status='rodando' AND atualizado_em < datetime('now','-25 minutes')").run();
+    // Só a tarefa mais antiga em aberto de cada conta pode rodar (fila por conta); entre contas, rodízio.
+    const t = db.prepare(`SELECT * FROM tarefas_longas t WHERE status='ativa' AND proxima_em <= CURRENT_TIMESTAMP
+      AND id = (SELECT MIN(id) FROM tarefas_longas t2 WHERE t2.conta_id=t.conta_id AND t2.status IN ('ativa','rodando'))
+      ORDER BY atualizado_em LIMIT 1`).get();
     if (!t) return;
     if (!db.prepare("UPDATE tarefas_longas SET status='rodando', atualizado_em=CURRENT_TIMESTAMP WHERE id=? AND status='ativa'").run(t.id).changes) return;
     await rodarLote(t, responderFn);
@@ -83,17 +103,19 @@ Responda em UMA linha, começando exatamente com:
 - "ERRO: <motivo>" se não conseguiu.`;
   let resp; let erroExec = null;
   try {
-    resp = await rodarComContexto({ contaId: conta.id, modulo: t.modulo }, () =>
-      responder({ prompt: montarPrompt({ modulo: t.modulo, conta, ativos, texto }), conta, modulo: t.modulo, msg: { texto, chatId: t.chat_id, conta: 'telegram', tipo: 'texto' }, ativos, autoConfirmar: true, rodadas: 10 }));
+    let relogio; const estouro = new Promise((_, rej) => { relogio = setTimeout(() => rej(new Error('lote passou de 18 min e foi interrompido')), LIMITE_LOTE_MS); });
+    resp = await Promise.race([estouro, rodarComContexto({ contaId: conta.id, modulo: t.modulo }, () =>
+      responder({ prompt: montarPrompt({ modulo: t.modulo, conta, ativos, texto }), conta, modulo: t.modulo, msg: { texto, chatId: t.chat_id, conta: 'telegram', tipo: 'texto' }, ativos, autoConfirmar: true, rodadas: 10 }))]).finally(() => clearTimeout(relogio));
   } catch (e) { erroExec = e.message; }
-  const linha = String(typeof resp === 'string' ? resp : resp?.texto || erroExec || 'sem resposta').trim().split('\n').find(Boolean)?.slice(0, 500) || 'sem resposta';
+  const linha = String(typeof resp === 'string' ? resp : resp?.texto || (erroExec ? 'ERRO: ' + erroExec : '') || 'sem resposta').trim().split('\n').find(Boolean)?.slice(0, 500) || 'sem resposta';
   const fim = (status) => db.prepare(`UPDATE tarefas_longas SET status=?, lote_atual=?, progresso=?, ultimo_resultado=?, falhas=0, atualizado_em=CURRENT_TIMESTAMP, concluido_em=CURRENT_TIMESTAMP WHERE id=?`).run(status, n, novoProgresso, linha, t.id);
   const novoProgresso = (t.progresso + `\n- Lote ${n}: ${linha.replace(/^(LOTE OK|TAREFA CONCLUIDA):\s*/i, '')}`).trim().slice(-2500);
   console.log(`[tarefas] #${t.id} lote ${n}/${t.total_lotes}: ${linha.slice(0, 160)}`);
 
   if (/^TAREFA CONCLU[IÍ]DA/i.test(linha) || (/^LOTE OK/i.test(linha) && n >= t.total_lotes)) {
     fim('concluida');
-    return avisar(t, `✅ *Tarefa #${t.id} concluída* (${n} lote${n > 1 ? 's' : ''}).\n${t.objetivo.slice(0, 160)}\n\n${linha.replace(/^(LOTE OK|TAREFA CONCLUIDA):\s*/i, '')}`);
+    const prox = db.prepare("SELECT id FROM tarefas_longas WHERE conta_id=? AND status IN ('ativa','rodando') ORDER BY id LIMIT 1").get(t.conta_id);
+    return avisar(t, `✅ *Tarefa #${t.id} concluída* (${n} lote${n > 1 ? 's' : ''}).\n${t.objetivo.slice(0, 160)}\n\n${linha.replace(/^(LOTE OK|TAREFA CONCLUIDA):\s*/i, '')}${prox ? `\n\n▶️ Já comecei a próxima da fila: tarefa #${prox.id}.` : ''}`);
   }
   if (/^LOTE OK/i.test(linha)) {
     db.prepare(`UPDATE tarefas_longas SET status='ativa', lote_atual=?, progresso=?, ultimo_resultado=?, falhas=0, atualizado_em=CURRENT_TIMESTAMP, proxima_em=datetime('now', '+${INTERVALO_S} seconds') WHERE id=?`).run(n, novoProgresso, linha, t.id);

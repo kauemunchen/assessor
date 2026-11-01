@@ -2,7 +2,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const MODELO = process.env.MODELO_PADRAO || 'gemini-3.8-flash';
-const transitorio = (e) => /503|429|high demand|overloaded|RESOURCE_EXHAUSTED|UNAVAILABLE/i.test(String(e?.message || e));
+const transitorio = (e) => /503|429|high demand|overloaded|RESOURCE_EXHAUSTED|UNAVAILABLE|abort|timed? ?out|ETIMEDOUT|ECONNRESET|fetch failed/i.test(String(e?.message || e) + ' ' + String(e?.name || ''));
+// Limite de tempo por chamada: uma chamada travada no Google não pode prender a conversa (nem a fila de tarefas) para sempre.
+const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS || 90000);
 async function comRetry(fn, tentativas = 2) {
   let ultimo;
   for (let i = 0; i < tentativas; i++) {
@@ -29,12 +31,12 @@ let _creditos = null; import('../creditos/index.js').then(m => { _creditos = m; 
 let _registrar = null; import('../canal/api-marca.js').then(m => { _registrar = m.registrarUso; }).catch(() => {});
 export const modelo = (opts = {}, { rapido = false } = {}) => {
   const cadeia = rapido ? [RAPIDO, ...CADEIA.filter(x => x !== RAPIDO)] : CADEIA;
-  const m = genai.getGenerativeModel({ model: cadeia[0], ...opts });
+  const m = genai.getGenerativeModel({ model: cadeia[0], ...opts }, { timeout: TIMEOUT_MS });
   m.generateContent = async (...a) => {
     if (_creditos && contextoUso.contaId && !_creditos.podeUsar(contextoUso.contaId, { tolerancia: 3 })) throw new Error('sem créditos: recarregue em Créditos no app ou mande "comprar"');
     let ultimo;
     for (const nome of cadeia) {
-      const inst = genai.getGenerativeModel({ model: nome, ...opts });
+      const inst = genai.getGenerativeModel({ model: nome, ...opts }, { timeout: TIMEOUT_MS });
       try { const r = await comRetry(() => inst.generateContent(...a), nome === cadeia[0] ? 2 : 1); try { _registrar?.(contextoUso.contaId, contextoUso.modulo, nome, r?.response?.usageMetadata); } catch {} return r; }
       catch (e) { ultimo = e; if (!transitorio(e) && !/indisponível/i.test(String(e?.message))) throw e; console.warn(`[gemini] ${nome} falhou: ${String(e?.message).slice(0, 160)}`); }
     }

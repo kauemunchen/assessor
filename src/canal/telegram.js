@@ -60,10 +60,20 @@ export class TelegramCanal {
     let r = await this._post({ ...base, text: html, parse_mode: 'HTML' });
     if (!r.ok) r = await this._post({ ...base, text: semMarkdown(texto) });
     if (!r.ok) console.error('[telegram] sendMessage falhou:', r.description);
+    return r;
   }
   async digitando(chatId) { fetch(`${API}/bot${this.token}/sendChatAction`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, action: 'typing' }) }).catch(() => {}); }
-  async _post(body) {
-    return fetch(`${API}/bot${this.token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+  // Envio com nova tentativa: falha de rede ou 429 (Telegram pedindo para esperar) não pode perder a mensagem.
+  async _post(body, tentativas = 3) {
+    let ultimo = { ok: false, description: 'sem resposta' };
+    for (let i = 0; i < tentativas; i++) {
+      try {
+        const r = await fetch(`${API}/bot${this.token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(20000) }).then(x => x.json());
+        if (r.ok || (r.error_code && r.error_code !== 429 && r.error_code < 500)) return r; // ok, ou erro definitivo (ex.: HTML inválido) → quem chamou decide
+        ultimo = r; await new Promise(res => setTimeout(res, ((r.parameters?.retry_after || 2) * 1000)));
+      } catch (e) { ultimo = { ok: false, description: e.message }; console.warn(`[telegram] envio falhou (tentativa ${i + 1}):`, e.message); await new Promise(res => setTimeout(res, 2000 * (i + 1))); }
+    }
+    return ultimo;
   }
   async baixarMidia(ref) {
     const r = await fetch(`${API}/bot${this.token}/getFile?file_id=${ref}`).then(r => r.json());
