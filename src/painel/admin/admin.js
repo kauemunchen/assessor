@@ -265,10 +265,17 @@ telas.clientes = async () => {
         <label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="ceOpt"${r.marketing_optin === 1 ? ' checked' : ''}> Aceita receber ofertas e lançamentos</label>
         <p class="d" style="margin:0 0 12px">${r.marketing_optin_em ? 'Consentimento atualizado em ' + diaBr(r.marketing_optin_em) + '. ' : ''}Só marque se o cliente pediu — é registro de consentimento (LGPD).</p>
         <p class="d">Pago: <b>${fmtR(r.total_pago)}</b> em ${r.compras} compra(s) · última ${r.ultima_compra ? diaBr(r.ultima_compra) : '—'} · custo IA ${fmtR(r.custo_ia_brl)} · saldo ${fmtC(r.saldo)} créd.</p>
+        <div id="ceSenha" class="cartao" style="background:var(--fundo);margin:10px 0;padding:12px"><b>🔑 Acesso</b><p class="d" style="margin:4px 0 8px">Cliente não consegue entrar? Gere um link para ele criar uma senha nova (vale 24h).</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sec" id="ceLink">Gerar link de nova senha</button><label style="display:inline-flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" id="ceLinkEmail" checked style="width:auto"> enviar também por e-mail</label></div><div id="ceLinkRes"></div></div>
         <p style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:0"><button class="btn sec" id="ceConta">Abrir conta</button><button class="btn sec" id="ceFechar">Fechar</button><button class="btn prim" id="ceSalvar">Salvar</button></p>`;
       d.showModal();
       $('#ceFechar').onclick = () => d.close();
       $('#ceConta').onclick = () => { d.close(); abrirConta(r.id); };
+      $('#ceLink').onclick = async () => {
+        if ($('#ceEmail').value.trim() !== (r.email || '')) { const x = await post(`/api/admin/clientes/${r.id}`, { email: $('#ceEmail').value }); if (!x.ok) return; r.email = $('#ceEmail').value.trim(); }
+        const x = await post(`/api/admin/clientes/${r.id}/link-senha`, { enviar_email: $('#ceLinkEmail').checked }); if (!x.ok) return;
+        $('#ceLinkRes').innerHTML = `<p class="d" style="margin:10px 0 6px">✅ Link gerado para <b>${esc(x.email)}</b> (vale ${x.expira})${x.enviado_email ? ' e enviado por e-mail' : ''}. Código alternativo: <b class="mono">${x.codigo}</b></p><input id="ceLinkTxt" readonly value="${esc(x.link)}" style="width:100%;font-size:12px"><p style="display:flex;gap:8px;margin:8px 0 0;flex-wrap:wrap"><button class="btn sec" id="ceCopiar">Copiar mensagem</button>${x.whatsapp ? `<a class="btn ouro" href="${esc(x.whatsapp)}" target="_blank" rel="noopener">Enviar no WhatsApp do cliente</a>` : '<span class="d">sem WhatsApp cadastrado — copie e envie por onde preferir</span>'}</p>`;
+        $('#ceCopiar').onclick = async () => { try { await navigator.clipboard.writeText(x.mensagem); toast('📋 mensagem copiada'); } catch { $('#ceLinkTxt').select(); document.execCommand('copy'); toast('📋 link copiado'); } };
+      };
       $('#ceSalvar').onclick = async () => { const corpo = { empresa: $('#ceEmp').value, email: $('#ceEmail').value, telefone: $('#ceTel').value, tags: $('#ceTags').value, notas: $('#ceNotas').value }; if ($('#ceOpt').checked !== (r.marketing_optin === 1)) corpo.marketing_optin = $('#ceOpt').checked; const x = await post(`/api/admin/clientes/${r.id}`, corpo); if (x.ok) { toast('✅ salvo'); d.close(); render(); } };
     };
     $('#qcli').oninput = (e) => { q = e.target.value; clearTimeout(window._bcli); window._bcli = setTimeout(render, 250); };

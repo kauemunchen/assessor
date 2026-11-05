@@ -168,6 +168,35 @@ export function rotasClientes(app, auth, logAdmin) {
   app.get('/api/admin/campanhas', auth, (req, res) => res.json(db.prepare('SELECT * FROM campanhas ORDER BY id DESC LIMIT 100').all()));
   app.get('/api/admin/campanhas/:id/envios', auth, (req, res) => res.json(db.prepare('SELECT e.*, c.nome_dono, c.empresa FROM campanha_envios e LEFT JOIN contas c ON c.id=e.conta_id WHERE campanha_id=? ORDER BY e.id').all(Number(req.params.id))));
 
+  // Admin: gera link de nova senha para um cliente (válido 24h) — para atendimento imediato (WhatsApp, sem e-mail etc.)
+  app.post('/api/admin/clientes/:id/link-senha', auth, async (req, res) => {
+    const contaId = Number(req.params.id);
+    const conta = db.prepare('SELECT id, nome_dono, email, telefone FROM contas WHERE id=?').get(contaId);
+    if (!conta) return res.status(404).json({ erro: 'conta não encontrada' });
+    const u = db.prepare("SELECT * FROM usuarios WHERE conta_id=? AND papel='dono' ORDER BY (email IS NULL), (canal<>'web'), id LIMIT 1").get(contaId);
+    if (!u) return res.status(400).json({ erro: 'conta sem usuário dono' });
+    const email = String(u.email || conta.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ erro: 'cadastre um e-mail para este cliente antes (campo E-mail acima) — ele vai entrar com esse e-mail' });
+    db.exec(`CREATE TABLE IF NOT EXISTS senha_reset (id INTEGER PRIMARY KEY, usuario_id INTEGER NOT NULL, email TEXT NOT NULL, codigo_hash TEXT NOT NULL, token_hash TEXT NOT NULL, expira_em TEXT NOT NULL, usado_em TEXT, tentativas INTEGER DEFAULT 0, ip TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP)`);
+    const sha = (x) => crypto.createHash('sha256').update(String(x)).digest('hex');
+    const token = crypto.randomBytes(24).toString('hex'); const codigo = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    db.prepare("UPDATE senha_reset SET usado_em=COALESCE(usado_em, datetime('now')) WHERE usuario_id=? AND usado_em IS NULL").run(u.id);
+    db.prepare("INSERT INTO senha_reset (usuario_id, email, codigo_hash, token_hash, expira_em, ip) VALUES (?,?,?,?,datetime('now','+24 hours'),?)").run(u.id, email, sha(codigo), sha(token), 'admin:' + req.contaId);
+    const link = `${base()}/app/?reset=${token}&email=${encodeURIComponent(email)}`;
+    let enviado_email = false;
+    if (req.body?.enviar_email) {
+      try { const { enviarEmail, emailConfigurado, moldura } = await import('../integracoes/email.js');
+        if (emailConfigurado()) { const nome = (conta.nome_dono || '').split(' ')[0] || 'olá';
+          await enviarEmail({ para: email, assunto: 'Crie sua nova senha do Fiel', texto: `Oi, ${nome}. Use este link para criar sua nova senha (válido por 24h): ${link}\nOu o código: ${codigo}`,
+            html: moldura({ titulo: 'Crie sua nova senha', preheader: 'Link válido por 24 horas', botao: { texto: 'Criar nova senha', url: link }, nota: 'Este link foi gerado pelo atendimento do Fiel a seu pedido. Se não foi você, ignore — sua senha atual continua valendo.', corpoHtml: `<p style="margin:0 0 16px">Oi, ${nome}. Liberamos a criação de uma nova senha para a sua conta. Clique no botão abaixo (válido por 24 horas) ou use o código <b style="font-family:ui-monospace,Menlo,monospace;letter-spacing:3px">${codigo}</b> em "Esqueci minha senha".</p>` }) });
+          enviado_email = true; } } catch (e) { console.error('[admin] link-senha e-mail', e.message); }
+    }
+    logAdmin(req.contaId, 'cliente.link_senha', contaId, { email, enviado_email });
+    const tel = String(conta.telefone || '').replace(/\D/g, '').replace(/^55/, '');
+    const msgWa = `Oi, ${(conta.nome_dono || '').split(' ')[0]}! Aqui é do Fiel. Para criar sua nova senha, abra este link (válido por 24h): ${link} — entre com o e-mail ${email}.`;
+    res.json({ ok: true, link, email, codigo, expira: '24 horas', enviado_email, whatsapp: tel.length >= 10 ? `https://wa.me/55${tel}?text=${encodeURIComponent(msgWa)}` : null, mensagem: msgWa });
+  });
+
   // Descadastro público (link no rodapé dos e-mails de oferta)
   app.get('/descadastrar', (req, res) => {
     const t = String(req.query.t || ''); const c = t && db.prepare('SELECT id, nome_dono FROM contas WHERE descadastro_token=?').get(t);
