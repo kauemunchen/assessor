@@ -173,10 +173,18 @@ export function rotasClientes(app, auth, logAdmin) {
     const contaId = Number(req.params.id);
     const conta = db.prepare('SELECT id, nome_dono, email, telefone FROM contas WHERE id=?').get(contaId);
     if (!conta) return res.status(404).json({ erro: 'conta não encontrada' });
-    const u = db.prepare("SELECT * FROM usuarios WHERE conta_id=? AND papel='dono' ORDER BY (email IS NULL), (canal<>'web'), id LIMIT 1").get(contaId);
-    if (!u) return res.status(400).json({ erro: 'conta sem usuário dono' });
-    const email = String(u.email || conta.email || '').trim().toLowerCase();
+    let u = db.prepare("SELECT * FROM usuarios WHERE conta_id=? AND papel='dono' ORDER BY (email IS NULL), (canal<>'web'), id LIMIT 1").get(contaId);
+    const email = String(u?.email || conta.email || '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ erro: 'cadastre um e-mail para este cliente antes (campo E-mail acima) — ele vai entrar com esse e-mail' });
+    const outro = db.prepare('SELECT conta_id FROM usuarios WHERE lower(email)=? AND conta_id<>?').get(email, contaId);
+    if (outro) return res.status(400).json({ erro: `esse e-mail já é usado para entrar na conta #${outro.conta_id} — use outro e-mail para este cliente` });
+    let criado_acesso = false;
+    if (!u) {
+      // Conta sem usuário dono (conta antiga/legada): cria o acesso web de dono com o e-mail da ficha, para ele poder entrar.
+      db.prepare("INSERT INTO usuarios (conta_id, canal, chat_id, nome, papel, email) VALUES (?,?,?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET conta_id=excluded.conta_id, papel='dono', email=COALESCE(usuarios.email, excluded.email)").run(contaId, 'web', `web:${contaId}`, conta.nome_dono || 'Dono', 'dono', email);
+      u = db.prepare("SELECT * FROM usuarios WHERE chat_id=?").get(`web:${contaId}`); criado_acesso = true;
+      logAdmin(req.contaId, 'cliente.criar_acesso_dono', contaId, { email });
+    }
     db.exec(`CREATE TABLE IF NOT EXISTS senha_reset (id INTEGER PRIMARY KEY, usuario_id INTEGER NOT NULL, email TEXT NOT NULL, codigo_hash TEXT NOT NULL, token_hash TEXT NOT NULL, expira_em TEXT NOT NULL, usado_em TEXT, tentativas INTEGER DEFAULT 0, ip TEXT, criado_em TEXT DEFAULT CURRENT_TIMESTAMP)`);
     const sha = (x) => crypto.createHash('sha256').update(String(x)).digest('hex');
     const token = crypto.randomBytes(24).toString('hex'); const codigo = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -194,7 +202,7 @@ export function rotasClientes(app, auth, logAdmin) {
     logAdmin(req.contaId, 'cliente.link_senha', contaId, { email, enviado_email });
     const tel = String(conta.telefone || '').replace(/\D/g, '').replace(/^55/, '');
     const msgWa = `Oi, ${(conta.nome_dono || '').split(' ')[0]}! Aqui é do Fiel. Para criar sua nova senha, abra este link (válido por 24h): ${link} — entre com o e-mail ${email}.`;
-    res.json({ ok: true, link, email, codigo, expira: '24 horas', enviado_email, whatsapp: tel.length >= 10 ? `https://wa.me/55${tel}?text=${encodeURIComponent(msgWa)}` : null, mensagem: msgWa });
+    res.json({ ok: true, link, email, codigo, expira: '24 horas', enviado_email, criado_acesso, whatsapp: tel.length >= 10 ? `https://wa.me/55${tel}?text=${encodeURIComponent(msgWa)}` : null, mensagem: msgWa });
   });
 
   // Descadastro público (link no rodapé dos e-mails de oferta)
