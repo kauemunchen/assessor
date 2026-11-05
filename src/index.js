@@ -44,6 +44,9 @@ app.get(['/termos', '/termos/'], (_, res) => res.set('Cache-Control', 'no-cache'
 app.use('/termos', express.static(path.resolve('src/painel/termos'), { index: false, redirect: false, setHeaders: semCache }));
 app.get(['/privacidade', '/privacidade/'], (_, res) => res.set('Cache-Control', 'no-cache').sendFile(path.resolve('src/painel/privacidade/index.html')));
 app.use('/privacidade', express.static(path.resolve('src/painel/privacidade'), { index: false, redirect: false, setHeaders: semCache }));
+// Beta Fundadores — landing fechada do programa de 10 vagas BETA
+app.get(['/fundadores', '/fundadores/'], (_, res) => res.set('Cache-Control', 'no-cache').sendFile(path.resolve('src/painel/fundadores/index.html')));
+app.use('/fundadores', express.static(path.resolve('src/painel/fundadores'), { index: false, redirect: false, setHeaders: semCache }));
 app.get('/', (_, res) => res.redirect('/app'));
 
 const canal = criarCanal(process.env.CANAL || 'telegram', app, servidor);
