@@ -347,32 +347,57 @@ document.querySelectorAll('input, textarea, select').forEach(el => {
   el.addEventListener('blur', () => { el.style.borderColor = 'rgba(23,21,43,0.1)'; el.style.boxShadow = 'none'; });
 });
 
-document.getElementById('form-fundadores').addEventListener('submit', (e) => {
+document.getElementById('form-fundadores').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
-  const nome = f.nome.value.trim();
-  const empresa = f.empresa.value.trim();
-  const whatsapp = f.whatsapp.value.trim();
-  const dor = f.dor.value.trim();
-  const ritmo = f.ritmo.value;
+  const btn = f.querySelector('button[type="submit"]');
+  const btnOrig = btn.textContent;
+  btn.disabled = true;
+  btn.style.opacity = '0.65';
+  btn.textContent = 'Reservando sua vaga…';
 
-  const msg = `Oi Kauê! Quero uma vaga no beta Fiel Founders.
+  const payload = {
+    nome: f.nome.value.trim(),
+    empresa: f.empresa.value.trim(),
+    whatsapp: f.whatsapp.value.trim(),
+    dor: f.dor.value.trim(),
+    ritmo: f.ritmo.value,
+  };
 
-👤 ${nome}
-🏢 ${empresa}
-📱 ${whatsapp}
-⏱ Ritmo: ${ritmo || '—'}
+  const msgWpp = `Oi Kauê! Quero uma vaga no beta Fiel Founders.
+
+👤 ${payload.nome}
+🏢 ${payload.empresa}
+📱 ${payload.whatsapp}
+⏱ Ritmo: ${payload.ritmo || '—'}
 
 💥 Maior dor administrativa:
-${dor}
+${payload.dor}
 
 (Vim pelo formulário em usefiel.com/fundadores)`;
+  const urlWpp = `https://wa.me/${WHATSAPP_DESTINO}?text=${encodeURIComponent(msgWpp)}`;
 
-  const url = `https://wa.me/${WHATSAPP_DESTINO}?text=${encodeURIComponent(msg)}`;
+  let leadId = null;
+  try {
+    const r = await fetch('/fundadores/inscrever', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) leadId = j.id;
+  } catch (err) { /* não bloqueia o WhatsApp mesmo se a API cair */ }
 
   document.getElementById('success').style.display = 'block';
   document.getElementById('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  setTimeout(() => { window.open(url, '_blank'); }, 400);
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.textContent = btnOrig;
+
+  // Sinaliza (best-effort) que a pessoa clicou — depois de abrir o WhatsApp
+  if (leadId) { navigator.sendBeacon?.(`/fundadores/confirmar/${leadId}`); }
+
+  setTimeout(() => { window.open(urlWpp, '_blank'); }, 400);
 });
 </script>
 </body>
