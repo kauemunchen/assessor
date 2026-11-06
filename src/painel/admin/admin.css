@@ -69,3 +69,17 @@
 .camp-tg-bolha{max-width:88%;background:#fff;color:#111;border-radius:14px 14px 14px 4px;padding:10px 12px;font-size:14px;line-height:1.45;box-shadow:0 1px 1px rgba(0,0,0,.12);word-wrap:break-word}
 .camp-tg-bolha a{color:#2A7AB8}
 .campo label.camp-chip,.camp-seg label{font-style:normal;font-family:inherit;font-size:inherit;color:inherit}
+
+/* ---------- Celular: barra do topo com ☰ e menu em gaveta ---------- */
+.admin-topo-mobile{display:none}
+.veu-menu{display:none}
+@media (max-width:860px){
+  .admin-topo-mobile{display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));background:var(--papel);border-bottom:1px solid var(--linha)}
+  .admin-topo-mobile .icone{font-size:20px;width:40px;height:40px;border-radius:10px;border:1px solid var(--linha);background:var(--branco);color:var(--tinta);display:inline-grid;place-items:center}
+  .admin-topo-titulo{font-family:var(--f-display);font-size:17px;color:var(--tinta)}
+  #lateral{z-index:20;box-shadow:4px 0 24px rgba(0,0,0,.18);padding-top:max(20px,env(safe-area-inset-top))}
+  #lateral .topo-lateral{display:flex;align-items:flex-start;justify-content:space-between;flex-direction:row-reverse}
+  .veu-menu.on{display:block;position:fixed;inset:0;z-index:15;background:rgba(23,21,43,.45)}
+  #principal{display:flex;flex-direction:column;min-height:100vh}
+  #tela.config{padding:16px 14px 40px!important}
+}

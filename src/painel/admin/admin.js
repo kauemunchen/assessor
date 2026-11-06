@@ -15,10 +15,15 @@ const telas = {};
 async function iniciar() {
   try { const r = await api('/api/admin/resumo'); if (!r.produto) throw new Error('sem acesso'); } catch { return; }
   $('#app').classList.remove('oculto'); montarTela('resumo');
-  document.querySelectorAll('.menu a').forEach(a => a.onclick = () => montarTela(a.dataset.tela));
+  document.querySelectorAll('.menu a').forEach(a => a.onclick = () => { montarTela(a.dataset.tela); fecharMenu(); });
+  // Celular: menu em gaveta (☰ abre; ✕, véu ou escolher uma tela fecha)
+  $('#abrirLateral').onclick = () => { $('#lateral').classList.add('aberta'); $('#veu').classList.add('on'); };
+  $('#fecharLateral').onclick = fecharMenu; $('#veu').onclick = fecharMenu;
 }
+function fecharMenu() { $('#lateral')?.classList.remove('aberta'); $('#veu')?.classList.remove('on'); }
 function montarTela(nome) {
   document.querySelectorAll('.menu a').forEach(a => a.classList.toggle('ativo', a.dataset.tela === nome));
+  const item = document.querySelector(`.menu a[data-tela="${nome}"]`); if (item && $('#topoTitulo')) $('#topoTitulo').textContent = item.textContent.trim();
   $('#tela').innerHTML = '<p class="sub">carregando…</p>'; telas[nome]().then(({ titulo, sub, corpo, depois }) => { $('#tela').innerHTML = `<h1>${titulo}</h1><p class="sub">${sub || ''}</p>${corpo}`; depois?.(); });
 }
 
