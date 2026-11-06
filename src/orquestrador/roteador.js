@@ -101,7 +101,8 @@ export async function tratarMensagem(msg, canal) {
       try {
         const { receberArquivo } = await import('../ferramentas/documentos.js');
         const doc = await receberArquivo(conta, { bytes, mime: msg.midia.mime, nome: msg.midia.nome || '' });
-        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Documento recebido do dono e JÁ ARQUIVADO no Drive. Dados: ${JSON.stringify(doc)}. Confirme em até 3 linhas: o que é, onde guardou (pasta) e o link; se houver vigência, diga a data e que os avisos estão agendados; se "legivel" for false, peça uma foto melhor ou que ele descreva o documento; se faltar empresa/tipo óbvios, pergunte. Não invente dados.]`;
+        if (doc.duplicado) msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[DUPLICADO — NÃO arquivei de novo: ${doc.motivo}. Original: ${JSON.stringify(doc.documento_original)}. Diga em 2 linhas que esse documento já estava guardado (título, pasta, link do original) e que não criei cópia.]`;
+        else msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Documento recebido do dono e JÁ ARQUIVADO no Drive. Dados: ${JSON.stringify(doc)}. Confirme em até 3 linhas: o que é, onde guardou (pasta) e o link; se houver vigência, diga a data e que os avisos estão agendados; se "legivel" for false, peça uma foto melhor ou que ele descreva o documento; se faltar empresa/tipo óbvios, pergunte. Não invente dados.]`;
         msg.forcarModulo = 'documentos';
       } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Documento recebido mas NÃO arquivado. Erro real: ${e.message}. Repita o erro ao dono e diga o que ele precisa fazer.]`; msg.forcarModulo = 'documentos'; }
     } else if (destino === 'financeiro') {
@@ -146,6 +147,7 @@ export async function tratarMensagem(msg, canal) {
   if (msg.tipo === 'texto' && !msg.linkTratado && ativosAgora.includes('documentos') && /drive\.google\.com\/(file|open|uc)|docs\.google\.com\/(document|presentation)\/d\//.test(msg.texto) && !/^documentos pasta/i.test(msg.texto.trim())) {
     await canal.enviar(msg.conta, msg.chatId, '📂 Lendo o arquivo do Drive e arquivando…');
     try { const { receberLinkDrive } = await import('../ferramentas/documentos.js'); const doc = await receberLinkDrive(conta, msg.texto);
+      if (doc.duplicado) msg.texto += `\n[DUPLICADO — NÃO arquivei de novo: ${doc.motivo}. Original: ${JSON.stringify(doc.documento_original)}. Diga em 2 linhas que já estava guardado (título, pasta, link do original).]`; else
       msg.texto += `\n[Arquivo do Drive JÁ MOVIDO para a pasta certa e registrado. Dados: ${JSON.stringify(doc)}. Confirme em até 3 linhas (o que é, pasta, link, vigência se houver). Não invente dados.]`; }
     catch (e) { msg.texto += `\n[Link do Drive recebido mas não consegui arquivar. Erro real: ${e.message}. Repita ao dono.]`; }
     msg.forcarModulo = 'documentos';

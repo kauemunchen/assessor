@@ -74,8 +74,13 @@ export async function upload(contaId, { nome, mime, bytes, pastaId, descricao })
   return { id: r.data.id, nome: r.data.name, link: r.data.webViewLink, tamanho: Number(r.data.size || 0), mime: r.data.mimeType };
 }
 export async function metadados(contaId, fileId) {
-  const r = await auth(contaId).files.get({ fileId, fields: 'id,name,mimeType,size,webViewLink,parents,createdTime' }).catch(e => { throw traduzErro(e); });
-  return { id: r.data.id, nome: r.data.name, mime: r.data.mimeType, tamanho: Number(r.data.size || 0), link: r.data.webViewLink, pais: r.data.parents || [] };
+  const r = await auth(contaId).files.get({ fileId, fields: 'id,name,mimeType,size,webViewLink,parents,createdTime,md5Checksum' }).catch(e => { throw traduzErro(e); });
+  return { id: r.data.id, nome: r.data.name, mime: r.data.mimeType, tamanho: Number(r.data.size || 0), link: r.data.webViewLink, pais: r.data.parents || [], md5: r.data.md5Checksum || null };
+}
+/** Manda o arquivo para a lixeira do Drive (o dono recupera em até 30 dias). */
+export async function lixeira(contaId, fileId) {
+  await auth(contaId).files.update({ fileId, requestBody: { trashed: true } }).catch(e => { throw traduzErro(e); });
+  return { ok: true };
 }
 export async function baixar(contaId, fileId) {
   const r = await auth(contaId).files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' }).catch(e => { throw traduzErro(e); });

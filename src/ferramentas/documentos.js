@@ -3,6 +3,27 @@ import * as drive from '../integracoes/google-drive.js';
 import * as gcal from '../integracoes/google-calendar.js';
 import { lerArquivoJSON } from '../integracoes/gemini.js';
 import { db } from '../db/index.js';
+import crypto from 'node:crypto';
+try { db.exec('ALTER TABLE documentos ADD COLUMN hash TEXT'); } catch {}
+try { db.exec('ALTER TABLE documentos ADD COLUMN identificador TEXT'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS ix_doc_hash ON documentos (conta_id, hash)'); } catch {}
+const md5 = (b) => crypto.createHash('md5').update(Buffer.from(b)).digest('hex');
+const soDigitos = (x) => String(x || '').replace(/\D/g, '');
+/** Identificador estável do conteúdo: chave de acesso da NF (44 dígitos) ou tipo+número+emissor+valor. */
+function identificadorDe(dados = {}) {
+  const c = dados.campos || {}; const todos = JSON.stringify(dados);
+  const chave = soDigitos(dados.chave_acesso || c.chave_acesso || c['chave de acesso'] || (todos.match(/\b(\d[\d\s.]{50,60}\d)\b/) || [])[1]);
+  if (chave.length === 44) return 'chave:' + chave;
+  const numero = String(dados.numero || c.numero || c['número'] || c.numero_documento || c['número do documento'] || c.nfse || c.numero_nota || '').replace(/[^\w]/g, '');
+  const emissor = soDigitos(c.cnpj_emissor || c.cnpj_prestador || c.cnpj || c.CNPJ) || semAcento(dados.contraparte || '').replace(/[^a-z0-9]/g, '').slice(0, 30);
+  if (numero && emissor) return `num:${semAcento(dados.tipo || '').slice(0, 4)}:${numero}:${emissor}:${dados.valor != null ? Number(dados.valor).toFixed(2) : ''}`;
+  return null;
+}
+function jaArquivado(contaId, { hash, identificador }) {
+  const por = (col, v) => v && db.prepare(`SELECT id, titulo, empresa, tipo, pasta, drive_link, data_doc, criado_em FROM documentos WHERE conta_id=? AND ${col}=? AND COALESCE(status,'ativo')<>'removido' ORDER BY id LIMIT 1`).get(contaId, v);
+  return por('hash', hash) || por('identificador', identificador) || null;
+}
+const respostaDuplicado = (orig, motivo) => ({ duplicado: true, motivo, nao_arquivado: true, documento_original: { documento_id: orig.id, titulo: orig.titulo, pasta: orig.pasta, link: orig.drive_link, arquivado_em: orig.criado_em } });
 
 export const TIPOS = ['Contratos', 'Fiscal', 'Pessoal', 'Veículos', 'Licenças', 'Imóveis', 'Financeiro', 'Jurídico', 'Seguros', 'Outros'];
 const LIMITE_OCR = 18 * 1024 * 1024; // inline do Gemini
@@ -23,39 +44,47 @@ export function normalizarEmpresa(nome, conta) {
 }
 const PROMPT_OCR = (empresas) => `Você classifica documentos de um empresário brasileiro. Empresas dele: ${empresas || 'desconhecidas'} — use EXATAMENTE um desses nomes em "empresa" quando o documento for de uma delas (razão social, nome fantasia ou CNPJ relacionado); se for pessoal (nome dele como pessoa física), empresa = "PF".
 Leia o arquivo e devolva JSON com:
-{"tipo": um de [${TIPOS.join(', ')}], "empresa": nome da empresa do dono a que pertence ou "PF" ou "Geral", "titulo": título curto e descritivo (ex.: "Contrato de prestação de serviços — Oficina Silva"), "contraparte": outra parte/emissor, "data_doc": "YYYY-MM-DD" ou null, "resumo": até 2 frases, "valor": número ou null, "vigencia": {"inicio": "YYYY-MM-DD"|null, "fim": "YYYY-MM-DD"|null, "renovacao_auto": bool, "aviso_previo_dias": número|null} ou null, "validade": "YYYY-MM-DD"|null (para certidão, alvará, CNH, apólice, licença), "sensivel": bool (RG, CPF, CNH, dados bancários, saúde), "legivel": bool, "campos": {outros dados úteis: CNPJ, CPF, número do documento, placa, endereço...}}
+{"tipo": um de [${TIPOS.join(', ')}], "empresa": nome da empresa do dono a que pertence ou "PF" ou "Geral", "titulo": título curto e descritivo (ex.: "Contrato de prestação de serviços — Oficina Silva"), "contraparte": outra parte/emissor, "data_doc": "YYYY-MM-DD" ou null, "resumo": até 2 frases, "valor": número ou null, "vigencia": {"inicio": "YYYY-MM-DD"|null, "fim": "YYYY-MM-DD"|null, "renovacao_auto": bool, "aviso_previo_dias": número|null} ou null, "validade": "YYYY-MM-DD"|null (para certidão, alvará, CNH, apólice, licença), "sensivel": bool (RG, CPF, CNH, dados bancários, saúde), "legivel": bool, "numero": número do documento (NF/NFS-e, contrato, apólice, boleto) ou null, "chave_acesso": chave de acesso da NF-e/NFS-e só com dígitos ou null, "campos": {outros dados úteis: CNPJ do emissor (cnpj_emissor), CPF, placa, endereço...}}
 Se não conseguir ler, "legivel": false e o resto null.`;
 
 /** Ponto de entrada quando o dono manda um arquivo/foto que é documento. Arquiva no Drive e registra; devolve contexto para a persona. */
 export async function receberArquivo(conta, { bytes, mime, nome }) {
   const empresas = listaEmpresas(conta).join(', ');
+  const hash = md5(bytes); const igual = jaArquivado(conta.id, { hash });
+  if (igual) return respostaDuplicado(igual, 'arquivo idêntico ao que já está arquivado');
   let dados = {};
   if (bytes.byteLength <= LIMITE_OCR && /^(image\/|application\/pdf)/.test(mime || '')) {
     try { dados = await lerArquivoJSON(bytes, mime, PROMPT_OCR(empresas)); } catch (e) { dados = { erro_ocr: e.message }; }
   } else dados = { legivel: false, motivo: 'arquivo grande ou formato sem OCR; classificado pelo nome' };
-  return arquivar(conta, { bytes, mime, nomeOriginal: nome, dados });
+  const identificador = identificadorDe(dados); const mesmo = jaArquivado(conta.id, { identificador });
+  if (mesmo) return respostaDuplicado(mesmo, 'mesmo documento (mesma chave/número, emissor e valor) já arquivado em outro arquivo');
+  return arquivar(conta, { bytes, mime, nomeOriginal: nome, dados, hash, identificador });
 }
 /** Dono mandou link do Drive: move o arquivo para a pasta certa e registra. */
 export async function receberLinkDrive(conta, texto) {
   const id = drive.extrairId(texto); if (!id) throw new Error('Não reconheci o link do Drive.');
   const m = await drive.metadados(conta.id, id);
   if (m.mime === 'application/vnd.google-apps.folder') throw new Error('É uma pasta; mande o link de um arquivo (ou diga "documentos pasta <link>" para usá-la como raiz).');
+  const ja = db.prepare("SELECT id, titulo, empresa, tipo, pasta, drive_link, data_doc, criado_em FROM documentos WHERE conta_id=? AND drive_id=? AND COALESCE(status,'ativo')<>'removido'").get(conta.id, id) || jaArquivado(conta.id, { hash: m.md5 });
+  if (ja) return respostaDuplicado(ja, 'esse arquivo já está arquivado');
   let dados = {}; const empresas = listaEmpresas(conta).join(', ');
   if (m.tamanho && m.tamanho <= LIMITE_OCR && /^(image\/|application\/pdf)/.test(m.mime)) {
     try { dados = await lerArquivoJSON(await drive.baixar(conta.id, id), m.mime, PROMPT_OCR(empresas)); } catch (e) { dados = { erro_ocr: e.message }; }
   } else dados = { legivel: false, motivo: 'arquivo grande ou formato sem OCR; classificado pelo nome' };
-  return arquivar(conta, { driveId: id, mime: m.mime, tamanho: m.tamanho, nomeOriginal: m.nome, dados });
+  const identificador = identificadorDe(dados); const mesmo = jaArquivado(conta.id, { identificador });
+  if (mesmo) return respostaDuplicado(mesmo, 'mesmo documento (mesma chave/número, emissor e valor) já arquivado em outro arquivo — não movi o arquivo do link');
+  return arquivar(conta, { driveId: id, mime: m.mime, tamanho: m.tamanho, nomeOriginal: m.nome, dados, hash: m.md5, identificador });
 }
 
-async function arquivar(conta, { bytes, driveId, mime, tamanho, nomeOriginal = '', dados = {} }) {
+async function arquivar(conta, { bytes, driveId, mime, tamanho, nomeOriginal = '', dados = {}, hash = null, identificador = null }) {
   const tipo = tipoValido(dados.tipo); const empresa = normalizarEmpresa(dados.empresa, conta);
   const dataDoc = dados.data_doc || hoje(); const ano = dataDoc.slice(0, 4);
   const titulo = dados.titulo || nomeOriginal.replace(/\.\w+$/, '') || `Documento ${dataDoc}`;
   const nome = `${dataDoc}_${slug(tipo.replace(/s$/, ''))}_${slug(titulo) || 'documento'}.${ext(mime, nomeOriginal)}`;
   const pastaId = await drive.pastaDestino(conta.id, { empresa, tipo, ano });
   const arq = bytes ? await drive.upload(conta.id, { nome, mime, bytes, pastaId, descricao: dados.resumo }) : await drive.mover(conta.id, driveId, pastaId, nome);
-  const r = db.prepare(`INSERT INTO documentos (conta_id, empresa, tipo, titulo, contraparte, data_doc, drive_id, drive_link, pasta, mime, tamanho, resumo, dados_json, sensivel)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(conta.id, empresa, tipo, titulo, dados.contraparte || null, dataDoc, arq.id, arq.link, `${empresa}/${tipo}/${ano}`, mime, tamanho ?? bytes?.byteLength ?? null, dados.resumo || null, JSON.stringify(dados), dados.sensivel ? 1 : 0);
+  const r = db.prepare(`INSERT INTO documentos (conta_id, empresa, tipo, titulo, contraparte, data_doc, drive_id, drive_link, pasta, mime, tamanho, resumo, dados_json, sensivel, hash, identificador)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(conta.id, empresa, tipo, titulo, dados.contraparte || null, dataDoc, arq.id, arq.link, `${empresa}/${tipo}/${ano}`, mime, tamanho ?? bytes?.byteLength ?? null, dados.resumo || null, JSON.stringify(dados), dados.sensivel ? 1 : 0, hash, identificador);
   const doc = { documento_id: r.lastInsertRowid, titulo, empresa, tipo, pasta: `${empresa}/${tipo}/${ano}`, link: arq.link, contraparte: dados.contraparte, data_doc: dataDoc, resumo: dados.resumo, valor: dados.valor, sensivel: !!dados.sensivel, legivel: dados.legivel !== false, campos: dados.campos };
   // Vigência/validade detectada → registra e agenda avisos automaticamente
   const fim = dados.vigencia?.fim || dados.validade;
@@ -80,6 +109,8 @@ async function registrarVigencia(conta, a) {
 
 export function ferramentas(_conta) {
   return [
+    { name: 'verificar_duplicados', description: 'Procura documentos arquivados em duplicidade (mesmo arquivo ou mesma nota/documento). Use quando o dono perguntar se duplicou ou pedir limpeza.', parameters: { type: 'OBJECT', properties: {} } },
+    { name: 'remover_documento', description: 'Remove um documento arquivado em duplicidade ou por engano: tira do registro e manda o arquivo para a lixeira do Drive (recuperável por 30 dias). Exige confirmação.', parameters: { type: 'OBJECT', properties: { documento_id: { type: 'NUMBER' } }, required: ['documento_id'] } },
     { name: 'buscar_documento', description: 'Busca documentos arquivados por descrição (título, contraparte, empresa, tipo, texto). Devolve até 5 com link do Drive.', parameters: { type: 'OBJECT', properties: { texto: { type: 'STRING' }, empresa: { type: 'STRING' }, tipo: { type: 'STRING', description: TIPOS.join('|') } }, required: ['texto'] } },
     { name: 'ler_documento', description: 'Abre o arquivo (do banco por documento_id, ou qualquer arquivo do Drive por drive_id) e responde uma pergunta sobre o conteúdo: "qual o CPF?", "qual a data de validade?", "qual o valor e a vigência?". Devolve o dado completo. Use depois de buscar_documento.', parameters: { type: 'OBJECT', properties: { documento_id: { type: 'NUMBER' }, drive_id: { type: 'STRING' }, pergunta: { type: 'STRING' } }, required: ['pergunta'] } },
     { name: 'listar_documentos', description: 'Lista documentos recentes, filtrando por empresa/tipo/período.', parameters: { type: 'OBJECT', properties: { empresa: { type: 'STRING' }, tipo: { type: 'STRING' }, de: { type: 'STRING', description: 'YYYY-MM-DD' }, ate: { type: 'STRING' }, max: { type: 'NUMBER' } } } },
@@ -94,7 +125,7 @@ export function ferramentas(_conta) {
     { name: 'pasta_raiz', description: 'Mostra onde os documentos estão sendo guardados no Drive (link da pasta raiz).', parameters: { type: 'OBJECT', properties: {} } },
   ];
 }
-export const requerConfirmacao = new Set(['encerrar_vigencia']);
+export const requerConfirmacao = new Set(['encerrar_vigencia', 'remover_documento']);
 
 const mapaDoc = (d) => ({ documento_id: d.id, titulo: d.titulo, empresa: d.empresa, tipo: d.tipo, contraparte: d.contraparte, data: d.data_doc, pasta: d.pasta, link: d.drive_link, resumo: d.resumo, sensivel: !!d.sensivel });
 
@@ -125,6 +156,24 @@ export async function executar(nome, a, conta, ctx) {
       const rows = db.prepare(`SELECT * FROM documentos WHERE conta_id=? AND status='ativo' ${a.empresa ? 'AND lower(empresa) LIKE ?' : ''} ${a.tipo ? 'AND lower(tipo) LIKE ?' : ''} ${a.de ? 'AND data_doc>=?' : ''} ${a.ate ? 'AND data_doc<=?' : ''} ORDER BY data_doc DESC LIMIT ?`)
         .all(conta.id, ...(a.empresa ? [`%${a.empresa.toLowerCase()}%`] : []), ...(a.tipo ? [`%${a.tipo.toLowerCase().slice(0, 5)}%`] : []), ...(a.de ? [a.de] : []), ...(a.ate ? [a.ate] : []), a.max || 20);
       return rows.map(mapaDoc);
+    }
+    case 'verificar_duplicados': {
+      const docs = db.prepare("SELECT id, titulo, pasta, drive_link, hash, identificador, dados_json, criado_em FROM documentos WHERE conta_id=? AND COALESCE(status,'ativo')<>'removido' ORDER BY id").all(conta.id);
+      const grupos = {};
+      for (const d of docs) { let ident = d.identificador; if (!ident) { try { ident = identificadorDe(JSON.parse(d.dados_json || '{}')); } catch {} }
+        for (const k of [d.hash && 'h:' + d.hash, ident && 'i:' + ident].filter(Boolean)) (grupos[k] ||= new Map()).set(d.id, d); }
+      const vistos = new Set(); const dup = [];
+      for (const g of Object.values(grupos)) { const l = [...g.values()]; if (l.length < 2) continue; const chave = l.map(x => x.id).join(','); if (vistos.has(chave)) continue; vistos.add(chave);
+        dup.push({ manter: { documento_id: l[0].id, titulo: l[0].titulo, link: l[0].drive_link, arquivado_em: l[0].criado_em }, copias: l.slice(1).map(x => ({ documento_id: x.id, titulo: x.titulo, link: x.drive_link, arquivado_em: x.criado_em })) }); }
+      return { total_duplicados: dup.reduce((n, g) => n + g.copias.length, 0), grupos: dup, instrucao: dup.length ? 'Mostre os grupos e ofereça remover as cópias com remover_documento (mantém o mais antigo).' : 'Nenhuma duplicidade encontrada.' };
+    }
+    case 'remover_documento': {
+      const d = db.prepare("SELECT * FROM documentos WHERE id=? AND conta_id=? AND COALESCE(status,'ativo')<>'removido'").get(Number(a.documento_id), conta.id);
+      if (!d) throw new Error(`documento #${a.documento_id} não encontrado`);
+      let lixeira = false; if (d.drive_id) { try { await drive.lixeira(conta.id, d.drive_id); lixeira = true; } catch (e) { return { ok: false, erro: `não consegui mandar para a lixeira do Drive: ${e.message}` }; } }
+      db.prepare("UPDATE documentos SET status='removido' WHERE id=?").run(d.id);
+      try { db.prepare("UPDATE vigencias SET status='encerrada' WHERE documento_id=?").run(d.id); } catch {}
+      return { ok: true, removido: d.id, titulo: d.titulo, arquivo_na_lixeira_do_drive: lixeira, observacao: 'recuperável na lixeira do Drive por 30 dias' };
     }
     case 'atualizar_documento': {
       const d = db.prepare('SELECT * FROM documentos WHERE id=? AND conta_id=?').get(a.documento_id, conta.id); if (!d) throw new Error('Documento não encontrado.');
