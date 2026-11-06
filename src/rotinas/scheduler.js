@@ -80,6 +80,13 @@ async function avisarTokenInstagram(canal) {
     await canal.enviar(r.conta_id, r.chat_id, `📸 O token do Instagram ${dias <= 0 ? 'venceu' : `vence em ${dias} dia(s)`} (${r.expira_em.split('-').reverse().join('/')}). Gere um novo em Meus apps → KM Graph API → Instagram → Gerar tokens e mande "conectar instagram <token>".`).catch(() => {});
   }
 }
+async function avisarFinanceiro(canal) {
+  const { avisosFinanceiros } = await import('../ferramentas/financeiro.js');
+  for (const u of db.prepare("SELECT u.conta_id, u.chat_id FROM usuarios u JOIN modulos m ON m.conta_id=u.conta_id AND m.modulo='financeiro' AND m.ligado=1 WHERE u.papel='dono' GROUP BY u.conta_id ORDER BY u.canal<>'telegram'").all()) {
+    try { const avisos = avisosFinanceiros(u.conta_id); if (avisos.length) await canal.enviar(u.conta_id, u.chat_id, `💰 *Tina · contas a pagar/receber*\n${avisos.slice(0, 15).join('\n')}${avisos.length > 15 ? `\n…e mais ${avisos.length - 15}. Peça "contas em aberto".` : ''}`); }
+    catch (e) { console.error('financeiro avisos', u.conta_id, e.message); }
+  }
+}
 async function avisarVencimentos(canal) {
   for (const u of db.prepare("SELECT u.conta_id, u.chat_id FROM usuarios u JOIN modulos m ON m.conta_id=u.conta_id AND m.modulo='documentos' AND m.ligado=1 WHERE u.papel='dono'").all()) {
     try { const avisos = avisosDeVencimento(u.conta_id); if (avisos.length) await canal.enviar(u.conta_id, u.chat_id, `⏰ Vencimentos:\n${avisos.join('\n')}`); }
@@ -131,6 +138,7 @@ export function iniciarRotinas(canal) {
     }
   }, { timezone: TZ });
   cron.schedule('0 8 * * *', () => avisarVencimentos(canal), { timezone: TZ });
+  cron.schedule('5 8 * * *', () => avisarFinanceiro(canal), { timezone: TZ });
   cron.schedule('5 8 * * *', () => avisarTokenInstagram(canal), { timezone: TZ });
   cron.schedule('0 3 * * *', () => limparBiblioteca(canal).catch(e => console.error('limparBiblioteca', e.message)), { timezone: TZ });
   cron.schedule('0 9 * * 1', () => avisarAdminsInativas().catch(e => console.error('inativas', e.message)), { timezone: TZ });

@@ -51,6 +51,7 @@ export async function tratarMensagem(msg, canal) {
   }
   const DOC_RX = /\b(guarda|arquiva|arquivo|documento|contrato|nota|boleto|certid[ãa]o|alvar[áa]|ap[óo]lice|comprovante|recibo|cadastro|rg|cnh|cpf|cnpj|procura[çc][ãa]o|holerite|extrato)\b/i;
   const SOCIAL_RX = /\b(post|legenda|instagram|story|stories|reels?|carrossel|marca d.?[áa]gua|publica)\b/i;
+  const FIN_RX = /\b(extrato|fatura|boleto|comprovante|pix|tina|financeiro|lan[çc]a(r)?|pagar|pago|paguei|recebi|cart[ãa]o de cr[ée]dito)\b/i;
   if (msg.tipo === 'video') {
     if (!ativosAgora.includes('social')) msg.texto = (msg.texto ? msg.texto + '\n' : '') + '[vídeo recebido; para publicar no Instagram, ligue a MIA: "ativa social"]';
     else if (msg.midia?.tamanho > 20 * 1024 * 1024 && !process.env.TELEGRAM_API_BASE) return `🎬 Esse vídeo tem ${(msg.midia.tamanho / 1048576).toFixed(0)} MB e o Telegram só me entrega até 20 MB. Suba no Google Drive e me mande o link aqui dizendo "MIA, esse é o reels de quinta" — eu baixo, hospedo e agendo igual.`;
@@ -66,22 +67,35 @@ export async function tratarMensagem(msg, canal) {
     }
   }
   if (msg.tipo === 'imagem' || msg.tipo === 'arquivo') {
-    const temDoc = ativosAgora.includes('documentos'), temSocial = ativosAgora.includes('social') && msg.tipo === 'imagem';
+    const temDoc = ativosAgora.includes('documentos'), temSocial = ativosAgora.includes('social') && msg.tipo === 'imagem', temFin = ativosAgora.includes('financeiro');
+    const nomeArq = String(msg.midia?.nome || '').toLowerCase(); const legenda = msg.texto || '';
     let destino = temDoc && !temSocial ? 'documentos' : temSocial && !temDoc ? 'social' : null;
     if (!destino && temDoc && temSocial) {
-      if (SOCIAL_RX.test(msg.texto)) destino = 'social'; else if (DOC_RX.test(msg.texto)) destino = 'documentos';
+      if (SOCIAL_RX.test(legenda)) destino = 'social'; else if (DOC_RX.test(legenda)) destino = 'documentos';
+    }
+    // Tina: OFX/CSV sempre; legenda financeira (extrato, boleto, comprovante, pix…) vai para ela; sem legenda clara, a IA decide abaixo
+    if (temFin) {
+      if (/\.(ofx|csv)$/.test(nomeArq) || /ofx|csv/i.test(msg.midia?.mime || '') || (FIN_RX.test(legenda) && !SOCIAL_RX.test(legenda) && !/\b(guarda|arquiva)\b/i.test(legenda))) destino = 'financeiro';
+      else if (!SOCIAL_RX.test(legenda) && !DOC_RX.test(legenda)) destino = null;
+      else if (!destino && !temDoc && !temSocial) destino = 'financeiro';
     }
     let bytes = null;
-    if (temDoc || temSocial) {
+    if (temDoc || temSocial || temFin) {
       if (msg.midia?.tamanho > 20 * 1024 * 1024 && !process.env.TELEGRAM_API_BASE) {
         return `📦 Esse arquivo tem ${(msg.midia.tamanho / 1048576).toFixed(0)} MB e o Telegram só me entrega até 20 MB. Suba no seu Google Drive e me mande o link do arquivo — eu guardo na pasta certa e registro do mesmo jeito.`;
       }
       try { bytes = await canal.baixarMidia(msg.midia.ref); } catch (e) { return `Não consegui baixar o arquivo (${e.message}). Se for grande, mande o link do Drive.`; }
     }
+    if (!destino && temFin && bytes && /^(image\/|application\/pdf)/.test(msg.midia?.mime || '')) {
+      try { const { lerImagem } = await import('../integracoes/gemini.js'); const r = await lerImagem(bytes, msg.midia.mime, `Classifique este arquivo. Responda só UMA palavra:\n- financeiro = extrato bancário, fatura de cartão, boleto ou comprovante de pagamento/pix/transferência\n${temDoc ? '- documento = contrato, nota fiscal, certidão, RG/CNH, apólice, formulário, recibo para guardar\n' : ''}${temSocial ? '- foto = foto de pessoa, cena, produto ou paisagem para redes sociais\n' : ''}`);
+        destino = /financ/i.test(r) ? 'financeiro' : /foto/i.test(r) && temSocial ? 'social' : temDoc ? 'documentos' : temSocial ? 'social' : 'financeiro'; } catch { destino = temDoc ? 'documentos' : 'financeiro'; }
+    }
+    if (!destino && temFin && !temDoc && !temSocial) destino = 'financeiro';
     if (!destino && temDoc && temSocial && bytes) {
       // foto sem legenda clara: pergunta rápida à IA se é documento ou foto para post
       try { const { lerImagem } = await import('../integracoes/gemini.js'); const r = await lerImagem(bytes, msg.midia.mime, 'Isto é um DOCUMENTO (contrato, nota, boleto, certidão, RG/CNH, print de texto, formulário, comprovante) ou uma FOTO para redes sociais (pessoa, cena, produto, paisagem)? Responda só: documento ou foto'); destino = /documento/i.test(r) ? 'documentos' : 'social'; } catch { destino = 'social'; }
     }
+    if (!destino) destino = temDoc ? 'documentos' : temSocial ? 'social' : temFin ? 'financeiro' : null;
     if (destino === 'documentos') {
       await canal.enviar(msg.conta, msg.chatId, '📂 Lendo e arquivando…');
       try {
@@ -90,6 +104,21 @@ export async function tratarMensagem(msg, canal) {
         msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Documento recebido do dono e JÁ ARQUIVADO no Drive. Dados: ${JSON.stringify(doc)}. Confirme em até 3 linhas: o que é, onde guardou (pasta) e o link; se houver vigência, diga a data e que os avisos estão agendados; se "legivel" for false, peça uma foto melhor ou que ele descreva o documento; se faltar empresa/tipo óbvios, pergunte. Não invente dados.]`;
         msg.forcarModulo = 'documentos';
       } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Documento recebido mas NÃO arquivado. Erro real: ${e.message}. Repita o erro ao dono e diga o que ele precisa fazer.]`; msg.forcarModulo = 'documentos'; }
+    } else if (destino === 'financeiro') {
+      await canal.enviar(msg.conta, msg.chatId, '🧾 Tina lendo o documento financeiro…');
+      try {
+        const { lerDocumentoFinanceiro } = await import('../integracoes/extrato.js'); const fin = await import('../ferramentas/financeiro.js');
+        const doc = await lerDocumentoFinanceiro(bytes, msg.midia.mime, msg.midia.nome || '');
+        const carts = fin.carteirasDe(conta.id); let info;
+        if (['extrato', 'fatura'].includes(doc.tipo) && doc.lancamentos?.length) {
+          const cart = fin.carteiraNoTexto(conta.id, legenda) || (carts.length === 1 ? carts[0] : null);
+          if (cart) { const r = await fin.importarLancamentos(conta.id, cart, doc); info = `[${doc.tipo === 'fatura' ? 'Fatura' : 'Extrato'} IMPORTADO na carteira ${cart}: ${JSON.stringify(r)}. Relate em até 5 linhas: período, quantos lançamentos novos (e duplicados ignorados), entradas e saídas, contas previstas que deram baixa sozinhas, e se houver itens sem categoria ofereça revisar.]`; }
+          else { const id = fin.guardarImportacao(conta.id, doc); info = `[${doc.tipo === 'fatura' ? 'Fatura' : 'Extrato'} lido: ${doc.lancamentos.length} lançamentos${doc.banco ? ' (' + doc.banco + ')' : ''}, guardado como importação #${id} aguardando a carteira. ${carts.length ? 'Pergunte de qual carteira é (' + carts.join(', ') + ') e, com a resposta, use importar_extrato_pendente.' : 'Ainda não há carteiras definidas: pergunte ao dono quais são (cada empresa e a vida pessoal), use definir_carteiras e depois importar_extrato_pendente.'}]`; }
+        } else if (doc.tipo === 'boleto' && doc.boleto?.valor) info = `[Boleto lido: ${JSON.stringify(doc.boleto)}. Lance com criar_conta_pagar (inclua linha_digitavel e contraparte=beneficiário). Carteira: ${fin.carteiraNoTexto(conta.id, legenda) || (carts.length === 1 ? carts[0] : 'pergunte uma vez (' + (carts.join(', ') || 'defina as carteiras') + ')')}.]`;
+        else if (doc.tipo === 'comprovante' && doc.comprovante?.valor) info = `[Comprovante lido: ${JSON.stringify(doc.comprovante)}. Procure a conta prevista com esse valor (contas_em_aberto) e dê baixa com dar_baixa usando comprovante="${(doc.comprovante.tipo || 'comprovante')} ${doc.comprovante.data || ''} ${doc.comprovante.favorecido || ''}". Se não houver conta prevista, registre com registrar_lancamento (pergunte a carteira se preciso).]`;
+        else info = `[Arquivo financeiro não reconhecido ou ilegível (tipo: ${doc.tipo || '?'}). Não chute valores: peça o extrato em OFX ou CSV (exportado do internet banking) ou uma foto mais nítida.]`;
+        msg.texto = (legenda ? legenda + '\n' : '') + info; msg.forcarModulo = 'financeiro';
+      } catch (e) { msg.texto = (legenda ? legenda + '\n' : '') + `[Não consegui ler o documento financeiro. Erro real: ${e.message}. Diga ao dono e sugira enviar o extrato em OFX ou CSV.]`; msg.forcarModulo = 'financeiro'; }
     } else if (destino === 'social') {
       try {
         const { guardarImagemEnviada } = await import('../ferramentas/social.js');
