@@ -106,6 +106,12 @@ export function debitar(contaId, quantidade, { tipo = 'debito', motivo = '', mod
 }
 export function debitarTokens(contaId, modulo, tokens, modelo) { if (!(tokens > 0)) return; return debitar(contaId, tokens / tokensPorCredito(), { motivo: `IA ${modelo || ''}`.trim(), modulo, ref: `tokens:${tokens}` }); }
 export function cobrar(contaId, item, { modulo = null, vezes = 1, ref = null } = {}) { const t = TARIFAS[item]; if (!t) return; return debitar(contaId, t * vezes, { motivo: item.replace(/_/g, ' '), modulo, ref }); }
+/** Reparo: conta em trial que nunca recebeu o crédito de boas-vindas (nenhum movimento de crédito) recebe agora. */
+export function repararTrials() {
+  const sem = db.prepare("SELECT c.id FROM contas c WHERE COALESCE(c.plano,'trial')='trial' AND COALESCE(c.admin,0)=0 AND NOT EXISTS (SELECT 1 FROM creditos_mov m WHERE m.conta_id=c.id AND m.tipo='trial')").all();
+  for (const { id } of sem) { try { concederTrial(id); console.log('[creditos] trial concedido (reparo) para conta', id); } catch (e) { console.error('[creditos] reparo trial', id, e.message); } }
+  return sem.length;
+}
 export function concederTrial(contaId) { if (db.prepare("SELECT id FROM creditos_mov WHERE conta_id=? AND tipo='trial'").get(contaId)) return; creditar(contaId, TRIAL_CREDITOS, { tipo: 'trial', motivo: `Boas-vindas ao ${PRODUTO}` }); }
 
 /** Pode consumir? (admin/ilimitada sempre; senão saldo > 0 + conta ativa + não bateu o piso de margem). */

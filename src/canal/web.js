@@ -79,7 +79,7 @@ export class WebCanal {
       if (!db.prepare('SELECT id FROM contas WHERE admin=1 AND id<>?').get(contaId)) db.prepare("UPDATE contas SET admin=1, plano='ilimitado' WHERE id=?").run(contaId);
       const chatSinteico = `web:${contaId}`; db.prepare('INSERT INTO usuarios (conta_id, canal, chat_id, nome, papel, email, senha_hash) VALUES (?,?,?,?,?,?,?)').run(contaId, 'web', chatSinteico, nome, 'dono', email, hash(senha));
       for (const m of ['secretaria', 'social']) db.prepare('INSERT INTO modulos (conta_id, modulo, ligado) VALUES (?,?,1)').run(contaId, m);
-      try { const c = await import('../creditos/index.js'); c.concederTrial(contaId); } catch {}
+      try { const c = await import('../creditos/index.js'); c.concederTrial(contaId); } catch (e) { console.error('[cadastro] trial NÃO concedido para conta', contaId, e.message); }
       const tok = crypto.randomBytes(24).toString('hex'); db.prepare('INSERT INTO web_sessoes (token, conta_id, chat_id) VALUES (?,?,?)').run(tok, contaId, chatSinteico);
       setCookie(res, tok);
       // Mensagem de boas-vindas: já cai no histórico do app, para o dono encontrar o manual sem precisar mandar nada antes

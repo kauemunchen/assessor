@@ -122,6 +122,9 @@ function destravarPublicando() {
 }
 
 export function iniciarRotinas(canal) {
+  // Reparo do crédito de boas-vindas: conta em trial que ficou sem os 250 créditos recebe (no início e todo dia)
+  const reparo = () => import('../creditos/index.js').then(m => m.repararTrials()).catch(e => console.error('[creditos] reparo', e.message));
+  setTimeout(reparo, 8000); setInterval(reparo, 24 * 3600e3);
   // Tarefas longas em segundo plano: verifica a fila a cada 20s (um lote por vez)
   setInterval(() => import('../orquestrador/tarefas-longas.js').then(m => m.tick()).catch(e => console.error('[tarefas]', e.message)), 20000);
   destravarPublicando(); // posts travados em 'publicando' do deploy anterior → 'erro' (admin reavalia)

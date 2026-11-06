@@ -79,7 +79,7 @@ export function rotasAdmin(app) {
   // Crédito/débito manual
   app.post('/api/admin/conta/:id/creditos', auth, (req, res) => {
     const id = Number(req.params.id); const { operacao, quantidade, motivo = '' } = req.body || {};
-    const q = Math.abs(Number(quantidade)); if (!(q > 0) || !['credito', 'debito'].includes(operacao)) return res.status(400).json({ erro: 'operação inválida' });
+    const tq = String(quantidade ?? '').trim(); const q = Math.abs(Number(/,\d{1,2}$/.test(tq) ? tq.replace(/\./g, '').replace(',', '.') : tq.replace(/,/g, ''))); if (!(q > 0) || !['credito', 'debito'].includes(operacao)) return res.status(400).json({ erro: 'operação inválida' });
     const ref = `admin:${req.contaId}`;
     logAdmin(req.contaId, 'creditos', id, { operacao, quantidade: q, motivo });
     if (operacao === 'credito') creditar(id, q, { tipo: 'ajuste', motivo: motivo || 'ajuste manual (+)', ref });
