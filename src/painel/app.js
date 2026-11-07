@@ -113,10 +113,14 @@ function fmt(t) {
   s = s.replace(/^\s*#{1,6}\s+(.+)$/gm, '<b>$1</b>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\w)/g, '$1<b>$2</b>').replace(/`([^`\n]+)`/g, '<code>$1</code>');
   // Links clicáveis: http(s), wa.me (WhatsApp), tel: (chamada), mailto: (e-mail).
   // WhatsApp e tel ganham ícone contextual na frente, não repetem a URL feia no texto do link.
-  s = s.replace(/\bhttps?:\/\/wa\.me\/(\d+)[^\s<]*/g, (u, num) => `<a href="${u}" target="_blank" rel="noopener" class="link-wa">📱 Abrir WhatsApp</a>`);
-  s = s.replace(/\btel:\+?([\d]+)/g, (u, num) => `<a href="${u}" class="link-tel">☎ Ligar</a>`);
-  s = s.replace(/\bmailto:([^\s<]+)/g, (u, m) => `<a href="${u}" class="link-mail">✉ ${m}</a>`);
-  s = s.replace(/(https?:\/\/[^\s<]+)/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u.length > 60 ? u.slice(0, 57) + '…' : u}</a>`);
+  // Uma passada só: cada trecho vira link uma única vez (antes o link do WhatsApp era reprocessado e o HTML vazava no texto).
+  s = s.replace(/\b(?:https?:\/\/[^\s<]+|tel:\+?\d+|mailto:[^\s<]+)/g, (bruto) => {
+    const fim = (bruto.match(/[.,;:!?)\]]+$/) || [''])[0]; const u = fim ? bruto.slice(0, -fim.length) : bruto; // pontuação da frase fica fora do link
+    if (/^https?:\/\/(?:api\.)?wa\.me\//i.test(u)) return `<a href="${u}" target="_blank" rel="noopener" class="link-wa">📱 Abrir WhatsApp</a>${fim}`;
+    if (/^tel:/i.test(u)) return `<a href="${u}" class="link-tel">☎ Ligar</a>${fim}`;
+    if (/^mailto:/i.test(u)) return `<a href="${u}" class="link-mail">✉ ${u.slice(7)}</a>${fim}`;
+    return `<a href="${u}" target="_blank" rel="noopener">${u.length > 60 ? u.slice(0, 57) + '…' : u}</a>${fim}`;
+  });
   return s;
 }
 function bolha(m, d) {

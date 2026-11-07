@@ -160,6 +160,7 @@ export const BOTOES_SIM_NAO = [[{ t: '✅ Sim', d: 'sim' }, { t: '❌ Não', d: 
 export function descreverAcao(c) {
   const a = c.args || {};
   switch (c.name) {
+    case 'ligar_assessor': return `ligar ${({ social: 'a MIA (conteúdo e redes sociais)', secretaria: 'a Olga (secretária)', documentos: 'o Estag (documentos)', financeiro: 'a Tina (financeiro)' })[a.modulo] || a.modulo} na sua conta${a.pedido_original ? ' e já fazer: ' + a.pedido_original : ''}`;
     case 'iniciar_tarefa_longa': return `rodar em segundo plano: ${a.objetivo} — até ${a.total_lotes} lote(s) de ~20 itens, sem você precisar mandar "continua"; aviso quando terminar (consome créditos a cada lote)`;
     case 'cancelar_evento': return `cancelar o evento ${a.titulo ? `"${a.titulo}"` : a.event_id?.slice(0, 12) + '…'}`;
     case 'criar_evento': return `criar "${a.titulo}" em ${a.inicio?.replace('T', ' ')}${a.categoria ? ` [${a.categoria}]` : ''}`;
