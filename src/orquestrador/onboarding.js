@@ -8,7 +8,7 @@ const salvar = (chat, e) => db.prepare('INSERT INTO onboarding (chat_id, estado)
 const SITE = (() => { const b = process.env.WEBAPP_URL || process.env.PUBLIC_URL || 'https://usefiel.com'; return b.replace(/\/$/, ''); })();
 const LINK_MANUAL = `${SITE}/ajuda`;
 
-const MSG = `👋 *Bem-vindo ao Fiel*\n_A equipe que você não precisou contratar._\n\nO cadastro agora é feito pelo nosso site — assim você aceita os Termos de Uso e a Política de Privacidade, confirma seu e-mail e CPF/CNPJ, e já começa com *250 créditos grátis*.\n\n🔗 *Crie sua conta:* ${SITE}\n📖 *Manual:* ${LINK_MANUAL}\n📱 *Suporte humano:* ola@usefiel.com · https://wa.me/5547933883929 — (47) 93388-3929\n\nDepois de criar a conta, dentro do app em *"Conectar Telegram"* você recebe o código para vincular este chat ao seu Fiel. A conversa fica sincronizada entre site e Telegram.`;
+const MSG = `👋 *Bem-vindo ao Fiel*\n_A equipe que você não precisou contratar._\n\nO cadastro agora é feito pelo nosso site — assim você aceita os Termos de Uso e a Política de Privacidade, confirma seu e-mail e CPF/CNPJ, e já começa com *250 créditos grátis*.\n\n🔗 *Crie sua conta:* ${SITE}\n📖 *Manual:* ${LINK_MANUAL}\n📱 *Suporte humano:* ola@usefiel.com · https://wa.me/5547933883929 — (47) 93388-3929\n\nDepois de criar a conta, dentro do app toque em *"Conectar Telegram"* (em Primeiros passos ou em Conexões) e você recebe o link para vincular este chat ao seu Fiel. A conversa fica sincronizada entre site e Telegram.`;
 
 export function onboarding(msg) {
   // Registra o toque e devolve a orientação. Sem perguntas, sem botões de criação de conta.

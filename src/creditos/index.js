@@ -145,7 +145,9 @@ function verificarAlertas(contaId, s) {
     if (!nivel || ordem.indexOf(nivel) <= ordem.indexOf(c.creditos_alerta)) return;
     db.prepare('UPDATE contas SET creditos_alerta=? WHERE id=?').run(nivel, contaId);
     if (nivel === 'zero') db.prepare("UPDATE contas SET status='bloqueada' WHERE id=? AND status='ativa'").run(contaId);
-    const dono = db.prepare("SELECT chat_id FROM usuarios WHERE conta_id=? AND papel='dono' AND canal='telegram' LIMIT 1").get(contaId)?.chat_id;
+    const dono = db.prepare("SELECT chat_id FROM usuarios WHERE conta_id=? AND papel='dono' ORDER BY canal<>'telegram', id LIMIT 1").get(contaId)?.chat_id;
+    const soTrial = (c.plano || 'trial') === 'trial' && !db.prepare("SELECT 1 FROM creditos_mov WHERE conta_id=? AND quantidade>0 AND tipo<>'trial'").get(contaId);
+    if (nivel === '20' && soTrial) { const canal = canalAtual(); if (dono && canal) import('../orquestrador/guia.js').then(g => canal.enviar(null, dono, g.mensagemFimTrial(contaId, s))).catch(e => console.error('[creditos] fim trial', e.message)); return; }
     const txt = nivel === 'zero' ? mensagemBloqueio(contaId) : `⚠️ Créditos do ${PRODUTO} em ${fmt(s)} (${nivel}% da última recarga). Recarregue em *Créditos* no app ou mande "comprar" para não parar.`;
     const canal = canalAtual(); if (dono && canal) canal.enviar(null, dono, txt).catch(() => {});
   } catch (e) { console.error('[creditos] alerta', e.message); }

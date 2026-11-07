@@ -177,6 +177,9 @@ export class WebCanal {
       let creditos = null; try { const c = await import('../creditos/index.js'); creditos = { saldo: c.saldo(conta.id), ilimitada: c.ilimitada(conta.id), base: c.ultimaRecarga(conta.id), produto: c.PRODUTO }; } catch {}
       res.json({ conta, modulos: ['diretor', ...modulos], personas, creditos });
     });
+    app.get('/api/guia', auth, async (req, res) => { const g = await import('../orquestrador/guia.js'); res.json(g.passos(req.sessao.conta_id)); });
+    app.post('/api/guia/dispensar', auth, async (req, res) => { const g = await import('../orquestrador/guia.js'); res.json(g.dispensarGuia(req.sessao.conta_id)); });
+    app.post('/api/telegram/vincular', auth, async (req, res) => { const g = await import('../orquestrador/guia.js'); res.json(g.gerarCodigoTelegram(req.sessao.conta_id)); });
     app.get('/api/mensagens', auth, (req, res) => {
       const antes = Number(req.query.antes || 0); const lim = Math.min(200, Number(req.query.limite || 60));
       const rows = antes ? db.prepare('SELECT * FROM mensagens WHERE conta_id=? AND id<? ORDER BY id DESC LIMIT ?').all(req.sessao.conta_id, antes, lim) : db.prepare('SELECT * FROM mensagens WHERE conta_id=? ORDER BY id DESC LIMIT ?').all(req.sessao.conta_id, lim);

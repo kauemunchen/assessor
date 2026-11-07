@@ -90,6 +90,7 @@ export function rotasConfig(app) {
     const { listarCadastradas } = await import('../integracoes/google-sheets.js');
     res.json({
       google: { conectado: !!g, desde: g?.atualizado_em, escopos: { agenda: /calendar/.test(scope), gmail_ler: /gmail.readonly/.test(scope), gmail_enviar: /gmail.send/.test(scope), drive: /auth\/drive/.test(scope), tasks: /auth\/tasks/.test(scope) }, url_autorizar: urlAutorizacao(req.contaId) },
+      telegram: !!db.prepare("SELECT 1 FROM usuarios WHERE conta_id=? AND canal='telegram'").get(req.contaId),
       instagram: ig ? { conectado: true, ig_user_id: ig.ig_user_id, expira_em: ig.expira_em, desde: ig.atualizado_em, ...igInfo } : { conectado: false },
       drive: { pasta_id: conta.drive_pasta_id, link: conta.drive_pasta_id ? `https://drive.google.com/drive/folders/${conta.drive_pasta_id}` : null },
       empresas: JSON.parse(conta.empresas || '[]'),

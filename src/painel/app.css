@@ -319,3 +319,30 @@ details.menu-mais[open] summary .seta{transform:rotate(90deg);color:var(--coral)
 .form-login .link-esqueci{margin:12px 0 0;font-size:13px;text-align:center}
 .form-login .link-esqueci a{color:var(--tinta-mid);text-decoration:underline;text-underline-offset:2px}
 .form-login .link-esqueci a:hover{color:var(--coral)}
+
+/* Primeiros passos */
+.guia{margin:10px 16px 0;background:var(--card);border:1px solid var(--linha);border-radius:var(--raio);box-shadow:var(--sombra);font-family:var(--f-body)}
+.guia-topo{display:flex;align-items:center}
+.guia-titulo{flex:1;display:flex;align-items:center;gap:10px;background:none;border:0;padding:12px 14px;cursor:pointer;color:var(--texto);font:inherit;text-align:left;min-width:0}
+.guia-titulo strong{font-family:var(--f-display);font-size:16px;font-weight:600;white-space:nowrap}
+.guia-cont{font-size:12px;color:var(--mudo);white-space:nowrap}
+.guia-bar{flex:1;height:6px;background:var(--papel-3);border-radius:99px;overflow:hidden;min-width:40px}
+.guia-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--coral),var(--dourado));border-radius:99px}
+.guia-seta{color:var(--mudo);font-size:12px}
+.guia-x{background:none;border:0;color:var(--tinta-dim);padding:12px 14px 12px 4px;cursor:pointer;font-size:14px}
+.guia-lista{list-style:none;margin:0;padding:0 8px 8px}
+.guia-lista li{display:flex;align-items:center;gap:12px;padding:10px 8px;border-top:1px solid var(--linha)}
+.guia-check{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--linha);display:grid;place-items:center;font-size:13px;color:#fff}
+.guia-lista li.feito .guia-check{background:var(--sage);border-color:var(--sage)}
+.guia-lista li.feito .guia-txt b{color:var(--mudo);text-decoration:line-through}
+.guia-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.guia-txt b{font-size:14px;font-weight:600}
+.guia-txt small{font-size:12px;color:var(--mudo)}
+.guia-bt{flex:none;font-size:13px;padding:6px 12px;white-space:nowrap}
+.guia-dialogo{border:0;border-radius:var(--raio);padding:22px;max-width:380px;width:calc(100% - 32px);background:var(--card);color:var(--texto);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.guia-dialogo h3{font-family:var(--f-display);margin:0 0 8px}
+.guia-dialogo .btn{display:inline-block;margin:6px 0}
+.guia-dialogo .d{font-size:13px;color:var(--mudo)}
+.guia-dialogo code{background:var(--papel-2);padding:2px 6px;border-radius:6px;font-size:14px}
+.guia-dialogo::backdrop{background:rgba(0,0,0,.35)}
+@media (max-width:520px){.guia{margin:8px 10px 0}.guia-cont{display:none}.guia-txt small{display:none}}

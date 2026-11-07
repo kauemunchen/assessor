@@ -70,6 +70,7 @@ async function iniciar() {
   $('#filtros').innerHTML = `<button class="ativo" data-f="">Todos</button>` + me.modulos.map(m => `<button data-f="${m}">${nome(m)}</button>`).join('');
   $('#filtros').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; filtro = b.dataset.f || null; [...$('#filtros').children].forEach(x => x.classList.toggle('ativo', x === b)); render(); };
   $('#texto').placeholder = `Fale com ${me.modulos.map(nome).slice(0, 4).join(', ')}…`;
+  carregarGuia();
   await carregar(); conectar(); setTimeout(irParaFim, 600); window.addEventListener('resize', () => { if (pertoDoFim($('#lista'))) irParaFim(); });
 }
 
@@ -151,7 +152,7 @@ function conectar() {
   ws.onclose = () => { $('#estado').textContent = 'reconectando…'; setTimeout(conectar, 2500); };
   ws.onmessage = (ev) => {
     const e = JSON.parse(ev.data);
-    if (e.tipo === 'mensagem') { msgs.push(e.mensagem); $('#digitando').classList.add('oculto'); acrescentar(e.mensagem); }
+    if (e.tipo === 'mensagem') { if (e.mensagem.direcao === 'saida') agendarGuia(); msgs.push(e.mensagem); $('#digitando').classList.add('oculto'); acrescentar(e.mensagem); }
     if (e.tipo === 'digitando') { $('#digitando').classList.remove('oculto'); clearTimeout(conectar._t); conectar._t = setTimeout(() => $('#digitando').classList.add('oculto'), 6000); }
   };
 }
@@ -204,3 +205,43 @@ $('#sair').onclick = async () => { await fetch('/api/logout', { method: 'POST' }
 // PWA
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/app/sw.js').catch(() => {});
 iniciar();
+
+
+// ---------------- PRIMEIROS PASSOS ----------------
+let _guiaT = null, _guiaAberto = null;
+function agendarGuia() { clearTimeout(_guiaT); _guiaT = setTimeout(carregarGuia, 1500); }
+async function carregarGuia() {
+  const el = $('#guia'); if (!el) return;
+  let g; try { g = await api('/api/guia'); } catch { return; }
+  if (!g || g.dispensado || g.completo || me?.conta?.admin === 1) { el.classList.add('oculto'); return; }
+  if (_guiaAberto === null) _guiaAberto = g.feitos < 2;
+  const acao = { telegram: 'Conectar', google: 'Conectar', audio: 'Gravar', post: 'Mandar foto', extrato: 'Mandar arquivo' };
+  const pct = Math.round(g.feitos / g.total * 100);
+  el.innerHTML = `<div class="guia-topo"><button class="guia-titulo" id="guiaAlterna" aria-expanded="${_guiaAberto}"><strong>Primeiros passos</strong><span class="guia-cont">${g.feitos} de ${g.total}</span><span class="guia-bar"><i style="width:${pct}%"></i></span><span class="guia-seta">${_guiaAberto ? '▴' : '▾'}</span></button><button class="guia-x" id="guiaX" title="Não mostrar mais">✕</button></div>
+    ${_guiaAberto ? `<ol class="guia-lista">${g.passos.map(p => `<li class="${p.feito ? 'feito' : ''}"><span class="guia-check">${p.feito ? '✓' : ''}</span><div class="guia-txt"><b>${esc(p.titulo)}</b><small>${esc(p.detalhe)}</small></div>${p.feito ? '' : `<button class="btn guia-bt" data-passo="${p.id}">${acao[p.id]}</button>`}</li>`).join('')}</ol>` : ''}`;
+  el.classList.remove('oculto');
+  $('#guiaAlterna').onclick = () => { _guiaAberto = !_guiaAberto; carregarGuia(); };
+  $('#guiaX').onclick = async () => { if (!confirm('Esconder os primeiros passos? Você ainda pode pedir ajuda ao Alfred quando quiser.')) return; await api('/api/guia/dispensar', { method: 'POST' }); el.classList.add('oculto'); };
+  el.querySelectorAll('[data-passo]').forEach(b => b.onclick = () => acaoGuia(b.dataset.passo, b));
+}
+async function acaoGuia(passo, botao) {
+  if (passo === 'telegram') return conectarTelegram(botao);
+  if (passo === 'google') { botao.disabled = true; try { const d = await api('/api/conexoes'); window.open(d.google.url_autorizar, '_blank', 'noopener'); } finally { botao.disabled = false; } return; }
+  if (passo === 'audio') { $('#gravar')?.click(); return; }
+  if (passo === 'post') { const t = $('#texto'); t.value = 'MIA, post sobre '; t.focus(); $('#arquivo').setAttribute('accept', 'image/*'); $('#arquivo').click(); setTimeout(() => $('#arquivo').setAttribute('accept', 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx'), 1000); return; }
+  if (passo === 'extrato') { const t = $('#texto'); t.value = 'Tina, extrato da empresa '; t.focus(); $('#arquivo').setAttribute('accept', '.ofx,.csv,.pdf,.xls,.xlsx'); $('#arquivo').click(); setTimeout(() => $('#arquivo').setAttribute('accept', 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx'), 1000); return; }
+}
+async function conectarTelegram(botao) {
+  if (botao) botao.disabled = true;
+  let r; try { r = await api('/api/telegram/vincular', { method: 'POST' }); } finally { if (botao) botao.disabled = false; }
+  if (!r?.link) return alert('Não consegui gerar o código agora. Tente de novo em instantes.');
+  const d = document.createElement('dialog'); d.className = 'guia-dialogo';
+  d.innerHTML = `<h3>Conectar o Telegram</h3><p>Toque no botão abaixo. O Telegram abre na conversa com o Fiel: toque em <b>Iniciar</b> e pronto.</p>
+    <a class="btn prim" href="${r.link}" target="_blank" rel="noopener">Abrir o Telegram</a>
+    <p class="d">No computador sem o app? Procure <b>@${esc(r.bot)}</b> no Telegram e mande:<br><code>vincular ${esc(r.codigo)}</code><br>O código vale ${r.validade_min} minutos.</p>
+    <button class="btn" id="guiaFecharDlg">Fechar</button>`;
+  document.body.appendChild(d); d.showModal();
+  const iv = setInterval(async () => { try { const g = await api('/api/guia'); if (g.passos.find(p => p.id === 'telegram')?.feito) { clearInterval(iv); d.querySelector('h3').textContent = '✅ Telegram conectado'; d.querySelector('p').textContent = 'Agora é só falar com a equipe por lá também — texto ou áudio.'; carregarGuia(); } } catch {} }, 4000);
+  d.querySelector('#guiaFecharDlg').onclick = () => { clearInterval(iv); d.close(); d.remove(); };
+}
+window.conectarTelegram = conectarTelegram;

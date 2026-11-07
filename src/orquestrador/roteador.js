@@ -11,6 +11,8 @@ import { onboarding } from './onboarding.js';
 import { governanca } from './governanca.js';
 
 export async function tratarMensagem(msg, canal) {
+  { const { vincularTelegram, PADRAO_VINCULO } = await import('./guia.js');
+    if (PADRAO_VINCULO.test(String(msg.texto || '').trim())) return vincularTelegram(msg); }
   const conta = await obterConta(msg.chatId);
   if (!conta) return (await tentarEntrar(msg)) || onboarding(msg);
   contextoUso.contaId = conta.id; contextoUso.modulo = null;
