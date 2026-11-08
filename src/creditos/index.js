@@ -10,7 +10,7 @@ export function prepararCreditos() {
   ); CREATE INDEX IF NOT EXISTS ix_creditos_conta ON creditos_mov (conta_id, criado_em)`);
   // Coluna com o valor em BRL da recarga (preenchida só para créditos pagos; usada pelo limitador de margem)
   try { db.exec(`ALTER TABLE creditos_mov ADD COLUMN valor_brl REAL`); } catch {}
-  for (const [c, def] of [['plano', "TEXT DEFAULT 'trial'"], ['status', "TEXT DEFAULT 'ativa'"], ['admin', 'INTEGER DEFAULT 0'], ['creditos_alerta', 'TEXT'], ['email', 'TEXT'], ['pesquisa_web', 'INTEGER DEFAULT 0'], ['aceite_termos_em', 'TEXT'], ['aceite_termos_versao', 'TEXT'], ['aceite_termos_ip', 'TEXT'], ['bloqueada_margem_em', 'TEXT']]) { try { db.exec(`ALTER TABLE contas ADD COLUMN ${c} ${def}`); } catch {} }
+  for (const [c, def] of [['plano', "TEXT DEFAULT 'trial'"], ['status', "TEXT DEFAULT 'ativa'"], ['admin', 'INTEGER DEFAULT 0'], ['creditos_alerta', 'TEXT'], ['email', 'TEXT'], ['pesquisa_web', 'INTEGER DEFAULT 0'], ['aceite_termos_em', 'TEXT'], ['aceite_termos_versao', 'TEXT'], ['aceite_termos_ip', 'TEXT'], ['bloqueada_margem_em', 'TEXT'], ['creditos_alerta_em', 'TEXT']]) { try { db.exec(`ALTER TABLE contas ADD COLUMN ${c} ${def}`); } catch {} }
   // Primeira conta do banco (a do Kauê) vira admin/ilimitada se ainda não houver nenhum admin.
   if (!db.prepare('SELECT id FROM contas WHERE admin=1').get()) { const p = db.prepare('SELECT id FROM contas ORDER BY id LIMIT 1').get(); if (p) db.prepare("UPDATE contas SET admin=1, plano='ilimitado' WHERE id=?").run(p.id); }
 }
@@ -50,7 +50,7 @@ export function pacotes() { try { if (db.prepare("SELECT name FROM sqlite_master
 /** Compat: código antigo lê `PACOTES` como array; agora é um Proxy que delega para `pacotes()`. */
 export const PACOTES = new Proxy([], { get(_t, k) { const arr = pacotes(); return typeof arr[k] === 'function' ? arr[k].bind(arr) : arr[k]; }, has(_t, k) { return k in pacotes(); }, ownKeys() { return Reflect.ownKeys(pacotes()); }, getOwnPropertyDescriptor(_t, k) { return Object.getOwnPropertyDescriptor(pacotes(), k); } });
 
-const contaDe = (id) => db.prepare('SELECT id, plano, status, admin, creditos_alerta, nome_dono FROM contas WHERE id=?').get(id);
+const contaDe = (id) => db.prepare('SELECT id, plano, status, admin, creditos_alerta, creditos_alerta_em, nome_dono FROM contas WHERE id=?').get(id);
 export function ilimitada(contaId) { const c = contaDe(contaId); return !!c && (c.admin === 1 || c.plano === 'ilimitado'); }
 export function saldo(contaId) { return +(db.prepare('SELECT COALESCE(SUM(quantidade),0) s FROM creditos_mov WHERE conta_id=?').get(contaId).s).toFixed(3); }
 /** Base para os alertas de 20%/5%: a última recarga (ou o trial). */
@@ -60,7 +60,7 @@ export function creditar(contaId, quantidade, { tipo = 'credito', motivo = '', r
   if (!(quantidade > 0)) throw new Error('quantidade inválida');
   db.prepare('INSERT INTO creditos_mov (conta_id, tipo, quantidade, motivo, ref, valor_brl) VALUES (?,?,?,?,?,?)').run(contaId, tipo, quantidade, motivo, ref, valor_brl);
   // Toda recarga limpa alertas e destrava bloqueios anteriores (saldo zero OU margem estourada)
-  db.prepare("UPDATE contas SET creditos_alerta=NULL, bloqueada_margem_em=NULL, status=CASE WHEN status='bloqueada' THEN 'ativa' ELSE status END WHERE id=?").run(contaId);
+  db.prepare("UPDATE contas SET creditos_alerta=NULL, creditos_alerta_em=NULL, bloqueada_margem_em=NULL, status=CASE WHEN status='bloqueada' THEN 'ativa' ELSE status END WHERE id=?").run(contaId);
   return saldo(contaId);
 }
 
@@ -143,8 +143,11 @@ function verificarAlertas(contaId, s) {
     const nivel = s <= 0 ? 'zero' : pct <= 5 ? '5' : pct <= 20 ? '20' : null;
     const ordem = ['20', '5', 'zero']; // só avisa quando piora de nível; zera na recarga
     if (!nivel || ordem.indexOf(nivel) <= ordem.indexOf(c.creditos_alerta)) return;
-    db.prepare('UPDATE contas SET creditos_alerta=? WHERE id=?').run(nivel, contaId);
+    // Um aviso só: se já avisamos nas últimas 12 h (ex.: "créditos acabando"), o alerta intermediário de 5% não sai de novo.
+    const recente = c.creditos_alerta_em && (Date.now() - new Date(String(c.creditos_alerta_em).replace(' ', 'T') + 'Z').getTime()) < 12 * 3600e3;
+    db.prepare('UPDATE contas SET creditos_alerta=?, creditos_alerta_em=CURRENT_TIMESTAMP WHERE id=?').run(nivel, contaId);
     if (nivel === 'zero') db.prepare("UPDATE contas SET status='bloqueada' WHERE id=? AND status='ativa'").run(contaId);
+    if (nivel === '5' && recente) return;
     const dono = db.prepare("SELECT chat_id FROM usuarios WHERE conta_id=? AND papel='dono' ORDER BY canal<>'telegram', id LIMIT 1").get(contaId)?.chat_id;
     const soTrial = (c.plano || 'trial') === 'trial' && !db.prepare("SELECT 1 FROM creditos_mov WHERE conta_id=? AND quantidade>0 AND tipo<>'trial'").get(contaId);
     if (nivel === '20' && soTrial) { const canal = canalAtual(); if (dono && canal) import('../orquestrador/guia.js').then(g => canal.enviar(null, dono, g.mensagemFimTrial(contaId, s))).catch(e => console.error('[creditos] fim trial', e.message)); return; }

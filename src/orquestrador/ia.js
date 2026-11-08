@@ -1,6 +1,7 @@
 // Camada de IA: classificação e resposta com function-calling + confirmação de ações externas.
 import { modelo } from '../integracoes/gemini.js';
 import { ferramentasDe, executarFerramenta, precisaConfirmar } from '../ferramentas/index.js';
+import { novoContador } from './limite-pecas.js';
 import { db } from '../db/index.js';
 import { historicoRecente } from './memoria.js';
 export { transcrever } from '../integracoes/gemini.js';
@@ -92,6 +93,7 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
   }
   contents.push({ role: 'user', parts: [{ text: msg.texto }] });
   let ultimoErro = null, assinaturaAnterior = ''; const consultados = new Set(); let ultimoResultado = null;
+  const contador = novoContador(conta.id, msg.textoOriginal ?? msg.texto); // proteção de consumo: peças/rascunhos por mensagem
   for (let i = 0; i < rodadas; i++) {
     let r;
     try { r = await m.generateContent({ contents }); }
@@ -139,6 +141,8 @@ FORMATO (canal de mensagem, não é documento): sem títulos com #, sem tabelas,
         ultimoResultado = result;
         respostas.push({ functionResponse: { name: c.name, response: result } }); continue;
       }
+      const barrado = contador.checar(c.name);
+      if (barrado) { console.log(`[limite] ${conta.id} ${c.name} barrado (cota ${contador.cota})`); respostas.push({ functionResponse: { name: c.name, response: barrado } }); continue; }
       try { result = { result: await executarFerramenta(modulo, c.name, c.args, conta, { chatId: msg.chatId }) }; }
       catch (e) { result = { erro: e.message }; ultimoErro = e.message; console.error(`[tool] ${modulo}.${c.name}`, e.message); }
       ultimoResultado = result;
