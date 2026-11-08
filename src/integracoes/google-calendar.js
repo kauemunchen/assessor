@@ -7,9 +7,47 @@ const TZ = 'America/Sao_Paulo';
 function clienteOAuth() {
   return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_REDIRECT_URI);
 }
+// Permissões do Google.
+//  BÁSICAS (clientes): só escopos "sensíveis" → verificação do Google gratuita, sem auditoria anual.
+//    Agenda, Tarefas, enviar e-mail, Planilhas e drive.file (o Fiel só enxerga os arquivos que ele mesmo criou
+//    ou que o cliente liberou pelo seletor do Google).
+//  COMPLETAS (conta admin, ou GOOGLE_ESCOPOS_CLIENTE=completo): + ler e-mails, rascunhos e Drive inteiro (escopos restritos).
+const G = 'https://www.googleapis.com/auth/';
+export const ESCOPOS_BASICOS = ['calendar', 'tasks', 'gmail.send', 'spreadsheets', 'drive.file'].map(s => G + s);
+export const ESCOPOS_COMPLETOS = [...ESCOPOS_BASICOS, ...['gmail.readonly', 'gmail.compose', 'drive'].map(s => G + s)];
+export function modoEscopos(contaId) {
+  const admin = db.prepare('SELECT admin FROM contas WHERE id=?').get(contaId)?.admin === 1;
+  return admin || process.env.GOOGLE_ESCOPOS_CLIENTE === 'completo' ? 'completo' : 'basico';
+}
+export const escoposPedidos = (contaId) => modoEscopos(contaId) === 'completo' ? ESCOPOS_COMPLETOS : ESCOPOS_BASICOS;
+/** O que a conta pode usar: o modo dela E o que o Google de fato concedeu (se já conectou). */
+export function temEscopo(contaId, escopo) {
+  const alvo = G + escopo;
+  if (!escoposPedidos(contaId).includes(alvo)) return false;
+  const row = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(contaId);
+  if (!row) return true; // ainda não conectou: a ferramenta pede para conectar
+  try { const sc = JSON.parse(row.token_json).scope || ''; return sc.split(/\s+/).includes(alvo); } catch { return false; }
+}
+// state assinado: o retorno do Google só liga a conta certa (evita alguém trocar o número da conta no link)
+import crypto from 'node:crypto';
+const assinar = (txt) => crypto.createHmac('sha256', process.env.GOOGLE_CLIENT_SECRET || 'fiel').update(txt).digest('base64url').slice(0, 24);
+export function estadoAssinado(contaId) { const exp = Date.now() + 60 * 60000; const base = `${contaId}.${exp}`; return `${base}.${assinar(base)}`; }
+export function contaDoEstado(state) {
+  const [id, exp, sig] = String(state || '').split('.');
+  if (!id || !exp || !sig || assinar(`${id}.${exp}`) !== sig) throw new Error('link de conexão inválido — gere um novo em Conexões');
+  if (Date.now() > Number(exp)) throw new Error('link de conexão expirou — gere um novo em Conexões');
+  return Number(id);
+}
 export function urlAutorizacao(contaId) {
-  return clienteOAuth().generateAuthUrl({ access_type: 'offline', prompt: 'consent', state: String(contaId),
-    scope: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/tasks'] });
+  return clienteOAuth().generateAuthUrl({ access_type: 'offline', prompt: 'consent', include_granted_scopes: true, state: estadoAssinado(contaId), scope: escoposPedidos(contaId) });
+}
+/** Token de acesso curto (para o seletor de arquivos do Google na web). */
+export async function tokenAcesso(contaId) {
+  const row = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(contaId);
+  if (!row) throw new Error('Google não conectado');
+  const auth = clienteOAuth(); const tok = JSON.parse(row.token_json); auth.setCredentials(tok);
+  auth.on('tokens', (t) => db.prepare('UPDATE google_auth SET token_json=? WHERE conta_id=?').run(JSON.stringify({ ...tok, ...t }), contaId));
+  const r = await auth.getAccessToken(); return r?.token || r;
 }
 export async function salvarCodigo(contaId, code) {
   const { tokens } = await clienteOAuth().getToken({ code: String(code) });

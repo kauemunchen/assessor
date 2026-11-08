@@ -79,7 +79,7 @@ app.get('/oauth/google/iniciar/:contaId', (req, res) => res.redirect(urlAutoriza
 app.get('/oauth/google/callback', async (req, res) => {
   const { state, code, error } = req.query;
   if (error || !code) { console.error('[oauth] google retornou erro:', error || 'sem code', req.query); return res.status(400).send(`Google não autorizou: ${error || 'sem código'}. Volte ao Telegram e peça "conectar google" de novo.`); }
-  try { await salvarCodigo(state, code); res.send('Google conectado. Pode voltar ao Telegram.'); }
+  try { const { contaDoEstado } = await import('./integracoes/google-calendar.js'); await salvarCodigo(contaDoEstado(state), code); res.send('Google conectado. Pode voltar ao Fiel (app ou Telegram).'); }
   catch (e) { console.error('[oauth] falha ao salvar token:', e?.message); res.status(500).send(`Erro ao conectar: ${e?.message}`); }
 });
 process.on('unhandledRejection', (e) => console.error('[unhandledRejection]', e?.stack || e));
