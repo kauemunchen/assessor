@@ -11,7 +11,7 @@ export const LOGO_RX = /\b(logos?|logotipos?|logomarcas?|s[íi]mbolos? da marca|
 export const varianteDaLegenda = (t = '') => /\b(branc|clar[ao]|negativ|para fundo escuro|fundo escuro)/i.test(t) ? 'claro' : /\b(escur[ao]|pret[ao]|positiv|para fundo claro|fundo claro)/i.test(t) ? 'escuro' : 'principal';
 
 const JANELA_MS = 3500;          // tempo para juntar fotos de um álbum / envio em sequência
-const LOGO_CONTINUA_MS = 120000; // fotos sem legenda logo depois de uma "logo" também são logos
+const LOGO_CONTINUA_MS = 120000; // depois de logos, a pergunta sobre fotos sem legenda mostra "São logos" primeiro
 const coletas = new Map();       // contaId → { itens: [{id, url, legenda, grupo}], timer, chatId, canal, conta }
 const ultimoLogo = new Map();    // contaId → timestamp
 
@@ -27,7 +27,8 @@ export function deveColetar(contaId, { legenda = '', grupo = null } = {}) {
 export async function coletar({ conta, msg, canal, bytes, processar }) {
   const { guardarImagemEnviada } = await import('../ferramentas/social.js');
   const legenda = msg.texto || '';
-  const ehLogo = LOGO_RX.test(legenda) || (!legenda.trim() && Date.now() - (ultimoLogo.get(conta.id) || 0) < LOGO_CONTINUA_MS);
+  // logo só com pedido explícito (a legenda do álbum vale para todas as fotos do mesmo álbum, decidido no fechamento)
+  const ehLogo = LOGO_RX.test(legenda);
   const [r, analise] = await Promise.all([
     guardarImagemEnviada(conta.id, bytes, { tipo: ehLogo ? 'logo' : 'imagem', marcar: false }),
     import('../integracoes/render.js').then(m => m.analisarLogo(bytes)).catch(() => null),
@@ -62,9 +63,11 @@ async function fechar(contaId) {
   // 3) sem pedido → uma pergunta
   db.prepare('INSERT INTO imagens_pendentes (conta_id, itens) VALUES (?,?) ON CONFLICT(conta_id) DO UPDATE SET itens=excluded.itens, criado_em=CURRENT_TIMESTAMP').run(contaId, JSON.stringify(c.itens.map(i => ({ id: i.id, url: i.url, variante: i.variante }))));
   const n = c.itens.length;
+  const logoRecente = Date.now() - (ultimoLogo.get(contaId) || 0) < LOGO_CONTINUA_MS;
+  const bLogo = [{ t: n === 1 ? '🏷️ É a logo da marca' : '🏷️ São logos da marca', d: 'imgs:logo' }], bPost = [{ t: '📌 Usar em um post', d: 'imgs:post' }], bGuardar = [{ t: '🗂️ Só guardar', d: 'imgs:guardar' }];
   return enviar({
     texto: `📥 Recebi ${n === 1 ? 'a imagem' : `${n} imagens`} e já ${n === 1 ? 'guardei' : 'guardei todas'} na Biblioteca. O que faço com ${n === 1 ? 'ela' : 'elas'}?`,
-    botoes: [[{ t: '📌 Usar em um post', d: 'imgs:post' }], [{ t: n === 1 ? '🏷️ É a logo da marca' : '🏷️ São logos da marca', d: 'imgs:logo' }], [{ t: '🗂️ Só guardar', d: 'imgs:guardar' }]],
+    botoes: logoRecente ? [bLogo, bPost, bGuardar] : [bPost, bLogo, bGuardar],
   });
 }
 
