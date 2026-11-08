@@ -87,7 +87,7 @@
   <tbody>
     <tr><td><b>Cadastro</b></td><td>Nome, e-mail, telefone, CPF ou CNPJ, senha (hash bcrypt), empresa, aceite dos Termos</td><td>Formulário no site</td></tr>
     <tr><td><b>Uso</b></td><td>Conversas com os agentes, histórico de ações, mídias enviadas, posts gerados, créditos consumidos, acessos (data, hora, IP)</td><td>Interação no app</td></tr>
-    <tr><td><b>Integrações</b></td><td>Tokens OAuth do Google (Calendar, Gmail, Drive, Tasks), tokens de página do Instagram (Meta), ID de conta Mercado Pago</td><td>Você autoriza no fluxo OAuth do próprio provedor</td></tr>
+    <tr><td><b>Integrações</b></td><td>Tokens OAuth do Google (Agenda, Tarefas, envio de Gmail, Planilhas e Drive restrito aos arquivos do Fiel), tokens de página do Instagram (Meta), ID de conta Mercado Pago</td><td>Você autoriza no fluxo OAuth do próprio provedor</td></tr>
     <tr><td><b>Pagamento</b></td><td>Valor, data, forma (Pix / cartão / mensal), ID da transação Mercado Pago. <b>Não guardamos número de cartão.</b></td><td>Webhook Mercado Pago</td></tr>
     <tr><td><b>Técnicos</b></td><td>IP de acesso, user-agent, logs do servidor, erros, cookies de sessão (<code>sid</code>, httpOnly)</td><td>Automático na navegação</td></tr>
     <tr><td><b>Comunicações</b></td><td>E-mails enviados por você, posts, documentos — <em>processados</em> para gerar resposta, não copiados para outros fins</td><td>Durante a tarefa</td></tr>
@@ -120,7 +120,7 @@
   <tbody>
     <tr><td><b>Hostinger</b> (Brasil)</td><td>Hospedagem do servidor VPS</td><td>Todos os dados em repouso + logs</td></tr>
     <tr><td><b>Google</b> — Gemini API</td><td>Processar linguagem natural, gerar respostas da IA</td><td>Textos das suas conversas no momento do processamento. Google não usa dados do Gemini API para treinar modelos.</td></tr>
-    <tr><td><b>Google</b> — OAuth (Calendar/Gmail/Drive/Tasks)</td><td>Executar tarefas que você autorizou (criar evento, ler e-mail)</td><td>Tokens OAuth que você concedeu</td></tr>
+    <tr><td><b>Google</b> — OAuth (Calendar/Gmail/Drive/Tasks)</td><td>Executar tarefas que você autorizou (criar evento, enviar e-mail, guardar documento)</td><td>Tokens OAuth que você concedeu</td></tr>
     <tr><td><b>Meta / Instagram Graph API</b></td><td>Publicar posts, stories, reels na sua página</td><td>Token de página + mídias que você aprovou publicar</td></tr>
     <tr><td><b>Mercado Pago</b></td><td>Processar pagamentos (Pix, cartão, mensalidades)</td><td>Nome, e-mail, CPF/CNPJ, valor, forma de pagamento</td></tr>
     <tr><td><b>Cloudinary</b></td><td>Armazenar e servir mídias geradas (posts, stories)</td><td>Imagens e vídeos criados no app</td></tr>
@@ -187,6 +187,30 @@
 <h2><span class="n">9.</span>IA e suas conversas</h2>
 <p>Os textos das suas conversas são processados pela API do Google Gemini para gerar as respostas da equipe (Alfred, Olga, Estag, Tina, MIA). Conforme <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">os termos do Google Gemini API para desenvolvedores pagantes</a>, o Google <strong>não usa esses dados para treinar seus modelos</strong>.</p>
 <p>O Fiel <strong>também não</strong> usa suas conversas para treinar modelos. Elas servem para gerar sua resposta e ficam gravadas no histórico da sua conta para que você consulte depois.</p>
+</section>
+
+<section id="google">
+<h2><span class="n">9-A.</span>Dados da sua conta Google</h2>
+<p>Quando você conecta o Google, o Fiel pede só o necessário para as tarefas que você delega:</p>
+<table>
+  <thead><tr><th>Permissão</th><th>Para que usamos</th></tr></thead>
+  <tbody>
+    <tr><td><b>Google Agenda</b></td><td>Ver, criar, mover e cancelar compromissos quando você pede ("marca reunião amanhã às 10h").</td></tr>
+    <tr><td><b>Google Tarefas</b></td><td>Criar e concluir tarefas que você pede.</td></tr>
+    <tr><td><b>Gmail — somente envio</b></td><td>Enviar e-mails que você ditou e aprovou no chat. Cada envio pede sua confirmação. O Fiel <strong>não lê</strong> sua caixa de entrada.</td></tr>
+    <tr><td><b>Google Planilhas</b></td><td>Ler e lançar dados nas planilhas que você cadastrou no Fiel (ex.: controle financeiro).</td></tr>
+    <tr><td><b>Google Drive — só arquivos do Fiel</b></td><td>Guardar os documentos que você manda (pasta "Fiel/Documentos") e abrir arquivos que <strong>você mesmo selecionar</strong> no seletor do Google. O Fiel não vê o restante do seu Drive.</td></tr>
+  </tbody>
+</table>
+<p><strong>Uso limitado.</strong> O uso e a transferência, pelo Fiel, de informações recebidas das APIs do Google seguem a <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Política de Dados do Usuário dos Serviços de API do Google</a>, incluindo os requisitos de Uso Limitado. <em>Fiel's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</em></p>
+<ul>
+  <li>Usamos os dados do Google <strong>somente</strong> para executar as tarefas que você pede dentro do Fiel.</li>
+  <li><strong>Não</strong> vendemos, não usamos para publicidade e não repassamos a terceiros, exceto aos operadores necessários para executar a tarefa (seção 4) ou por obrigação legal.</li>
+  <li><strong>Não</strong> usamos dados do Google para treinar modelos de inteligência artificial.</li>
+  <li>Pessoas da nossa equipe <strong>não leem</strong> seus dados do Google, salvo com sua autorização expressa (ex.: atendimento que você pediu), por segurança ou por exigência legal.</li>
+  <li>Os tokens de acesso ficam no nosso servidor e são usados apenas para as tarefas da sua conta.</li>
+</ul>
+<p><strong>Como revogar:</strong> em Conexões, no app, toque em "desconectar" no Google; ou em <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com → Segurança → Apps de terceiros</a>. Ao desconectar, apagamos os tokens do Google da sua conta.</p>
 </section>
 
 <section>

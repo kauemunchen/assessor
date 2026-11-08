@@ -67,7 +67,7 @@ telas.conexoes = async () => {
   const corpo = `<div class="grade">
     <div class="cartao"><h3>Google ${g.conectado ? '<span class="tag ok">conectado</span>' : '<span class="tag off">não conectado</span>'}</h3>
       <p class="d">Agenda, Gmail, Drive, Tasks e Planilhas na sua conta Google.</p>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${esc_(g.escopos.agenda, 'Agenda')}${esc_(g.escopos.gmail_ler, 'Gmail ler')}${esc_(g.escopos.gmail_enviar, 'Gmail enviar')}${esc_(g.escopos.drive, 'Drive')}${esc_(g.escopos.tasks, 'Tasks')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${esc_(g.escopos.agenda, 'Agenda')}${g.modo === 'completo' ? esc_(g.escopos.gmail_ler, 'Gmail ler') : ''}${esc_(g.escopos.gmail_enviar, 'Gmail enviar')}${esc_(g.escopos.planilhas, 'Planilhas')}${esc_(g.escopos.drive, g.escopos.drive_total ? 'Drive' : 'Drive (arquivos do Fiel)')}${esc_(g.escopos.tasks, 'Tarefas')}</div>${g.modo === 'completo' ? '' : '<p class="d" style="font-size:12px;margin-top:8px">Por segurança, o Fiel não lê sua caixa de entrada e só abre no Drive os arquivos que ele guardou ou que você liberar.</p><div>'}</div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><a class="btn prim" href="${g.url_autorizar}" target="_blank" rel="noopener">${g.conectado ? 'Reautorizar (novos escopos)' : 'Conectar Google'}</a>${g.conectado ? '<button class="btn perigo" id="descGoogle">desconectar</button>' : ''}</div></div>
     <div class="cartao"><h3>Telegram ${d.telegram ? '<span class="tag ok">conectado</span>' : '<span class="tag off">não conectado</span>'}</h3>
       <p class="d">Fale com a equipe pelo celular, por texto ou áudio. A conversa é a mesma do app.</p>

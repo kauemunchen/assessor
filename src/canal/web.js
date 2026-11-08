@@ -177,6 +177,31 @@ export class WebCanal {
       let creditos = null; try { const c = await import('../creditos/index.js'); creditos = { saldo: c.saldo(conta.id), ilimitada: c.ilimitada(conta.id), base: c.ultimaRecarga(conta.id), produto: c.PRODUTO }; } catch {}
       res.json({ conta, modulos: ['diretor', ...modulos], personas, creditos });
     });
+    // Seletor de arquivos do Google (clientes com drive.file): link assinado vindo do chat, sem precisar de login no app
+    app.get('/api/google/picker', async (req, res) => {
+      try {
+        const drv = await import('../integracoes/google-drive.js'); const gc = await import('../integracoes/google-calendar.js');
+        const l = drv.lerLinkLiberar(req.query.t);
+        const chave = process.env.GOOGLE_PICKER_KEY; if (!chave) return res.json({ erro: 'Seletor do Google ainda não configurado. Avise o suporte.' });
+        const token = await gc.tokenAcesso(l.contaId);
+        res.json({ token, chave, app_id: String(process.env.GOOGLE_CLIENT_ID || '').split('-')[0], ids: l.ids, pasta: l.pasta });
+      } catch (e) { res.json({ erro: /invalid_grant/.test(e.message) ? 'A conexão com o Google expirou. No chat, diga "conectar google".' : e.message }); }
+    });
+    app.post('/api/google/picker', async (req, res) => {
+      try {
+        const drv = await import('../integracoes/google-drive.js');
+        const l = drv.lerLinkLiberar(req.body?.t); const esc = (req.body?.escolhidos || []).slice(0, 20);
+        if (!esc.length) return res.json({ erro: 'nada selecionado' });
+        const ok = []; for (const x of esc) { try { const m = await drv.metadados(l.contaId, x.id); ok.push(m); } catch {} }
+        if (!ok.length) return res.json({ erro: 'O Google não liberou o acesso. Tente de novo.' });
+        let mensagem;
+        if (l.pasta && ok[0].mime === 'application/vnd.google-apps.folder') { const r = await drv.definirPastaRaiz(l.contaId, ok[0].id); mensagem = `A pasta "${r.nome}" agora é onde o Fiel guarda seus documentos.`; }
+        else mensagem = `${ok.length === 1 ? `"${ok[0].nome}" liberado` : `${ok.length} itens liberados`}. Volte para a conversa e repita o pedido.`;
+        try { const { canalAtual } = await import('./atual.js'); const dono = db.prepare("SELECT chat_id FROM usuarios WHERE conta_id=? AND papel='dono' ORDER BY canal<>'telegram', id LIMIT 1").get(l.contaId)?.chat_id;
+          if (dono) canalAtual()?.enviar(null, dono, `🔓 ${mensagem}${ok.length && !l.pasta ? '\n' + ok.map(m => `- ${m.nome}: ${m.link}`).join('\n') : ''}`).catch(() => {}); } catch {}
+        res.json({ ok: true, mensagem });
+      } catch (e) { res.json({ erro: e.message }); }
+    });
     app.get('/api/guia', auth, async (req, res) => { const g = await import('../orquestrador/guia.js'); res.json(g.passos(req.sessao.conta_id)); });
     app.post('/api/guia/dispensar', auth, async (req, res) => { const g = await import('../orquestrador/guia.js'); res.json(g.dispensarGuia(req.sessao.conta_id)); });
     app.post('/api/telegram/vincular', auth, async (req, res) => { const g = await import('../orquestrador/guia.js'); res.json(g.gerarCodigoTelegram(req.sessao.conta_id)); });

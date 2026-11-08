@@ -8,6 +8,13 @@ import { db } from '../db/index.js';
 
 // Declarações no formato function-calling do Gemini
 export function ferramentas(_conta) {
+  // Clientes com permissões básicas do Google: sem ler a caixa de entrada e sem rascunhos no Gmail.
+  const semLeitura = _conta?.id && !gcal.temEscopo(_conta.id, 'gmail.readonly');
+  const semRascunho = _conta?.id && !gcal.temEscopo(_conta.id, 'gmail.compose');
+  const fora = new Set([...(semLeitura ? ['ler_emails', 'ler_email'] : []), ...(semRascunho ? ['criar_rascunho_email'] : [])]);
+  return lista().filter(f => !fora.has(f.name)).map(f => (f.name === 'enviar_email' && semLeitura) ? { ...f, description: f.description + ' SEM acesso à caixa de entrada: você não lê e-mails recebidos; peça ao dono destinatário e assunto quando for resposta. Se pedirem para ler/resumir e-mails, diga que o Fiel não acessa a caixa de entrada por segurança.' } : f);
+}
+function lista() {
   return [
     { name: 'criar_evento', description: 'Cria compromisso no Google Agenda do dono. categoria = marcador/calendário (ex.: Financeiro PF, Financeiro PJ, Profissional, Família, Saúde); se o dono não disser, deduza pelo contexto ou deixe vazio (Principal).', parameters: { type: 'OBJECT', properties: { titulo: { type: 'STRING' }, categoria: { type: 'STRING' }, inicio: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM' }, fim: { type: 'STRING' }, local: { type: 'STRING' }, convidados: { type: 'ARRAY', items: { type: 'STRING' } }, meet: { type: 'BOOLEAN' }, lembrete_min: { type: 'NUMBER' } }, required: ['titulo', 'inicio'] } },
     { name: 'listar_agenda', description: 'Lista compromissos de um período (padrão: próximos 90 dias). Datas ISO YYYY-MM-DD.', parameters: { type: 'OBJECT', properties: { inicio: { type: 'STRING' }, fim: { type: 'STRING' }, categoria: { type: 'STRING', description: 'filtrar por marcador' } } } },

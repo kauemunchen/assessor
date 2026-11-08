@@ -156,14 +156,14 @@ export async function tratarMensagem(msg, canal) {
         else { const r = await soc.guardarImagemEnviada(conta.id, bytes); msg.texto += r.aplicada ? `\n[Imagem do Drive hospedada. Original: ${r.original}. Com marca d'água: ${r.marcada || 'falhou'}. Use a marcada como midia_url (story ou post, conforme o dono).]` : `\n[Imagem do Drive hospedada (sem marca d'água): ${r.original}. Use como midia_url (story ou post, conforme o dono).]`; }
         msg.forcarModulo = 'social'; msg.linkTratado = true;
       }
-    } catch (e) { console.error('[drive→social]', e.message); }
+    } catch (e) { if (e.liberar) return { texto: e.message.replace(/: (https?:\/\/\S+)$/, '.'), botoes: [[{ t: '🔓 Liberar arquivo', url: e.message.match(/(https?:\/\/\S+)$/)?.[1] }]] }; console.error('[drive→social]', e.message); }
   }
   if (msg.tipo === 'texto' && !msg.linkTratado && ativosAgora.includes('documentos') && /drive\.google\.com\/(file|open|uc)|docs\.google\.com\/(document|presentation)\/d\//.test(msg.texto) && !/^documentos pasta/i.test(msg.texto.trim())) {
     await canal.enviar(msg.conta, msg.chatId, '📂 Lendo o arquivo do Drive e arquivando…');
     try { const { receberLinkDrive } = await import('../ferramentas/documentos.js'); const doc = await receberLinkDrive(conta, msg.texto);
       if (doc.duplicado) msg.texto += `\n[DUPLICADO — NÃO arquivei de novo: ${doc.motivo}. Original: ${JSON.stringify(doc.documento_original)}. Diga em 2 linhas que já estava guardado (título, pasta, link do original).]`; else
       msg.texto += `\n[Arquivo do Drive JÁ MOVIDO para a pasta certa e registrado. Dados: ${JSON.stringify(doc)}. Confirme em até 3 linhas (o que é, pasta, link, vigência se houver). Não invente dados.]`; }
-    catch (e) { msg.texto += `\n[Link do Drive recebido mas não consegui arquivar. Erro real: ${e.message}. Repita ao dono.]`; }
+    catch (e) { if (e.liberar) return { texto: e.message.replace(/: (https?:\/\/\S+)$/, '.'), botoes: [[{ t: '🔓 Liberar arquivo', url: e.message.match(/(https?:\/\/\S+)$/)?.[1] }]] }; msg.texto += `\n[Link do Drive recebido mas não consegui arquivar. Erro real: ${e.message}. Repita ao dono.]`; }
     msg.forcarModulo = 'documentos';
   }
   if (!msg.texto?.trim()) return 'Recebi uma mensagem vazia.';

@@ -22,6 +22,10 @@ services:
     depends_on: [render]
     environment:
       - RENDER_URL=http://render:5055
+      # Login do Google: retorno no domínio da marca (exigência da verificação do Google)
+      - GOOGLE_REDIRECT_URI=https://usefiel.com/oauth/google/callback
+      # Seletor de arquivos do Google (chave pública do navegador, restrita a usefiel.com e à Picker API)
+      - GOOGLE_PICKER_KEY=AIzaSyAOJJwXw_nJtu1xGhTY2ShYEzDwptIxwMk
     build: .
     container_name: assessor-km
     restart: unless-stopped

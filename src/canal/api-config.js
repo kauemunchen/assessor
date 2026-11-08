@@ -89,7 +89,7 @@ export function rotasConfig(app) {
     const conta = db.prepare('SELECT drive_pasta_id, empresas FROM contas WHERE id=?').get(req.contaId);
     const { listarCadastradas } = await import('../integracoes/google-sheets.js');
     res.json({
-      google: { conectado: !!g, desde: g?.atualizado_em, escopos: { agenda: /calendar/.test(scope), gmail_ler: /gmail.readonly/.test(scope), gmail_enviar: /gmail.send/.test(scope), drive: /auth\/drive/.test(scope), tasks: /auth\/tasks/.test(scope) }, url_autorizar: urlAutorizacao(req.contaId) },
+      google: { conectado: !!g, desde: g?.atualizado_em, escopos: { agenda: /calendar/.test(scope), gmail_ler: /gmail.readonly/.test(scope), gmail_enviar: /gmail.send/.test(scope), drive: /auth\/drive(\.file)?(\s|$)/.test(scope), drive_total: /auth\/drive(\s|$)/.test(scope), planilhas: /auth\/(spreadsheets|drive)(\s|$)/.test(scope), tasks: /auth\/tasks/.test(scope) }, modo: (await import('../integracoes/google-calendar.js')).modoEscopos(req.contaId), url_autorizar: urlAutorizacao(req.contaId) },
       telegram: !!db.prepare("SELECT 1 FROM usuarios WHERE conta_id=? AND canal='telegram'").get(req.contaId),
       instagram: ig ? { conectado: true, ig_user_id: ig.ig_user_id, expira_em: ig.expira_em, desde: ig.atualizado_em, ...igInfo } : { conectado: false },
       drive: { pasta_id: conta.drive_pasta_id, link: conta.drive_pasta_id ? `https://drive.google.com/drive/folders/${conta.drive_pasta_id}` : null },
@@ -108,7 +108,11 @@ export function rotasConfig(app) {
     res.json({ ok: true, username: me.username });
   });
   app.delete('/api/conexoes/instagram', auth, (req, res) => { db.prepare('DELETE FROM instagram_auth WHERE conta_id=?').run(req.contaId); res.json({ ok: true }); });
-  app.delete('/api/conexoes/google', auth, (req, res) => { db.prepare('DELETE FROM google_auth WHERE conta_id=?').run(req.contaId); res.json({ ok: true }); });
+  app.delete('/api/conexoes/google', auth, async (req, res) => {
+    // revoga no Google (o acesso some também em myaccount.google.com) e apaga os tokens daqui
+    try { const t = JSON.parse(db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(req.contaId)?.token_json || '{}'); const tk = t.refresh_token || t.access_token; if (tk) await fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(tk), { method: 'POST' }).catch(() => {}); } catch {}
+    db.prepare('DELETE FROM google_auth WHERE conta_id=?').run(req.contaId); res.json({ ok: true });
+  });
   app.post('/api/conexoes/drive', auth, async (req, res) => {
     try { const d = await import('../integracoes/google-drive.js'); const r = await d.definirPastaRaiz(req.contaId, String(req.body?.link || '')); res.json({ ok: true, ...r }); } catch (e) { res.status(400).json({ erro: e.message }); }
   });

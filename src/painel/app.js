@@ -134,7 +134,7 @@ function bolha(m, d) {
   else if (m.midia?.url && m.tipo === 'audio') midia = `<audio src="${m.midia.url}" controls></audio>`;
   else if (m.midia?.url) midia = `<a class="doc" href="${m.midia.url}" target="_blank">📄 ${esc(m.midia.nome || 'arquivo')}</a>`;
   else if (m.midia && m.direcao === 'entrada') midia = `<span style="color:var(--mudo)">📎 ${esc(m.midia.nome || m.tipo)} (enviado pelo Telegram)</span>`;
-  const botoes = m.botoes ? `<div class="botoes" data-id="${m.id}">${m.botoes.flat().map(b => `<button data-d="${esc(b.d ?? b.t)}">${esc(b.t)}</button>`).join('')}</div>` : '';
+  const botoes = m.botoes ? `<div class="botoes" data-id="${m.id}">${m.botoes.flat().map(b => b.url ? `<a class="bt-link" href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.t)}</a>` : `<button data-d="${esc(b.d ?? b.t)}">${esc(b.t)}</button>`).join('')}</div>` : '';
   const texto = m.texto && !(m.midia && /^\[(imagem|video|arquivo|audio)\]$/.test(m.texto)) ? fmt(m.texto) : '';
   return `<div class="msg ${m.direcao}" data-id="${m.id}">${nome ? `<div class="mod">${esc(nome)}</div>` : ''}${midia}${texto}${botoes}<div class="meta"><span>${hora}</span><span>${m.direcao === 'entrada' ? (m.canal === 'web' ? '💻 web' : '📱 telegram') : ''}</span></div></div>`;
 }

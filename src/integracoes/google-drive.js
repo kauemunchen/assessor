@@ -1,6 +1,8 @@
 // Google Drive do dono: pasta raiz "KM/Assessor/Documentos" (ou a que ele apontar), subpastas Empresa/Tipo/Ano.
-// Escopo: drive (completo) — necessário para mover arquivos que o dono mandou por link. O bot nunca apaga (só move para lixeira se pedido).
+// Escopo: drive (admin) ou drive.file (clientes — só arquivos que o Fiel criou ou que o cliente liberou pelo seletor do Google).
+// Sem acesso a um arquivo colado por link → erro com o botão "Liberar arquivo" (página /app/drive). O bot nunca apaga (só lixeira, se pedido).
 import { google } from 'googleapis';
+import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { db } from '../db/index.js';
 
@@ -8,7 +10,7 @@ function auth(contaId) {
   const row = db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(contaId);
   if (!row) throw new Error('Google não conectado. Diga "conectar google".');
   const tok = JSON.parse(row.token_json);
-  if (!/auth\/drive(\b|\.)/.test(tok.scope || '')) throw new Error('A autorização atual não inclui o Google Drive. Diga "conectar google" de novo e aceite o acesso ao Drive.');
+  if (!/auth\/drive(\.file)?(\s|$)/.test(tok.scope || '')) throw new Error('A autorização atual não inclui o Google Drive. Diga "conectar google" de novo e aceite o acesso ao Drive.');
   const a = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_REDIRECT_URI);
   a.setCredentials(tok);
   a.on('tokens', (t) => db.prepare('UPDATE google_auth SET token_json=? WHERE conta_id=?').run(JSON.stringify({ ...tok, ...t }), contaId));
@@ -23,6 +25,30 @@ function traduzErro(e) {
   return new Error(`Drive: ${m.slice(0, 200)}`);
 }
 const PASTA = 'application/vnd.google-apps.folder';
+const APP = () => (process.env.WEBAPP_URL || process.env.PUBLIC_URL || 'https://usefiel.com').replace(/\/$/, '').replace(/\/app$/, '');
+const soArquivosDoFiel = (contaId) => { try { const sc = JSON.parse(db.prepare('SELECT token_json FROM google_auth WHERE conta_id=?').get(contaId)?.token_json || '{}').scope || ''; return !/auth\/drive(\s|$)/.test(sc); } catch { return true; } };
+const assinar = (txt) => crypto.createHmac('sha256', process.env.GOOGLE_CLIENT_SECRET || 'fiel').update(txt).digest('base64url').slice(0, 24);
+/** Link assinado (30 min) para o cliente liberar arquivos/pastas pelo seletor do Google. */
+export function linkLiberar(contaId, ids = [], { pasta = false } = {}) {
+  const exp = Date.now() + 30 * 60000; const base = `${contaId}.${exp}.${ids.join(',')}.${pasta ? 1 : 0}`;
+  return `${APP()}/app/drive/?t=${encodeURIComponent(Buffer.from(base).toString('base64url') + '.' + assinar(base))}`;
+}
+export function lerLinkLiberar(t) {
+  const [b, sig] = String(t || '').split('.'); const base = Buffer.from(b || '', 'base64url').toString();
+  if (!b || assinar(base) !== sig) throw new Error('link inválido');
+  const [contaId, exp, ids, pasta] = base.split('.');
+  if (Date.now() > Number(exp)) throw new Error('link expirado — peça de novo no chat');
+  return { contaId: Number(contaId), ids: ids ? ids.split(',').filter(Boolean) : [], pasta: pasta === '1' };
+}
+/** Erro de "não encontrado" num arquivo do cliente: se ele só deu acesso aos arquivos do Fiel, oferece liberar. */
+function semAcesso(contaId, fileId, e, { pasta = false } = {}) {
+  const m = String(e?.message || e);
+  if (fileId && /File not found|notFound|404|insufficientFilePermissions|403/i.test(m) && soArquivosDoFiel(contaId)) {
+    const err = new Error(`Ainda não tenho acesso a ${pasta ? 'essa pasta' : 'esse arquivo'} do seu Drive (por segurança, o Fiel só abre o que você libera). Toque para liberar — você escolhe no seu Google Drive e pronto: ${linkLiberar(contaId, [fileId], { pasta })}`);
+    err.liberar = true; return err;
+  }
+  return traduzErro(e);
+}
 const esc = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 export function extrairId(texto = '') {
@@ -44,18 +70,19 @@ async function caminho(contaId, partes, base = 'root') {
   for (const p of partes.filter(Boolean)) id = await obterOuCriarPasta(contaId, p, id);
   return id;
 }
-/** Pasta raiz dos documentos da conta: a apontada pelo dono ou KM/Assessor/Documentos (criada na 1ª vez). */
+/** Pasta raiz dos documentos da conta: a apontada pelo dono ou Fiel/Documentos (admin: KM/Assessor/Documentos), criada na 1ª vez. */
 export async function pastaRaiz(contaId) {
   const row = db.prepare('SELECT drive_pasta_id FROM contas WHERE id=?').get(contaId);
   if (row?.drive_pasta_id) return row.drive_pasta_id;
-  const id = await caminho(contaId, ['KM', 'Assessor', 'Documentos']);
+  const admin = db.prepare('SELECT admin FROM contas WHERE id=?').get(contaId)?.admin === 1;
+  const id = await caminho(contaId, admin ? ['KM', 'Assessor', 'Documentos'] : ['Fiel', 'Documentos']);
   db.prepare('UPDATE contas SET drive_pasta_id=? WHERE id=?').run(id, contaId);
   return id;
 }
 export async function definirPastaRaiz(contaId, linkOuId) {
   const id = extrairId(linkOuId); if (!id) throw new Error('Não reconheci o link/ID da pasta.');
   const d = auth(contaId);
-  const r = await d.files.get({ fileId: id, fields: 'id,name,mimeType' }).catch(e => { throw traduzErro(e); });
+  const r = await d.files.get({ fileId: id, fields: 'id,name,mimeType' }).catch(e => { throw semAcesso(contaId, id, e, { pasta: true }); });
   if (r.data.mimeType !== PASTA) throw new Error('Esse link não é de uma pasta.');
   db.prepare('UPDATE contas SET drive_pasta_id=? WHERE id=?').run(id, contaId);
   return { id, nome: r.data.name };
@@ -74,7 +101,7 @@ export async function upload(contaId, { nome, mime, bytes, pastaId, descricao })
   return { id: r.data.id, nome: r.data.name, link: r.data.webViewLink, tamanho: Number(r.data.size || 0), mime: r.data.mimeType };
 }
 export async function metadados(contaId, fileId) {
-  const r = await auth(contaId).files.get({ fileId, fields: 'id,name,mimeType,size,webViewLink,parents,createdTime,md5Checksum' }).catch(e => { throw traduzErro(e); });
+  const r = await auth(contaId).files.get({ fileId, fields: 'id,name,mimeType,size,webViewLink,parents,createdTime,md5Checksum' }).catch(e => { throw semAcesso(contaId, fileId, e); });
   return { id: r.data.id, nome: r.data.name, mime: r.data.mimeType, tamanho: Number(r.data.size || 0), link: r.data.webViewLink, pais: r.data.parents || [], md5: r.data.md5Checksum || null };
 }
 /** Manda o arquivo para a lixeira do Drive (o dono recupera em até 30 dias). */
@@ -83,7 +110,7 @@ export async function lixeira(contaId, fileId) {
   return { ok: true };
 }
 export async function baixar(contaId, fileId) {
-  const r = await auth(contaId).files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' }).catch(e => { throw traduzErro(e); });
+  const r = await auth(contaId).files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' }).catch(e => { throw semAcesso(contaId, fileId, e); });
   return r.data;
 }
 export async function mover(contaId, fileId, pastaId, novoNome) {
@@ -92,7 +119,7 @@ export async function mover(contaId, fileId, pastaId, novoNome) {
   return { id: r.data.id, nome: r.data.name, link: r.data.webViewLink };
 }
 export async function copiar(contaId, fileId, pastaId) {
-  const r = await auth(contaId).files.copy({ fileId, requestBody: { parents: [pastaId] }, fields: 'id,name,webViewLink' }).catch(e => { throw traduzErro(e); });
+  const r = await auth(contaId).files.copy({ fileId, requestBody: { parents: [pastaId] }, fields: 'id,name,webViewLink' }).catch(e => { throw semAcesso(contaId, fileId, e); });
   return { id: r.data.id, nome: r.data.name, link: r.data.webViewLink };
 }
 export async function criarTexto(contaId, { nome, conteudo, pastaId }) {
@@ -104,11 +131,11 @@ export async function buscarNoDrive(contaId, texto, max = 10) {
   const porNome = termos.map(t => `name contains '${esc(t)}'`).join(' and ');
   const q = `(fullText contains '${esc(texto)}'${porNome ? ` or (${porNome})` : ''}) and trashed=false and mimeType!='${PASTA}'`;
   const r = await auth(contaId).files.list({ q, fields: 'files(id,name,webViewLink,mimeType,size,modifiedTime)', pageSize: max, orderBy: 'modifiedTime desc' }).catch(e => { throw traduzErro(e); });
-  return (r.data.files || []).map(f => ({ drive_id: f.id, nome: f.name, link: f.webViewLink, mime: f.mimeType, tamanho: Number(f.size || 0), modificado: f.modifiedTime, raiz }));
+  return (r.data.files || []).map(f => ({ drive_id: f.id, nome: f.name, link: f.webViewLink, mime: f.mimeType, tamanho: Number(f.size || 0), modificado: f.modifiedTime, raiz, ...(soArquivosDoFiel(contaId) ? { escopo: 'só arquivos guardados pelo Fiel ou liberados pelo dono' } : {}) }));
 }
 export async function linkPasta(contaId, pastaId) { return `https://drive.google.com/drive/folders/${pastaId}`; }
 export async function exportarTexto(contaId, fileId) {
-  const r = await auth(contaId).files.export({ fileId, mimeType: 'text/plain' }, { responseType: 'text' }).catch(e => { throw traduzErro(e); });
+  const r = await auth(contaId).files.export({ fileId, mimeType: 'text/plain' }, { responseType: 'text' }).catch(e => { throw semAcesso(contaId, fileId, e); });
   return String(r.data || '');
 }
 export async function compartilharLeitor(contaId, fileId, email) {
@@ -116,6 +143,6 @@ export async function compartilharLeitor(contaId, fileId, email) {
   return { fileId, email, papel: 'leitor' };
 }
 export async function exportarPDF(contaId, fileId) {
-  const r = await auth(contaId).files.export({ fileId, mimeType: 'application/pdf' }, { responseType: 'arraybuffer' }).catch(e => { throw traduzErro(e); });
+  const r = await auth(contaId).files.export({ fileId, mimeType: 'application/pdf' }, { responseType: 'arraybuffer' }).catch(e => { throw semAcesso(contaId, fileId, e); });
   return r.data;
 }
