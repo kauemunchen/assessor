@@ -4,13 +4,14 @@ etiqueta do pilar (Bold 30 caixa alta) · rodapé: logo KM branco + KAUÊ MÜNCH
 """
 import io, os, re
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+from marca import mk, h2r as _h2r
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.environ.get("LOGO_PATH", os.path.join(AQUI, "logo_km.png"))
 W, H, M = 1080, 1440, 64
+# Cores KM fixas (só para a marca d'água da conta KM); as artes usam mk() = identidade da conta da requisição.
 PRIM, SEC, BRANCO, PRETO, OURO = "#37414E", "#C8CFD7", "#FFFFFF", "#000000", "#B9964B"
-
-def h2r(h): h = h.lstrip("#"); return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+h2r = _h2r
 
 def fonte(peso, tam):
     p = os.path.join(AQUI, "fonts", f"Poppins-{peso}.ttf")
@@ -20,14 +21,12 @@ def fonte(peso, tam):
             if os.path.exists(alt): return ImageFont.truetype(alt, tam)
         return ImageFont.load_default()
 
-# Logos oficiais (fundo transparente): escuro #37414E, claro #C8CFD7, branco
-_logos = {}
-def logo(variante="claro"):
-    if variante not in _logos:
-        p = os.path.join(AQUI, f"logo_km_{variante}.png")
-        _logos[variante] = Image.open(p).convert("RGBA") if os.path.exists(p) else None
-    return _logos[variante]
-def logo_branco(): return logo("claro")  # rodapé das artes sobre #37414E usa o claro do manual
+# Logo da marca da requisição (KM: arquivos oficiais; cliente: logos enviadas por ele). Pode ser None.
+def logo(variante="claro"): return mk().logo(variante)
+def logo_branco():
+    """Logo para o fundo da arte: versão clara em fundo escuro, escura em fundo claro."""
+    from marca import _lum
+    return logo("claro" if _lum(mk().fundo) < 0.4 else "escuro")
 
 def wrap(draw, texto, font, max_w):
     linhas, linha = [], ""
@@ -38,22 +37,24 @@ def wrap(draw, texto, font, max_w):
     if linha: linhas.append(linha)
     return linhas
 
-def titulo_destacado(draw, texto, palavra, font, x, y, max_w, lh, cor=BRANCO):
+def titulo_destacado(draw, texto, palavra, font, x, y, max_w, lh, cor=None):
     """Desenha título quebrando linhas; a palavra-chave (primeira ocorrência) sai em dourado."""
     alvo = re.sub(r"[^\wÀ-ÿ]", "", (palavra or "")).strip().lower()
+    cor = cor or mk().titulo; dest = mk().destaque
     feito = False
     for linha in wrap(draw, texto, font, max_w):
         cx = x
         for tok in linha.split(" "):
             limpo = re.sub(r"[^\wÀ-ÿ]", "", tok).lower()
-            c = OURO if (alvo and not feito and limpo == alvo) else cor
-            if c == OURO: feito = True
+            dourada = bool(alvo and not feito and limpo == alvo)
+            c = dest if dourada else cor
+            if dourada: feito = True
             draw.text((cx, y), tok, fill=h2r(c), font=font)
             cx += draw.textbbox((0, 0), tok + " ", font=font)[2]
         y += lh
     return y
 
-def rodape(img, draw, cor_texto=BRANCO):
+def rodape(img, draw, cor_texto=None):
     # Só o símbolo KM, sem nome (decisão do dono, 11/10/2026)
     lg = logo_branco()
     y = H - M - 52
@@ -62,11 +63,11 @@ def rodape(img, draw, cor_texto=BRANCO):
         img.paste(l2, (M, y), l2)
 
 def etiqueta(draw, texto):
-    draw.text((M, M), texto.upper(), fill=h2r(OURO), font=fonte("Bold", 30))
-    draw.rectangle([M, M + 46, M + 72, M + 49], fill=h2r(OURO))
+    draw.text((M, M), texto.upper(), fill=h2r(mk().destaque), font=fonte("Bold", 30))
+    draw.rectangle([M, M + 46, M + 72, M + 49], fill=h2r(mk().destaque))
 
 def base():
-    img = Image.new("RGB", (W, H), h2r(PRIM)); return img, ImageDraw.Draw(img)
+    img = Image.new("RGB", (W, H), h2r(mk().fundo)); return img, ImageDraw.Draw(img)
 
 def jpeg(img):
     b = io.BytesIO(); img.save(b, "JPEG", quality=95); return b.getvalue()
@@ -74,7 +75,7 @@ def jpeg(img):
 def numeracao(draw, i, total):
     t = f"{i:02d}/{total:02d}"; f = fonte("Medium", 22)
     w = draw.textbbox((0, 0), t, font=f)[2]
-    draw.text((W - M - w, H - M - 34), t, fill=h2r(SEC), font=f)
+    draw.text((W - M - w, H - M - 34), t, fill=h2r(mk().apoio), font=f)
 
 # ---------- Carrossel (capa → problema → conteúdo… → resumo → CTA) ----------
 def carrossel(d):
@@ -85,7 +86,7 @@ def carrossel(d):
     img, dr = base(); etiqueta(dr, d.get("etiqueta", "GESTÃO"))
     y = titulo_destacado(dr, d.get("titulo", ""), d.get("palavra_dourada"), fonte("Bold", 72), M, 420, W - 2 * M, 84)
     for l in wrap(dr, d.get("subtitulo", ""), fonte("Regular", 32), W - 2 * M)[:2]:
-        dr.text((M, y + 24), l, fill=h2r(SEC), font=fonte("Regular", 32)); y += 44
+        dr.text((M, y + 24), l, fill=h2r(mk().apoio), font=fonte("Regular", 32)); y += 44
     rodape(img, dr); numeracao(dr, 1, total); out.append(jpeg(img))
     # Internos
     for i, s in enumerate(slides, start=2):
@@ -93,11 +94,11 @@ def carrossel(d):
         tipo = (s.get("tipo") or "conteudo").lower()
         rotulo = {"problema": "O PROBLEMA", "resumo": "RESUMO"}.get(tipo)
         y = 300
-        if rotulo: dr.text((M, y), rotulo, fill=h2r(SEC), font=fonte("Medium", 22)); y += 44
+        if rotulo: dr.text((M, y), rotulo, fill=h2r(mk().apoio), font=fonte("Medium", 22)); y += 44
         y = titulo_destacado(dr, s.get("titulo", ""), s.get("palavra_dourada"), fonte("Bold", 54), M, y, W - 2 * M, 66)
         y += 28
         for l in wrap(dr, s.get("texto", ""), fonte("Regular", 32), W - 2 * M - 40)[:8]:
-            dr.text((M, y), l, fill=h2r(SEC), font=fonte("Regular", 32)); y += 46
+            dr.text((M, y), l, fill=h2r(mk().apoio), font=fonte("Regular", 32)); y += 46
         rodape(img, dr); numeracao(dr, i, total); out.append(jpeg(img))
     # CTA
     img, dr = base(); etiqueta(dr, d.get("etiqueta", "GESTÃO"))
@@ -107,23 +108,24 @@ def carrossel(d):
     f = fonte("Bold", 54); cta = d.get("cta", "")
     y = 640
     for l in wrap(dr, cta, f, W - 2 * M):
-        w = dr.textbbox((0, 0), l, font=f)[2]; dr.text(((W - w) // 2, y), l, fill=h2r(BRANCO), font=f); y += 66
-    dr.rectangle([W // 2 - 40, y + 20, W // 2 + 40, y + 24], fill=h2r(OURO))
-    f2 = fonte("Regular", 30); t2 = "@kauemunchen"; w2 = dr.textbbox((0, 0), t2, font=f2)[2]
-    dr.text(((W - w2) // 2, y + 56), t2, fill=h2r(OURO), font=f2)
+        w = dr.textbbox((0, 0), l, font=f)[2]; dr.text(((W - w) // 2, y), l, fill=h2r(mk().titulo), font=f); y += 66
+    dr.rectangle([W // 2 - 40, y + 20, W // 2 + 40, y + 24], fill=h2r(mk().destaque))
+    f2 = fonte("Regular", 30); t2 = mk().assinatura; w2 = dr.textbbox((0, 0), t2, font=f2)[2]
+    if t2: dr.text(((W - w2) // 2, y + 56), t2, fill=h2r(mk().destaque), font=f2)
     rodape(img, dr); numeracao(dr, total, total); out.append(jpeg(img))
     return out
 
 # ---------- Estático: frase forte + assinatura ----------
-def frase(texto, palavra_dourada=None, etiqueta_txt=None, autoria="@kauemunchen"):
+def frase(texto, palavra_dourada=None, etiqueta_txt=None, autoria=None):
+    if autoria is None: autoria = mk().assinatura
     img, dr = base()
     if etiqueta_txt: etiqueta(dr, etiqueta_txt)
     f = fonte("Bold", 64); linhas = wrap(dr, texto, f, W - 2 * M)
     lh = 78; y = (H - len(linhas) * lh) // 2 - 40
     titulo_destacado(dr, texto, palavra_dourada, f, M, y, W - 2 * M, lh)
     y2 = y + len(linhas) * lh + 28
-    dr.rectangle([M, y2, M + 72, y2 + 4], fill=h2r(OURO))
-    dr.text((M, y2 + 24), autoria, fill=h2r(SEC), font=fonte("Regular", 30))
+    dr.rectangle([M, y2, M + 72, y2 + 4], fill=h2r(mk().destaque))
+    if autoria: dr.text((M, y2 + 24), autoria, fill=h2r(mk().apoio), font=fonte("Regular", 30))
     rodape(img, dr); return jpeg(img)
 
 # ---------- Letreiro de reel (gancho em caixa #37414E, 9:16 transparente) ----------
@@ -132,9 +134,9 @@ def letreiro(gancho, largura=1080):
     linhas = wrap(dr, gancho, f, largura - 2 * 80)
     h = 48 + len(linhas) * 68 + 32
     img = Image.new("RGBA", (largura, h), (0, 0, 0, 0)); dr = ImageDraw.Draw(img)
-    dr.rounded_rectangle([40, 0, largura - 40, h], radius=24, fill=h2r(PRIM))
+    dr.rounded_rectangle([40, 0, largura - 40, h], radius=24, fill=h2r(mk().fundo))
     y = 40
-    for l in linhas: dr.text((80, y), l, fill=h2r(BRANCO), font=f); y += 68
+    for l in linhas: dr.text((80, y), l, fill=h2r(mk().titulo), font=f); y += 68
     b = io.BytesIO(); img.save(b, "PNG"); return b.getvalue()
 
 # ---------- Marca d'água inteligente (foto do dono) ----------
@@ -154,7 +156,7 @@ def logo_colorido(cor_hex):
     return Image.merge("RGBA", (Image.new("L", lg.size, r), Image.new("L", lg.size, g), Image.new("L", lg.size, b), a))
 
 def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatura=False):
-    """Aplica o logo KM com cor decidida pela luminosidade do canto: branco em fundo escuro, #37414E em fundo claro.
+    """Aplica o logo da marca da requisição (KM por padrão) com cor decidida pela luminosidade do canto: branco em fundo escuro, #37414E em fundo claro.
     Em fundo médio/ruidoso adiciona sombra suave para legibilidade. Retorna (jpeg_bytes, info)."""
     img = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGBA")
     Wf, Hf = img.size
@@ -171,7 +173,13 @@ def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatur
     if lum < 60: variante, nome, cor = "branco", "branco", BRANCO
     elif lum < 140: variante, nome, cor = "claro", "claro #C8CFD7", SEC
     else: variante, nome, cor = "escuro", "escuro #37414E", PRIM
-    logo_img = logo(variante).resize((lw, lh), Image.LANCZOS)
+    if not mk().km:  # cliente: versão clara da logo em fundo escuro/médio, versão escura em fundo claro
+        variante = "claro" if lum < 140 else "escuro"; nome = f"logo do cliente ({'versão clara' if variante == 'claro' else 'versão escura'})"
+        cor = "#FFFFFF" if lum < 140 else "#1A1A1A"
+    lgv = logo(variante) or lg0
+    lh = int(lgv.height * lw / lgv.width)
+    y = Hf - lh - margem if "inferior" in posicao else margem
+    logo_img = lgv.resize((lw, lh), Image.LANCZOS)
     # sombra suave quando fundo é médio ou ruidoso
     if 90 < lum < 190 or dev > 40:
         from PIL import ImageFilter
@@ -183,7 +191,7 @@ def marca_dagua(img_bytes, posicao="inferior-direito", proporcao=0.14, assinatur
     img.alpha_composite(logo_img, (x, y))
     if assinatura:
         dr = ImageDraw.Draw(img); f = fonte("Medium", max(18, int(Wf * 0.02)))
-        txt = "@kauemunchen"; tw = dr.textbbox((0, 0), txt, font=f)[2]
+        txt = mk().assinatura or ""; tw = dr.textbbox((0, 0), txt, font=f)[2]
         tx = x + lw - tw if "direito" in posicao else x
         dr.text((tx, y + lh + 6), txt, fill=h2r(cor), font=f)
     out = io.BytesIO(); img.convert("RGB").save(out, "JPEG", quality=95)

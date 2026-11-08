@@ -22,12 +22,13 @@ export function rotasMarca(app) {
   const lerRegras = () => { const p = path.join(CONHECIMENTO, 'estrategia-conteudo.md'); const t = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''; const i = t.indexOf('## Regras operacionais'); return { completo: t, regras: i >= 0 ? t.slice(i) : '', antes: i >= 0 ? t.slice(0, i) : t }; };
 
   // ---------- Identidade & Marca ----------
-  app.get('/api/marca', auth, (req, res) => {
+  app.get('/api/marca', auth, async (req, res) => {
     const row = db.prepare('SELECT dados, atualizado_em FROM social_identidade WHERE conta_id=?').get(req.contaId);
     const id = row ? JSON.parse(row.dados) : {};
     const { regras } = lerRegras();
-    const logos = ['logo_km_escuro.png', 'logo_km_claro.png', 'logo_km_branco.png'].filter(f => fs.existsSync(path.resolve('render', f))).map(f => `/api/marca/logo/${f}`);
-    res.json({ identidade: id, campos: CAMPOS_ID, atualizado_em: row?.atualizado_em, regras_operacionais: regras, logos, ajustes: { ...AJUSTES_PADRAO, ...Object.fromEntries(Object.keys(AJUSTES_PADRAO).map(k => [k, ajuste(req.contaId, k, AJUSTES_PADRAO[k])])) } });
+    const kitM = await import('../integracoes/marca-kit.js'); const km = kitM.usaKM(req.contaId);
+    const logos = km ? ['logo_km_escuro.png', 'logo_km_claro.png', 'logo_km_branco.png'].filter(f => fs.existsSync(path.resolve('render', f))).map(f => `/api/marca/logo/${f}`) : [];
+    res.json({ km, kit: km ? null : (kitM.lerKit(req.contaId) || {}), admin: db.prepare('SELECT admin FROM contas WHERE id=?').get(req.contaId)?.admin === 1, identidade: id, campos: CAMPOS_ID, atualizado_em: row?.atualizado_em, regras_operacionais: db.prepare('SELECT admin FROM contas WHERE id=?').get(req.contaId)?.admin === 1 ? regras : '', logos, ajustes: { ...AJUSTES_PADRAO, ...Object.fromEntries(Object.keys(AJUSTES_PADRAO).map(k => [k, ajuste(req.contaId, k, AJUSTES_PADRAO[k])])) } });
   });
   app.post('/api/marca/identidade', auth, (req, res) => {
     const atual = (() => { const r = db.prepare('SELECT dados FROM social_identidade WHERE conta_id=?').get(req.contaId); return r ? JSON.parse(r.dados) : {}; })();
@@ -36,7 +37,23 @@ export function rotasMarca(app) {
     db.prepare('INSERT INTO social_identidade (conta_id, dados, atualizado_em) VALUES (?,?,CURRENT_TIMESTAMP) ON CONFLICT(conta_id) DO UPDATE SET dados=excluded.dados, atualizado_em=CURRENT_TIMESTAMP').run(req.contaId, JSON.stringify(novo));
     res.json({ ok: true });
   });
+  // ---------- Kit visual da marca (clientes) ----------
+  app.post('/api/marca/kit', auth, async (req, res) => {
+    const kitM = await import('../integracoes/marca-kit.js'); const b = req.body || {};
+    res.json(kitM.salvarKit(req.contaId, { nome: b.nome, assinatura: b.assinatura, cores: b.cores || {}, marca_dagua_auto: b.marca_dagua_auto }));
+  });
+  app.post('/api/marca/kit/logo', auth, async (req, res) => {
+    try {
+      const b = req.body || {}; const bytes = Buffer.from(String(b.imagem_b64 || '').replace(/^data:[^,]+,/, ''), 'base64');
+      if (bytes.length < 100 || bytes.length > 8 * 1024 * 1024) return res.status(400).json({ erro: 'imagem inválida (até 8 MB)' });
+      const cdn = await import('../integracoes/cloudinary.js'); const kitM = await import('../integracoes/marca-kit.js');
+      const url = await cdn.upload(bytes, { pasta: `assessor/${req.contaId}/marca` });
+      res.json(kitM.salvarLogo(req.contaId, url, b.variante || 'principal', { substituir: true }));
+    } catch (e) { res.status(500).json({ erro: e.message }); }
+  });
+  app.delete('/api/marca/kit/logo/:variante', auth, async (req, res) => { const kitM = await import('../integracoes/marca-kit.js'); res.json(kitM.removerLogo(req.contaId, req.params.variante)); });
   app.post('/api/marca/regras', auth, (req, res) => {
+    if (db.prepare('SELECT admin FROM contas WHERE id=?').get(req.contaId)?.admin !== 1) return res.status(403).json({ erro: 'só o administrador edita as regras do manual KM' });
     const txt = String(req.body?.regras || ''); if (!txt.startsWith('## Regras operacionais')) return res.status(400).json({ erro: 'O texto precisa começar com "## Regras operacionais".' });
     const { antes } = lerRegras(); const p = path.join(CONHECIMENTO, 'estrategia-conteudo.md');
     fs.copyFileSync(p, p + '.bak'); fs.writeFileSync(p, antes + txt.trimEnd() + '\n'); res.json({ ok: true });
@@ -45,7 +62,7 @@ export function rotasMarca(app) {
   // prévia de story no padrão da marca (render ao vivo)
   app.post('/api/marca/previa', auth, async (req, res) => {
     try { const render = await import('../integracoes/render.js'); const { modelo = 'frase', texto = 'Processo não é burocracia, é liberdade', palavra_dourada = 'liberdade', etiqueta = 'Gestão' } = req.body || {};
-      const r = await render.story({ modelo, texto, titulo: texto, palavra_dourada, etiqueta, itens: ['Defina o resultado', 'Documente o como', 'Acompanhe pelo indicador'], quando: 'Quinta, 19h' });
+      const r = await render.story({ modelo, texto, titulo: texto, palavra_dourada, etiqueta, itens: ['Defina o resultado', 'Documente o como', 'Acompanhe pelo indicador'], quando: 'Quinta, 19h' }, { contaId: req.contaId });
       res.setHeader('content-type', 'image/jpeg'); res.send(r.bytes); } catch (e) { res.status(500).json({ erro: e.message }); }
   });
 

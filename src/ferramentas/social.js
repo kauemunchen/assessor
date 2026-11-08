@@ -4,7 +4,11 @@ import { gerarJSON } from '../integracoes/gemini.js';
 import { db } from '../db/index.js';
 import * as gcal from '../integracoes/google-calendar.js';
 import * as render from '../integracoes/render.js';
+import * as kit from '../integracoes/marca-kit.js';
 const MARCADOR = 'Social Media';
+/** Nome da marca/dono para os prompts: KM (admin) ou o cliente. */
+const quemE = (conta) => kit.usaKM(conta.id) ? 'Kauê München' : (kit.lerKit(conta.id)?.nome || conta.empresa || conta.nome_dono);
+const manualDe = (conta) => kit.usaKM(conta.id) ? 'o MANUAL DA MARCA KM' : `a identidade de ${quemE(conta)} (${kit.resumoParaPrompt(conta.id)?.replace(/\n/g, ' ') || 'sem kit cadastrado'})`;
 
 const identidade = (contaId) => { const r = db.prepare('SELECT dados FROM social_identidade WHERE conta_id=?').get(contaId); return r ? JSON.parse(r.dados) : null; };
 const historico = (contaId, n = 5) => db.prepare("SELECT formato, tema, legenda, hashtags FROM posts WHERE conta_id=? AND status='publicado' ORDER BY id DESC LIMIT ?").all(contaId, n);
@@ -13,14 +17,16 @@ export function ferramentas(_conta) {
   return [
     { name: 'definir_identidade', description: 'Salva/atualiza a identidade da marca para conteúdo (perfil, nicho, público, tom, pilares, hashtags fixas). Chame quando o dono descrever a marca.', parameters: { type: 'OBJECT', properties: { perfil: { type: 'STRING' }, nicho: { type: 'STRING' }, publico: { type: 'STRING' }, tom: { type: 'STRING' }, pilares: { type: 'STRING' }, hashtags_fixas: { type: 'STRING' }, descricao: { type: 'STRING' } } } },
     { name: 'ver_identidade', description: 'Mostra a identidade de marca salva', parameters: { type: 'OBJECT', properties: {} } },
-    { name: 'gerar_legenda', description: 'Gera legenda no modelo do manual KM (gancho, contexto, 3 pontos, CTA único, 5 hashtags = 3 fixas + 2 do pilar). Informe o pilar (GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO) e o objetivo do CTA (salvar|compartilhar|comentar|seguir|conversa|direct).', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, formato: { type: 'STRING', description: 'post|carrossel|reels|story' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa|direct' }, serie: { type: 'STRING', description: 'Antes do processo | Método 3R | Ferramenta da semana | (vazio)' }, ajuste: { type: 'STRING', description: 'instrução de ajuste sobre uma versão anterior' } }, required: ['tema', 'pilar'] } },
+    { name: 'gerar_legenda', description: 'Gera legenda no modelo do manual da marca (gancho, contexto, 3 pontos, CTA único, 5 hashtags = fixas + do pilar). Informe o pilar (um dos pilares da marca) e o objetivo do CTA (salvar|compartilhar|comentar|seguir|conversa|direct).', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, formato: { type: 'STRING', description: 'post|carrossel|reels|story' }, pilar: { type: 'STRING', description: 'pilar de conteúdo da marca (KM: GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO; clientes: os pilares deles)' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa|direct' }, serie: { type: 'STRING', description: 'Antes do processo | Método 3R | Ferramenta da semana | (vazio)' }, ajuste: { type: 'STRING', description: 'instrução de ajuste sobre uma versão anterior' } }, required: ['tema', 'pilar'] } },
     { name: 'gerar_midia', description: 'Gera imagem via fal.ai a partir de briefing visual (na identidade da marca). Retorna URL.', parameters: { type: 'OBJECT', properties: { briefing: { type: 'STRING' }, ratio: { type: 'STRING', description: '1:1|4:5|9:16' } }, required: ['briefing'] } },
-    { name: 'gerar_frase', description: 'Estático do manual: frase forte (até 2 linhas) com UMA palavra em dourado, etiqueta do pilar, fundo #37414E, 3:4. template=km usa o visual antigo (paletas km/preto/copa/azul/vinho). Retorna URL.', parameters: { type: 'OBJECT', properties: { frase: { type: 'STRING' }, palavra_dourada: { type: 'STRING', description: 'a palavra da frase que vai em dourado' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' }, autoria: { type: 'STRING' } }, required: ['frase'] } },
-    { name: 'gerar_carrossel', description: 'Carrossel do manual KM (6–8 slides, 3:4): capa (etiqueta + título ≤8 palavras com UMA palavra dourada + subtítulo) → problema → 3–5 conteúdo → resumo → CTA. IA escreve, serviço renderiza em Poppins/fundo #37414E. Retorna URLs + textos. Depois criar_post(formato=carrossel, midias_urls). template=km usa o visual antigo.', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, pilar: { type: 'STRING', description: 'GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa' }, qtd_conteudo: { type: 'NUMBER', description: 'slides de conteúdo, 3 a 5 (padrão 3)' }, instrucoes: { type: 'STRING' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' } }, required: ['tema', 'pilar'] } },
-    { name: 'aplicar_marca', description: 'Aplica o logo KM como marca d\'água numa imagem (URL) escolhendo automaticamente a cor pelo fundo (branco em fundo escuro, azul-cinza em fundo claro, com sombra se precisar). Use em toda foto enviada pelo dono antes de propor o post.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, posicao: { type: 'STRING', description: 'inferior-direito (padrão) | inferior-esquerdo | superior-direito | superior-esquerdo' }, assinatura: { type: 'BOOLEAN', description: 'escrever @kauemunchen sob o logo (padrão false — só se o dono pedir)' } }, required: ['url'] } },
-    { name: 'listar_paletas', description: 'Paletas de cor disponíveis para artes KM', parameters: { type: 'OBJECT', properties: {} } },
+    { name: 'gerar_frase', description: 'Estático: frase forte (até 2 linhas) com UMA palavra na cor de destaque, etiqueta do pilar, nas cores e logo da marca da conta, 3:4. Retorna URL.', parameters: { type: 'OBJECT', properties: { frase: { type: 'STRING' }, palavra_dourada: { type: 'STRING', description: 'a palavra da frase que vai em dourado' }, pilar: { type: 'STRING', description: 'pilar de conteúdo da marca (KM: GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO; clientes: os pilares deles)' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' }, autoria: { type: 'STRING' } }, required: ['frase'] } },
+    { name: 'gerar_carrossel', description: 'Carrossel (6–8 slides, 3:4) NA IDENTIDADE DA CONTA (cores, @ e logo cadastrados no kit de marca): capa (etiqueta + título ≤8 palavras com UMA palavra em destaque + subtítulo) → problema → 3–5 conteúdo → resumo → CTA. Para transformar um texto pronto do dono, passe-o em texto_base. Retorna URLs + textos. Depois criar_post(formato=carrossel, midias_urls).', parameters: { type: 'OBJECT', properties: { tema: { type: 'STRING' }, texto_base: { type: 'STRING', description: 'texto pronto do dono a transformar em carrossel (mantenha as ideias dele)' }, pilar: { type: 'STRING', description: 'pilar de conteúdo da marca (KM: GESTÃO|NEGÓCIOS|IA|AUTOMAÇÃO; clientes: os pilares deles)' }, objetivo_cta: { type: 'STRING', description: 'salvar|compartilhar|comentar|seguir|conversa' }, qtd_conteudo: { type: 'NUMBER', description: 'slides de conteúdo, 3 a 5 (padrão 3)' }, instrucoes: { type: 'STRING' }, template: { type: 'STRING', description: 'manual (padrão) | km' }, paleta: { type: 'STRING' } }, required: ['tema', 'pilar'] } },
+    { name: 'aplicar_marca', description: 'Aplica a LOGO DA MARCA DA CONTA como marca d\'água numa imagem (URL), escolhendo a versão clara/escura pelo fundo. Só use quando o dono PEDIR marca d\'água/logo na foto.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, posicao: { type: 'STRING', description: 'inferior-direito (padrão) | inferior-esquerdo | superior-direito | superior-esquerdo' }, assinatura: { type: 'BOOLEAN', description: 'escrever @kauemunchen sob o logo (padrão false — só se o dono pedir)' } }, required: ['url'] } },
+    { name: 'ver_marca_visual', description: 'Mostra o kit de marca visual da conta (cores, @, logos cadastradas). Use antes de criar arte se não souber a identidade.', parameters: { type: 'OBJECT', properties: {} } },
+    { name: 'definir_marca_visual', description: 'Salva o kit de marca VISUAL da conta usado nas artes (carrossel, frase, story): cores em hex, @ do Instagram, nome, fontes e regras. Use quando o dono passar as cores/identidade ou mandar o manual da marca (extraia as cores HEX do manual). Depois confirme o que salvou.', parameters: { type: 'OBJECT', properties: { nome: { type: 'STRING', description: 'nome da marca como aparece' }, assinatura: { type: 'STRING', description: '@ do Instagram' }, cor_fundo: { type: 'STRING', description: 'hex da cor de fundo das artes (geralmente a cor principal escura)' }, cor_destaque: { type: 'STRING', description: 'hex da cor de destaque (palavra-chave, detalhes)' }, cor_titulo: { type: 'STRING', description: 'hex do texto do título (opcional; automático pelo contraste)' }, cor_apoio: { type: 'STRING', description: 'hex do texto de apoio (opcional)' }, fontes: { type: 'STRING' }, observacoes: { type: 'STRING', description: 'regras do manual em 1–3 linhas (ex.: não distorcer a logo, área de respiro)' } } } },
+    { name: 'salvar_logo', description: 'Guarda uma imagem (URL já hospedada) como LOGO da marca da conta. variante: principal | claro (versão para fundo escuro, ex.: logo branca) | escuro (versão para fundo claro). substituir=true troca a logo daquela variante. NUNCA gere post a partir de uma logo.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, variante: { type: 'STRING' }, substituir: { type: 'BOOLEAN' } }, required: ['url'] } },
     { name: 'remover_audio', description: 'Gera uma versão SEM áudio de um vídeo já hospedado (URL do Cloudinary) e devolve a nova URL para usar como midia_url. Use quando o dono pedir vídeo mudo/sem som.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' } }, required: ['url'] } },
-    { name: 'listar_biblioteca', description: 'Lista mídias guardadas do dono (fotos já com marca KM, vídeos hospedados, stories prontos) para montar um post depois. Devolve id, descrição e URL pronta para midia_url.', parameters: { type: 'OBJECT', properties: { tipo: { type: 'STRING', description: 'imagem|video|story|vazio=todas' }, max: { type: 'NUMBER' } } } },
+    { name: 'listar_biblioteca', description: 'Lista mídias guardadas do dono (fotos, vídeos hospedados, stories prontos) para montar um post depois. Devolve id, descrição e URL pronta para midia_url.', parameters: { type: 'OBJECT', properties: { tipo: { type: 'STRING', description: 'imagem|video|story|vazio=todas' }, max: { type: 'NUMBER' } } } },
     { name: 'criar_post', description: 'Salva post no calendário editorial com legenda/hashtags/mídia aprovados. formato: post (foto) | carrossel | reels (vídeo, com legenda) | story (foto ou vídeo ≤60 s, sem legenda). midia_url pode ser imagem ou vídeo (URL do Cloudinary vinda do upload). status: rascunho ou agendado (com data).', parameters: { type: 'OBJECT', properties: { formato: { type: 'STRING' }, tema: { type: 'STRING' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' }, description: 'slides do carrossel, em ordem' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM para agendar; vazio = rascunho' }, pilar: { type: 'STRING' } }, required: ['formato', 'legenda'] } },
     { name: 'agendar_post', description: 'Agenda um post salvo (rascunho) para uma data/hora; cria o evento no marcador Social Media da agenda. Use quando o dono aprovar e disser quando.', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' }, data: { type: 'STRING', description: 'YYYY-MM-DDTHH:MM' } }, required: ['post_id', 'data'] } },
     { name: 'atualizar_post', description: 'Altera legenda, hashtags, mídia, tema, pilar ou formato de um post salvo', parameters: { type: 'OBJECT', properties: { post_id: { type: 'NUMBER' }, legenda: { type: 'STRING' }, hashtags: { type: 'STRING' }, midia_url: { type: 'STRING' }, midias_urls: { type: 'ARRAY', items: { type: 'STRING' } }, tema: { type: 'STRING' }, pilar: { type: 'STRING' }, formato: { type: 'STRING' } }, required: ['post_id'] } },
@@ -47,17 +53,17 @@ export async function executar(nome, a, conta, ctx = {}) {
       const pilarKey = (a.pilar || 'gestao').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const tagsPilar = id.hashtags_pilar?.[pilarKey] || '';
       const cta = id.ctas?.[(a.objetivo_cta || 'salvar').toLowerCase()] || a.objetivo_cta || '';
-      const r = await gerarJSON(`Você é a MIA, social media de ${id.perfil || 'Kauê München'}. Gere legenda para Instagram em português do Brasil seguindo o MANUAL DA MARCA à risca.
+      const r = await gerarJSON(`Você é a MIA, social media de ${id.perfil || quemE(conta)}. Gere legenda para Instagram em português do Brasil seguindo ${manualDe(conta)} à risca.
 IDENTIDADE: ${JSON.stringify({ nicho: id.nicho, publico: id.publico, tom: id.tom, pilares: id.pilares, provas: id.provas, fase: id.fase })}
 HISTÓRICO APROVADO (referência de tom): ${JSON.stringify(hist)}
 TEMA: ${a.tema}
-FORMATO: ${a.formato || 'post'} · PILAR: ${(a.pilar || 'GESTÃO').toUpperCase()}${a.serie ? ' · SÉRIE: ' + a.serie : ''}
+FORMATO: ${a.formato || 'post'} · PILAR: ${(a.pilar || (kit.usaKM(conta.id) ? 'GESTÃO' : 'CONTEÚDO')).toUpperCase()}${a.serie ? ' · SÉRIE: ' + a.serie : ''}
 CTA OBRIGATÓRIO (único, no fim, exatamente este texto): "${cta}"
 HASHTAGS OBRIGATÓRIAS (exatamente 5): fixas ${id.hashtags_fixas || ''} + 2 escolhidas de: ${tagsPilar}
 ${a.ajuste ? 'AJUSTE PEDIDO SOBRE A VERSÃO ANTERIOR: ' + a.ajuste : ''}
 MODELO DA LEGENDA: [gancho 1 linha] linha em branco [história/contexto real 2–3 linhas] linha em branco [3 pontos curtos numerados 1. 2. 3.] linha em branco [CTA] linha em branco [5 hashtags].
 REGRAS: gancho nas 3 primeiras palavras (fórmulas: número+contraste, frase que dói, confissão, "e se"); uma ideia por post; números só os das provas de autoridade ou os informados; nunca inventar depoimento; sem venda na fase atual; sem emoji além de um no máximo.
-Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "gancho": "...", "legenda": "texto completo no modelo, sem as hashtags", "hashtags": "#a #b #c #d #e", "cta": "${cta}", "briefing_imagem": "descrição visual curta na identidade KM (fundo #37414E, título branco, uma palavra em dourado)"${(a.formato === 'carrossel') ? ', "slides": ["capa: título até 8 palavras com UMA palavra em dourado", "problema", "conteúdo 1", "conteúdo 2", "conteúdo 3", "resumo", "cta"]' : ''}}`);
+Responda JSON: {"etiqueta": "${(a.pilar || (kit.usaKM(conta.id) ? 'GESTÃO' : 'CONTEÚDO')).toUpperCase()}", "gancho": "...", "legenda": "texto completo no modelo, sem as hashtags", "hashtags": "#a #b #c #d #e", "cta": "${cta}", "briefing_imagem": "descrição visual curta na identidade visual da marca"${(a.formato === 'carrossel') ? ', "slides": ["capa: título até 8 palavras com UMA palavra em dourado", "problema", "conteúdo 1", "conteúdo 2", "conteúdo 3", "resumo", "cta"]' : ''}}`);
       return r;
     }
     case 'gerar_midia': {
@@ -66,19 +72,27 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "gancho":
       return { url: await ig.gerarImagemFal(prompt, a.ratio || '4:5'), briefing: a.briefing };
     }
     case 'listar_paletas': return render.paletas();
+    case 'ver_marca_visual': return kit.usaKM(conta.id) ? { identidade: 'KM (padrão do manual KM)' } : (kit.lerKit(conta.id) || { aviso: 'Nenhum kit de marca visual cadastrado. Peça cores (hex), @ e logos — ou o manual da marca.' });
+    case 'definir_marca_visual': {
+      const k = kit.salvarKit(conta.id, { nome: a.nome, assinatura: a.assinatura, fontes: a.fontes, observacoes: a.observacoes, cores: { fundo: a.cor_fundo, destaque: a.cor_destaque, titulo: a.cor_titulo, apoio: a.cor_apoio } });
+      return { salvo: true, kit: k, falta: [!k.cores?.fundo && 'cor de fundo', !k.cores?.destaque && 'cor de destaque', !kit.temLogo(conta.id) && 'logos (mande as imagens com a legenda "logo")'].filter(Boolean) };
+    }
+    case 'salvar_logo': { const r = kit.salvarLogo(conta.id, a.url, a.variante, { substituir: !!a.substituir }); db.prepare("UPDATE biblioteca SET tipo='logo' WHERE conta_id=? AND url=?").run(conta.id, a.url); return { salvo: true, ...r }; }
     case 'aplicar_marca': {
+      if (!kit.temLogo(conta.id)) throw new Error('Nenhuma logo cadastrada para esta marca. Peça ao dono para mandar a logo com a legenda "logo".');
       const src = await fetch(a.url).then(r => { if (!r.ok) throw new Error('não consegui baixar a imagem'); return r.arrayBuffer(); });
-      const { bytes, info } = await render.marcaDagua(Buffer.from(src), { posicao: a.posicao || 'inferior-direito', assinatura: a.assinatura === true });
+      const { bytes, info } = await render.marcaDagua(Buffer.from(src), { posicao: a.posicao || 'inferior-direito', assinatura: a.assinatura === true, contaId: conta.id });
       const url = await cdn.upload(bytes, { pasta: `assessor/${conta.id}/marcadas` });
       return { url, ...info };
     }
     case 'gerar_frase': {
-      const bytes = await render.frase(a.frase, { template: a.template || 'manual', paleta: a.paleta || 'km', autoria: a.autoria || '@kauemunchen', palavra_dourada: a.palavra_dourada, etiqueta: a.pilar });
+      const bytes = await render.frase(a.frase, { template: a.template || 'manual', paleta: a.paleta || 'km', autoria: a.autoria, palavra_dourada: a.palavra_dourada, etiqueta: a.pilar, contaId: conta.id });
       const url = await cdn.upload(bytes, { pasta: `assessor/${conta.id}/frases` });
       return { url, frase: a.frase, palavra_dourada: a.palavra_dourada, template: a.template || 'manual' };
     }
     case 'gerar_carrossel': {
-      const template = a.template || 'manual';
+      const km = kit.usaKM(conta.id);
+      const template = km ? (a.template || 'manual') : 'manual';
       const idd = identidade(conta.id) || {};
       const cta = idd.ctas?.[(a.objetivo_cta || 'salvar').toLowerCase()] || 'Salva para aplicar na segunda-feira.';
       let dados;
@@ -89,22 +103,22 @@ ${a.instrucoes ? 'Instrucoes de estilo: ' + a.instrucoes + '\n' : ''}Formato exa
 Crie EXATAMENTE ${qtd} objetos dentro do array slides. Apenas o JSON.`);
       } else {
         const n = Math.min(5, Math.max(3, a.qtd_conteudo || 3));
-        dados = await gerarJSON(`Você é a MIA, social media de Kauê München. Escreva um carrossel de Instagram seguindo o Manual da Marca KM.
+        dados = await gerarJSON(`Você é a MIA, social media de ${quemE(conta)}. Escreva um carrossel de Instagram seguindo ${km ? 'o Manual da Marca KM' : 'o tom e o público desta marca (NÃO é a marca KM)'}.
 IDENTIDADE: ${JSON.stringify({ nicho: idd.nicho, publico: idd.publico, tom: idd.tom, provas: idd.provas })}
-TEMA: ${a.tema} · PILAR: ${(a.pilar || 'GESTÃO').toUpperCase()}
-${a.instrucoes ? 'INSTRUÇÕES: ' + a.instrucoes + '\n' : ''}ESTRUTURA OBRIGATÓRIA: capa → 1 slide "problema" → ${n} slides "conteudo" → 1 slide "resumo" → CTA.
+TEMA: ${a.tema} · PILAR: ${(a.pilar || (km ? 'GESTÃO' : 'CONTEÚDO')).toUpperCase()}
+${a.texto_base ? 'TEXTO DO DONO (transforme ESTE texto em carrossel: mantenha as ideias, a ordem e os dados dele; só divida e enxugue):\n' + String(a.texto_base).slice(0, 4000) + '\n' : ''}${a.instrucoes ? 'INSTRUÇÕES: ' + a.instrucoes + '\n' : ''}ESTRUTURA OBRIGATÓRIA: capa → 1 slide "problema" → ${n} slides "conteudo" → 1 slide "resumo" → CTA.
 REGRAS: título da capa com até 8 palavras e UMA palavra-chave para destacar em dourado (palavra_dourada = exatamente uma palavra que aparece no título); subtítulo 1 linha; cada slide interno: título até 6 palavras (pode ter palavra_dourada) e texto de até 30 palavras, direto, de igual para igual, sem jargão; números só os das provas ou do tema; sem emoji.
-Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo": "...", "palavra_dourada": "...", "subtitulo": "...", "slides": [{"tipo": "problema", "titulo": "...", "texto": "..."}, {"tipo": "conteudo", "titulo": "...", "palavra_dourada": "...", "texto": "..."}, {"tipo": "resumo", "titulo": "...", "texto": "..."}], "cta": "${cta}"}`);
+Responda JSON: {"etiqueta": "${(a.pilar || (km ? 'GESTÃO' : 'CONTEÚDO')).toUpperCase()}", "titulo": "...", "palavra_dourada": "...", "subtitulo": "...", "slides": [{"tipo": "problema", "titulo": "...", "texto": "..."}, {"tipo": "conteudo", "titulo": "...", "palavra_dourada": "...", "texto": "..."}, {"tipo": "resumo", "titulo": "...", "texto": "..."}], "cta": "${cta}"}`);
       }
       if (!dados?.slides?.length) throw new Error('IA não devolveu slides válidos; tente de novo.');
-      const slides = await render.carrossel(dados, { template, paleta: a.paleta || 'km' });
+      const slides = await render.carrossel(dados, { template, paleta: a.paleta || 'km', contaId: conta.id });
       const base = Date.now();
       const urls = await Promise.all(slides.map((b, i) => cdn.upload(b, { pasta: `assessor/${conta.id}/carrossel`, nome: `car_${base}_${i}` })));
       return { urls, textos: dados, template };
     }
     case 'remover_audio': {
       const bytes = Buffer.from(await fetch(a.url).then(r => { if (!r.ok) throw new Error('não consegui baixar o vídeo'); return r.arrayBuffer(); }));
-      const r = await render.editarVideo(bytes, { sem_audio: true });
+      const r = await render.editarVideo(bytes, { sem_audio: true, logo: kit.marcaDaguaAutomatica(conta.id) }, { contaId: conta.id });
       const v = await cdn.uploadVideo(r.bytes, { pasta: `assessor/${conta.id}/videos` });
       db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem, descricao, largura, altura, duracao) VALUES (?,?,?,?,?,?,?,?,?)').run(conta.id, v.url, v.url, 'video', 'sem-audio', 'vídeo sem áudio', v.largura || null, v.altura || null, v.duracao || null);
       return { url: v.url, audio: 'removido', logo: r.info.logo };
@@ -164,12 +178,13 @@ Responda JSON: {"etiqueta": "${(a.pilar || 'GESTÃO').toUpperCase()}", "titulo":
  *  qualquer outra é baixada, marcada e re-hospedada. Vídeo não passa por aqui (não há marca d'água em vídeo nesta etapa). */
 export async function garantirMarca(contaId, url) {
   if (!url) return url;
+  if (!kit.marcaDaguaAutomatica(contaId)) return url; // clientes: sem marca d'água automática (só quando pedirem, via aplicar_marca)
   if (ig.ehVideo(url)) {
     const ok = db.prepare('SELECT 1 FROM biblioteca WHERE conta_id=? AND marcada_url=? AND tipo=?').get(contaId, url, 'video');
     if (ok) return url;
     const bytes = Buffer.from(await fetch(url).then(r => { if (!r.ok) throw new Error(`não consegui baixar o vídeo (${r.status})`); return r.arrayBuffer(); }));
     if (bytes.byteLength > 200 * 1024 * 1024) throw new Error('vídeo acima de 200 MB — não consigo aplicar o logo KM; reduza o arquivo.');
-    const r = await render.editarVideo(bytes, {}); // só o logo
+    const r = await render.editarVideo(bytes, {}, { contaId }); // só o logo
     const v = await cdn.uploadVideo(r.bytes, { pasta: `assessor/${contaId}/videos` });
     db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem, largura, altura, duracao) VALUES (?,?,?,?,?,?,?,?)').run(contaId, url, v.url, 'video', 'auto-logo', v.largura || null, v.altura || null, v.duracao || null);
     console.log(`[marca] logo KM aplicado no vídeo → ${r.info.logo}`);
@@ -178,7 +193,7 @@ export async function garantirMarca(contaId, url) {
   const conhecida = db.prepare('SELECT 1 FROM biblioteca WHERE conta_id=? AND marcada_url=?').get(contaId, url) || /\/(marcadas|stories|carrossel|frase|artes)\//.test(url);
   if (conhecida) return url;
   const bytes = Buffer.from(await fetch(url).then(r => { if (!r.ok) throw new Error(`não consegui baixar a imagem (${r.status})`); return r.arrayBuffer(); }));
-  const r = await render.marcaDagua(bytes);
+  const r = await render.marcaDagua(bytes, { contaId });
   const nova = await cdn.upload(r.bytes, { pasta: `assessor/${contaId}/marcadas` });
   db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem) VALUES (?,?,?,?,?)').run(contaId, url, nova, 'imagem', 'auto-marca');
   console.log(`[marca] aplicada automaticamente em ${url.slice(-40)} → logo ${r.info.logo}`);
@@ -198,7 +213,7 @@ export async function publicarPost(contaId, postId) {
   const p = db.prepare('SELECT * FROM posts WHERE id=? AND conta_id=?').get(postId, contaId);
   if (!p) throw new Error(`Post #${postId} não existe.`);
   if (!p.midia_url) throw new Error('Post sem mídia. Gere ou envie uma imagem/vídeo antes.');
-  await garantirMarcaPost(contaId, p); // regra dura: KM em toda imagem antes de sair
+  await garantirMarcaPost(contaId, p); // KM: logo em toda imagem antes de sair; clientes: só se ligaram a marca d'água automática
   const legenda = [p.legenda, p.hashtags].filter(Boolean).join('\n\n');
   let id;
   if (p.midia_url?.startsWith('[')) id = await ig.publicarCarrossel({ igUserId: cred.ig_user_id, token: cred.token, legenda, urls: JSON.parse(p.midia_url) });
@@ -233,11 +248,12 @@ export async function guardarVideoEnviado(contaId, bytes) {
   return { ...v, avisos };
 }
 // Upload de imagem enviada pelo dono no chat → URL pública (vira mídia do próximo post)
-export async function guardarImagemEnviada(contaId, bytes) {
+export async function guardarImagemEnviada(contaId, bytes, { tipo = 'imagem', marcar = null } = {}) {
+  const aplicar = marcar ?? kit.marcaDaguaAutomatica(contaId);
   const [original, m] = await Promise.all([
     cdn.upload(bytes, { pasta: `assessor/${contaId}` }),
-    render.marcaDagua(Buffer.from(bytes)).then(async r => ({ marcada: await cdn.upload(r.bytes, { pasta: `assessor/${contaId}/marcadas` }), info: r.info })).catch(e => ({ marcada: null, info: { erro: e.message } })),
+    !aplicar ? Promise.resolve({ marcada: null, info: { logo: 'não aplicada' } }) : render.marcaDagua(Buffer.from(bytes), { contaId }).then(async r => ({ marcada: await cdn.upload(r.bytes, { pasta: `assessor/${contaId}/marcadas` }), info: r.info })).catch(e => ({ marcada: null, info: { erro: e.message } })),
   ]);
-  db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem) VALUES (?,?,?,?,?)').run(contaId, original, m.marcada || null, 'imagem', 'telegram');
-  return { original, ...m };
+  const id = db.prepare('INSERT INTO biblioteca (conta_id, url, marcada_url, tipo, origem) VALUES (?,?,?,?,?)').run(contaId, original, m.marcada || null, tipo, 'telegram').lastInsertRowid;
+  return { id, original, aplicada: aplicar, ...m };
 }

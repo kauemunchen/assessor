@@ -29,14 +29,14 @@ const SAIR = /^(cancela|cancelar|sair|deixa|para|parar|esquece)\b/i;
 
 export const MODELOS_FOTO = [
   { n: 1, id: 'foto_faixa', nome: 'Foto + faixa de texto', pede: 'texto' },
-  { n: 0, id: 'so_marca', nome: 'Sem render — só a marca KM na foto', pede: null },
+  { n: 0, id: 'so_marca', nome: 'Sem render — só a logo da marca na foto', pede: null },
 ];
 export const MODELOS_VIDEO = [
   { n: 1, id: 'v_legenda', nome: 'Legenda automática (transcrição queimada no vídeo)' },
-  { n: 2, id: 'v_letreiro', nome: 'Frase/letreiro na faixa KM (texto seu)' },
+  { n: 2, id: 'v_letreiro', nome: 'Frase/letreiro na faixa da marca (texto seu)' },
   { n: 3, id: 'v_enquadrar', nome: 'Ajustar para 9:16 (1080x1920)' },
   { n: 4, id: 'v_cortar', nome: 'Cortar duração (ex.: primeiros 60 s)' },
-  { n: 0, id: 'v_so_logo', nome: 'Sem edição — só o logo KM no canto' },
+  { n: 0, id: 'v_so_logo', nome: 'Sem edição — só a logo da marca no canto' },
 ];
 export const MODELOS_TEXTO = [
   { n: 1, id: 'frase', nome: 'Frase do dia', pede: 'texto' },
@@ -76,7 +76,7 @@ const botoesDe = (ms, porLinha = 2) => { const out = []; for (let i = 0; i < ms.
 function perguntaModelo(e) {
   if (e.base === 'foto') return { texto: 'Foto recebida. Modelo:', botoes: botoesDe(MODELOS_FOTO, 1) };
   if (e.base === 'texto') return { texto: 'Modelo de story em texto:', botoes: botoesDe(MODELOS_TEXTO, 1) };
-  return { texto: `Vídeo recebido${e.vinfo ? ` (${e.vinfo.w}x${e.vinfo.h}, ${Math.round(e.vinfo.dur)} s)` : ''}. O que aplicar? (toque em um, ou escreva "1 e 2" para combinar). O logo KM entra sempre.`, botoes: [[{ t: '💬 Legenda automática', d: '1' }, { t: '🏷 Frase na faixa KM', d: '2' }], [{ t: '📐 Ajustar 9:16', d: '3' }, { t: '✂️ Cortar', d: '4' }], [{ t: '🏷+💬 Frase + legenda', d: '1 e 2' }, { t: 'Só o logo', d: '0' }], [{ t: '✖ Cancelar', d: 'cancela' }]] };
+  return { texto: `Vídeo recebido${e.vinfo ? ` (${e.vinfo.w}x${e.vinfo.h}, ${Math.round(e.vinfo.dur)} s)` : ''}. O que aplicar? (toque em um, ou escreva "1 e 2" para combinar). A logo da marca entra quando cadastrada.`, botoes: [[{ t: '💬 Legenda automática', d: '1' }, { t: '🏷 Frase na faixa KM', d: '2' }], [{ t: '📐 Ajustar 9:16', d: '3' }, { t: '✂️ Cortar', d: '4' }], [{ t: '🏷+💬 Frase + legenda', d: '1 e 2' }, { t: 'Só o logo', d: '0' }], [{ t: '✖ Cancelar', d: 'cancela' }]] };
 }
 
 /** Trata a mensagem do dono dentro do modo. Devolve string (continua), {foto, texto} (prévia) ou null (não é dele). */

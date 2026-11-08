@@ -3,7 +3,8 @@ Operações (combináveis, nesta ordem): enquadrar 9:16 → cortar duração →
 """
 import io, os, json, subprocess, tempfile, shutil
 from PIL import Image, ImageDraw
-from template_manual import fonte, h2r, wrap, titulo_destacado, logo, PRIM, SEC, BRANCO, OURO
+from template_manual import fonte, h2r, wrap, titulo_destacado, logo
+from marca import mk
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 FONT_BOLD = os.path.join(AQUI, "fonts", "Poppins-Bold.ttf")
@@ -37,9 +38,11 @@ def _lum_canto(path, w, h, t=1.0):
         if os.path.exists(out): os.remove(out)
 
 def _png_logo(variante, largura):
-    lg = logo(variante); lh = int(lg.height * largura / lg.width)
+    lg = logo(variante)
+    if lg is None: return None, 0
+    lh = int(lg.height * largura / lg.width)
     lg = lg.resize((largura, lh), Image.LANCZOS)
-    p = os.path.join(tempfile.gettempdir(), f"km_logo_{variante}_{largura}.png"); lg.save(p); return p, lh
+    p = os.path.join(tempfile.gettempdir(), f"km_logo_{os.getpid()}_{id(lg)}_{variante}_{largura}.png"); lg.save(p); return p, lh
 
 def _png_faixa(texto, palavra, W, posicao="base", etiqueta=None):
     """Faixa #37414E translúcida com texto (padrão KM) como PNG RGBA de largura W."""
@@ -47,9 +50,9 @@ def _png_faixa(texto, palavra, W, posicao="base", etiqueta=None):
     f = fonte("Bold", int(W * 0.046)); tmp = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
     M = int(W * 0.067); linhas = wrap(tmp, texto, f, W - 2 * M - 20); lh = int(W * 0.056); pad = int(lh * 0.6)
     alt = pad + (60 if etiqueta else 0) + len(linhas) * lh + pad
-    img = Image.new("RGBA", (W, alt), (*h2r(PRIM), 215)); dr = ImageDraw.Draw(img); y = pad
+    img = Image.new("RGBA", (W, alt), (*h2r(mk().fundo), 215)); dr = ImageDraw.Draw(img); y = pad
     if etiqueta:
-        dr.text((M, y), etiqueta.upper(), fill=h2r(OURO), font=fonte("Bold", int(W * 0.026))); dr.rectangle([M, y + 40, M + 60, y + 43], fill=h2r(OURO)); y += 70
+        dr.text((M, y), etiqueta.upper(), fill=h2r(mk().destaque), font=fonte("Bold", int(W * 0.026))); dr.rectangle([M, y + 40, M + 60, y + 43], fill=h2r(mk().destaque)); y += 70
     titulo_destacado(dr, texto, palavra, f, M, y, W - 2 * M - 20, lh)
     p = os.path.join(tempfile.gettempdir(), f"km_faixa_{abs(hash(texto))}.png"); img.save(p); return p, alt
 
@@ -102,9 +105,12 @@ def editar(video_bytes, ops):
         else: filtros_leg = None
         # 4) logo KM (regra dura)
         lum = _lum_canto(src, W, H); variante = "branco" if lum < 60 else ("claro" if lum < 140 else "escuro")
-        lw = int(W * 0.13); lp, lh = _png_logo(variante, lw); inputs += ["-i", lp]
-        ov.append((idx, f"overlay=W-w-{int(W*0.045)}:H-h-{int(H*0.03) + logo_sobe}")); idx += 1
-        info["logo"] = {"branco": "branco", "claro": "claro #C8CFD7", "escuro": "escuro #37414E"}[variante]
+        lw = int(W * 0.13); lp, lh = _png_logo(variante, lw) if ops.get("logo", True) else (None, 0)
+        if lp:
+            inputs += ["-i", lp]
+            ov.append((idx, f"overlay=W-w-{int(W*0.045)}:H-h-{int(H*0.03) + logo_sobe}")); idx += 1
+            info["logo"] = {"branco": "branco", "claro": "claro", "escuro": "escuro"}[variante]
+        else: info["logo"] = "sem logo"
         # montar filter_complex
         chain = "[0:v]" + (",".join(filtros) if filtros else "null") + "[v0]"; last = "v0"; parts = [chain]
         if filtros_leg: parts.append(f"[{last}]{filtros_leg}[vL]"); last = "vL"

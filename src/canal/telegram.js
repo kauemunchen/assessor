@@ -22,6 +22,7 @@ export class TelegramCanal {
         conta: null, chatId: String(m.chat.id), remetente: String(m.from.id),
         tipo: (m.voice || m.audio) ? 'audio' : vid ? 'video' : m.photo ? 'imagem' : m.document ? 'arquivo' : 'texto',
         texto: m.text || m.caption || '',
+        grupo: m.media_group_id || null,
         midia: vid ? { ref: vid.file_id, mime: vid.mime_type || 'video/mp4', nome: vid.file_name, tamanho: vid.file_size, duracao: vid.duration }
              : m.voice ? { ref: m.voice.file_id, mime: 'audio/ogg' }
              : m.audio ? { ref: m.audio.file_id, mime: m.audio.mime_type || 'audio/mpeg' }

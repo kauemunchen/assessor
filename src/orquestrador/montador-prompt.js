@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { configPersona } from '../db/contas.js';
 import { lerMemoria } from './memoria.js';
+import { usaKM, resumoParaPrompt } from '../integracoes/marca-kit.js';
 
 const base = (n) => fs.readFileSync(path.resolve(`src/personas/${n}.md`), 'utf8');
 const conhecimento = (n) => { const p = path.resolve(`src/conhecimento/${n}.md`); return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''; };
@@ -30,10 +31,13 @@ export function montarPrompt({ modulo, conta, ativos, texto: mensagem = '' }) {
     janela_silencio: conta.janela_silencio || '22h–6h e domingo', padrao_tarde: cfg.padrao_tarde || '14h',
     memoria: lerMemoria(conta.id, modulo).map(m => `- ${m}`).join('\n') || '- (nada ainda)',
   };
-  let texto = base(modulo).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
+  // MIA: a conta KM (admin) usa o manual KM; clientes usam a persona genérica + o kit de marca deles.
+  const cliente = modulo === 'social' && !usaKM(conta.id);
+  if (cliente) vars.marca_visual = resumoParaPrompt(conta.id) || '';
+  let texto = base(cliente ? 'social-cliente' : modulo).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
   const leve = modulo === 'social' && mensagem && !mensagem.startsWith('[') && (CURTA(mensagem) || !PRECISA_CONHECIMENTO.social.test(mensagem)); // redução só na MIA; os demais sempre com expertise completa
-  let ref = leve ? '' : conhecimento(MAPA_CONHECIMENTO[modulo]);
-  if (leve) texto += '\n\n(Referência de expertise omitida nesta mensagem por ser curta/operacional; se precisar do manual para responder, diga ao dono para repetir o pedido com mais detalhe.)';
+  let ref = leve || cliente ? '' : conhecimento(MAPA_CONHECIMENTO[modulo]); // estrategia-conteudo.md é o manual KM: não vale para clientes
+  if (leve && !cliente) texto += '\n\n(Referência de expertise omitida nesta mensagem por ser curta/operacional; se precisar do manual para responder, diga ao dono para repetir o pedido com mais detalhe.)';
   if (ref) {
     // se o arquivo tiver um bloco "## Regras operacionais", usa só dali para baixo (resumo executável); senão corta em 7000 chars
     const i = ref.indexOf('## Regras operacionais'); if (i > 0) ref = ref.slice(i);

@@ -7,22 +7,34 @@ async function post(path, body, json = true) {
   return Buffer.from(await r.arrayBuffer());
 }
 export const paletas = () => fetch(BASE + '/paletas').then(r => r.json());
-export const frase = (texto, { paleta = 'km', autoria = '@kauemunchen', template = 'manual', palavra_dourada, etiqueta } = {}) => post('/frase', { frase: texto, paleta, autoria, template, palavra_dourada, etiqueta });
+export async function frase(texto, { paleta = 'km', autoria, template = 'manual', palavra_dourada, etiqueta, contaId } = {}) {
+  const marca = await marcaDe(contaId);
+  return post('/frase', { frase: texto, paleta, autoria: autoria ?? (marca ? undefined : '@kauemunchen'), template: marca ? 'manual' : template, palavra_dourada, etiqueta, marca });
+}
 export const letreiro = (gancho) => post('/letreiro', { gancho });
 import { contextoUso } from './gemini.js';
 import { cobrar } from '../creditos/index.js';
+import { marcaParaRender } from './marca-kit.js';
+/** Identidade da conta para o render (null = padrão KM). contaId explícito > conta da conversa atual. */
+const marcaDe = (contaId) => marcaParaRender(contaId ?? contextoUso.contaId).catch(e => { console.error('[render] marca', e.message); return null; });
 const cobra = (item, vezes = 1) => cobrar(contextoUso.contaId, item, { modulo: contextoUso.modulo || 'social', vezes });
 
-export async function marcaDagua(bytes, { posicao = 'inferior-direito', proporcao = 0.14, assinatura = false } = {}) {
-  const r = await fetch(`${BASE}/marca-dagua?posicao=${posicao}&proporcao=${proporcao}&assinatura=${assinatura ? 1 : 0}`, { method: 'POST', body: bytes });
+export async function marcaDagua(bytes, { posicao = 'inferior-direito', proporcao = 0.14, assinatura = false, contaId } = {}) {
+  const marca = await marcaDe(contaId);
+  const url = `${BASE}/marca-dagua?posicao=${posicao}&proporcao=${proporcao}&assinatura=${assinatura ? 1 : 0}`;
+  const r = marca ? await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imagem_b64: Buffer.from(bytes).toString('base64'), marca }) })
+    : await fetch(url, { method: 'POST', body: bytes });
   if (!r.ok) throw new Error(`render /marca-dagua: ${r.status} ${await r.text()}`);
   let info = {}; try { info = JSON.parse(r.headers.get('x-marca-info') || '{}'); } catch {}
   return { bytes: Buffer.from(await r.arrayBuffer()), info };
 }
 export const comLogo = (bytes) => post('/logo', bytes, false);
-export async function carrossel(dados, { paleta = 'km', template = 'manual' } = {}) {
+/** Logo enviada pelo cliente: tem transparência? é clara ou escura? → sugestão de variante (claro = para fundo escuro). */
+export async function analisarLogo(bytes) { const r = await fetch(BASE + '/logo/analisar', { method: 'POST', body: bytes }); if (!r.ok) throw new Error('analisar logo falhou'); return r.json(); }
+export async function carrossel(dados, { paleta = 'km', template = 'manual', contaId } = {}) {
   cobra('render_carrossel');
-  const zip = await post('/carrossel', { dados, paleta, template });
+  const marca = await marcaDe(contaId);
+  const zip = await post('/carrossel', { dados, paleta, template: marca ? 'manual' : template, marca });
   return extrairZip(zip);
 }
 // ZIP "stored"/deflate mínimo sem dependência
@@ -38,9 +50,10 @@ function extrairZip(buf) {
 }
 
 /** Story 9:16 no padrão KM. dados = {modelo, ...}; foto/capa = Buffer opcional. Devolve {bytes, info}. */
-export async function story(dados, { foto, capa } = {}) {
+export async function story(dados, { foto, capa, contaId } = {}) {
   cobra('render_story');
-  const fd = new FormData(); fd.append('json', JSON.stringify(dados));
+  const marca = await marcaDe(contaId);
+  const fd = new FormData(); fd.append('json', JSON.stringify(dados)); if (marca) fd.append('marca', JSON.stringify(marca));
   if (foto) fd.append('foto', new Blob([foto]), 'foto.jpg');
   if (capa) fd.append('capa', new Blob([capa]), 'capa.jpg');
   const r = await fetch(BASE + '/story', { method: 'POST', body: fd });
@@ -50,9 +63,10 @@ export async function story(dados, { foto, capa } = {}) {
 }
 
 /** Edição de vídeo (ffmpeg no render). ops: {enquadrar, cortar, letreiro, legendas}. Sempre sai com o logo KM. */
-export async function editarVideo(bytes, ops) {
+export async function editarVideo(bytes, ops, { contaId } = {}) {
   cobra('video_edicao');
-  const fd = new FormData(); fd.append('json', JSON.stringify(ops)); fd.append('video', new Blob([bytes]), 'in.mp4');
+  const marca = await marcaDe(contaId);
+  const fd = new FormData(); fd.append('json', JSON.stringify(ops)); fd.append('video', new Blob([bytes]), 'in.mp4'); if (marca) fd.append('marca', JSON.stringify(marca));
   const r = await fetch(BASE + '/video/editar', { method: 'POST', body: fd });
   if (!r.ok) { let e = ''; try { e = (await r.json()).erro; } catch { e = await r.text(); } throw new Error(`edição de vídeo: ${String(e).slice(0, 300)}`); }
   let info = {}; try { info = JSON.parse(r.headers.get('x-video-info') || '{}'); } catch {}

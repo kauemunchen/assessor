@@ -27,6 +27,10 @@ export async function tratarMensagem(msg, canal) {
     if (/^(receber|quero) ofertas?$/.test(t)) { db.prepare('UPDATE contas SET marketing_optin=1, marketing_optin_em=CURRENT_TIMESTAMP WHERE id=?').run(conta.id); return '✅ Combinado — você vai receber novidades, ofertas e lançamentos do Fiel. Para parar, mande *parar ofertas*.'; } }
   const usuario = obterUsuario(msg.chatId);
   if (usuario && usuario.papel !== 'dono') return fluxoColaborador(msg, conta, usuario);
+  // Imagens sem pedido: resposta aos botões "usar em post / são logos / só guardar" (sem IA)
+  { const imgs = await import('./imagens-social.js'); const b = imgs.tratarBotao(conta, msg);
+    if (b?.resposta) return b.resposta; if (b?.msg) Object.assign(msg, b.msg);
+    else if (msg.tipo === 'texto' && msg.texto && !msg.texto.startsWith('[')) { const ctx = imgs.contextoPendente(conta.id); if (ctx) msg.texto += ctx; } }
   // Créditos: sem saldo, só comandos livres (status, créditos, sim/não, login web…)
   const cred = await import('../creditos/index.js');
   if (!cred.podeUsar(conta.id) && !(msg.tipo === 'texto' && cred.COMANDOS_LIVRES.test((msg.texto || '').trim()))) return cred.mensagemBloqueio(conta.id);
@@ -69,14 +73,18 @@ export async function tratarMensagem(msg, canal) {
     }
   }
   if (msg.tipo === 'imagem' || msg.tipo === 'arquivo') {
-    const temDoc = ativosAgora.includes('documentos'), temSocial = ativosAgora.includes('social') && msg.tipo === 'imagem', temFin = ativosAgora.includes('financeiro');
-    const nomeArq = String(msg.midia?.nome || '').toLowerCase(); const legenda = msg.texto || '';
+    const imgs = await import('./imagens-social.js');
+    const legenda = msg.texto || '';
+    const ehImagem = msg.tipo === 'imagem' || (msg.tipo === 'arquivo' && /^image\/(png|jpe?g|webp)/i.test(msg.midia?.mime || '') && imgs.LOGO_RX.test(legenda));
+    const temDoc = ativosAgora.includes('documentos'), temSocial = ativosAgora.includes('social') && ehImagem, temFin = ativosAgora.includes('financeiro');
+    const nomeArq = String(msg.midia?.nome || '').toLowerCase();
     let destino = temDoc && !temSocial ? 'documentos' : temSocial && !temDoc ? 'social' : null;
+    if (temSocial && imgs.LOGO_RX.test(legenda)) destino = 'social'; // logo da marca → MIA guarda (nunca vira documento nem post)
     if (!destino && temDoc && temSocial) {
       if (SOCIAL_RX.test(legenda)) destino = 'social'; else if (DOC_RX.test(legenda)) destino = 'documentos';
     }
     // Tina: OFX/CSV sempre; legenda financeira (extrato, boleto, comprovante, pix…) vai para ela; sem legenda clara, a IA decide abaixo
-    if (temFin) {
+    if (temFin && destino !== 'social') {
       if (/\.(ofx|csv)$/.test(nomeArq) || /ofx|csv/i.test(msg.midia?.mime || '') || (FIN_RX.test(legenda) && !SOCIAL_RX.test(legenda) && !/\b(guarda|arquiva)\b/i.test(legenda))) destino = 'financeiro';
       else if (!SOCIAL_RX.test(legenda) && !DOC_RX.test(legenda)) destino = null;
       else if (!destino && !temDoc && !temSocial) destino = 'financeiro';
@@ -122,11 +130,15 @@ export async function tratarMensagem(msg, canal) {
         else info = `[Arquivo financeiro não reconhecido ou ilegível (tipo: ${doc.tipo || '?'}). Não chute valores: peça o extrato em OFX ou CSV (exportado do internet banking) ou uma foto mais nítida.]`;
         msg.texto = (legenda ? legenda + '\n' : '') + info; msg.forcarModulo = 'financeiro';
       } catch (e) { msg.texto = (legenda ? legenda + '\n' : '') + `[Não consegui ler o documento financeiro. Erro real: ${e.message}. Diga ao dono e sugira enviar o extrato em OFX ou CSV.]`; msg.forcarModulo = 'financeiro'; }
+    } else if (destino === 'social' && imgs.deveColetar(conta.id, { legenda, grupo: msg.grupo })) {
+      // logo, álbum ou foto sem pedido: guarda e decide o lote de uma vez (sem gerar post por conta própria)
+      return imgs.coletar({ conta, msg, canal, bytes: Buffer.from(bytes), processar: (m) => tratarMensagem(m, canal) });
     } else if (destino === 'social') {
       try {
         const { guardarImagemEnviada } = await import('../ferramentas/social.js');
         const r = await guardarImagemEnviada(conta.id, bytes);
-        msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Foto enviada pelo dono. Original: ${r.original}. Versão com marca d'água KM já aplicada (logo ${r.info.logo || '?'}${r.info.sombra ? ' com sombra' : ''}, canto ${r.info.posicao || 'inferior-direito'}): ${r.marcada || 'falhou: ' + (r.info.erro || '')}. Use a versão marcada como midia_url. Mostre-a na resposta (vira prévia), diga qual cor de logo foi escolhida e por quê, e proponha legenda no modelo do manual (pergunte o pilar se não estiver claro).]`;
+        if (!r.aplicada) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Foto enviada pelo dono, já hospedada (SEM marca d'água): ${r.original}. Use esta URL como midia_url. Faça só o que ele pediu na legenda; marca d'água só se ele pedir (aplicar_marca).]`; msg.forcarModulo = 'social'; }
+        else msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[Foto enviada pelo dono. Original: ${r.original}. Versão com marca d'água KM já aplicada (logo ${r.info.logo || '?'}${r.info.sombra ? ' com sombra' : ''}, canto ${r.info.posicao || 'inferior-direito'}): ${r.marcada || 'falhou: ' + (r.info.erro || '')}. Use a versão marcada como midia_url. Mostre-a na resposta (vira prévia), diga qual cor de logo foi escolhida e por quê, e proponha legenda no modelo do manual (pergunte o pilar se não estiver claro).]`;
         msg.forcarModulo = 'social';
       } catch (e) { msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[imagem recebida, mas não consegui hospedar: ${e.message}]`; }
     } else msg.texto = (msg.texto ? msg.texto + '\n' : '') + `[${msg.tipo === 'imagem' ? 'imagem' : 'arquivo'} recebido; para eu guardar, ligue o módulo Documentos ("ativa documentos").]`;
@@ -141,7 +153,7 @@ export async function tratarMensagem(msg, canal) {
         await canal.enviar(msg.conta, msg.chatId, `🎬 Baixando "${meta.nome}" do Drive e hospedando…`);
         const bytes = await drive.baixar(conta.id, id); const soc = await import('../ferramentas/social.js');
         if (/^video\//.test(meta.mime)) { const v = await soc.guardarVideoEnviado(conta.id, bytes); msg.texto += `\n[Vídeo do Drive já hospedado: ${v.url} (${Math.round(v.duracao || 0)} s, ${v.largura}x${v.altura}${v.avisos.length ? '; atenção: ' + v.avisos.join('; ') : ''}). Use como midia_url. Pergunte Reels ou Story e quando, se o dono não disse; senão salve com criar_post e confirme.]`; }
-        else { const r = await soc.guardarImagemEnviada(conta.id, bytes); msg.texto += `\n[Imagem do Drive hospedada. Original: ${r.original}. Com marca d'água: ${r.marcada || 'falhou'}. Use a marcada como midia_url (story ou post, conforme o dono).]`; }
+        else { const r = await soc.guardarImagemEnviada(conta.id, bytes); msg.texto += r.aplicada ? `\n[Imagem do Drive hospedada. Original: ${r.original}. Com marca d'água: ${r.marcada || 'falhou'}. Use a marcada como midia_url (story ou post, conforme o dono).]` : `\n[Imagem do Drive hospedada (sem marca d'água): ${r.original}. Use como midia_url (story ou post, conforme o dono).]`; }
         msg.forcarModulo = 'social'; msg.linkTratado = true;
       }
     } catch (e) { console.error('[drive→social]', e.message); }

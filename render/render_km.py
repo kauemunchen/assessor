@@ -6,6 +6,8 @@ Endpoints: POST /frase {frase, paleta, autoria} -> JPEG
 """
 import os, io, json, zipfile
 from flask import Flask, request, send_file, jsonify
+import base64
+import marca as marca_mod
 import template_manual as manual
 import template_story as story
 import video_km as video
@@ -255,14 +257,24 @@ def car_renderizar(dados, paleta="km", custom=None):
 
 app = Flask(__name__)
 
+@app.before_request
+def _marca_da_requisicao():
+    """Identidade visual da conta (vinda do app). Sem ela → padrão KM."""
+    d = None
+    try:
+        if request.is_json: d = (request.get_json(silent=True) or {}).get("marca")
+        elif (request.content_type or "").startswith("multipart/") and request.form.get("marca"): d = json.loads(request.form["marca"])
+    except Exception: d = None
+    marca_mod.usar(d)
+
 @app.get("/paletas")
 def paletas(): return jsonify({k: v["nome"] for k, v in PALETAS.items()})
 
 @app.post("/frase")
 def frase_ep():
     j = request.get_json(force=True)
-    if j.get("template", "manual") == "manual":
-        out = manual.frase(j["frase"], j.get("palavra_dourada"), j.get("etiqueta"), j.get("autoria", "@kauemunchen"))
+    if j.get("template", "manual") == "manual" or j.get("marca"):
+        out = manual.frase(j["frase"], j.get("palavra_dourada"), j.get("etiqueta"), j.get("autoria"))
     else:
         out = renderizar_frase(j["frase"], j.get("paleta", "km"), j.get("autoria", "@kauemunchen"), j.get("custom"))
     return send_file(io.BytesIO(out), mimetype="image/jpeg")
@@ -270,7 +282,7 @@ def frase_ep():
 @app.post("/carrossel")
 def carrossel_ep():
     j = request.get_json(force=True)
-    if j.get("template", "manual") == "manual": slides = manual.carrossel(j["dados"])
+    if j.get("template", "manual") == "manual" or j.get("marca"): slides = manual.carrossel(j["dados"])
     else: slides = car_renderizar(j["dados"], j.get("paleta", "km"), j.get("custom"))
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
@@ -281,10 +293,27 @@ def carrossel_ep():
 def logo_ep():
     return send_file(io.BytesIO(add_logo(request.get_data(), True)), mimetype="image/jpeg")
 
+@app.post("/logo/analisar")
+def logo_analisar_ep():
+    """Diz se a logo tem fundo transparente e se o desenho é claro ou escuro (para escolher a variante)."""
+    from PIL import Image, ImageOps
+    img = ImageOps.exif_transpose(Image.open(io.BytesIO(request.get_data()))).convert("RGBA")
+    img.thumbnail((256, 256))
+    px = list(img.getdata()); n = len(px) or 1
+    transp = sum(1 for p in px if p[3] < 40) / n
+    vis = [p for p in px if p[3] >= 128] or px
+    lum = sum(0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2] for p in vis) / len(vis) / 255
+    if transp > 0.05: sugestao = "claro" if lum > 0.62 else ("escuro" if lum < 0.45 else "principal")
+    else: sugestao = "principal"  # logo com fundo próprio (selo): serve em qualquer fundo
+    return jsonify(transparente=transp > 0.05, luminancia=round(lum, 2), sugestao=sugestao)
+
 @app.post("/marca-dagua")
 def marca_ep():
     pos = request.args.get("posicao", "inferior-direito"); prop = float(request.args.get("proporcao", "0.14")); ass = request.args.get("assinatura", "0") == "1"
-    out, info = manual.marca_dagua(request.get_data(), pos, prop, ass)
+    if request.is_json:  # {imagem_b64, marca}
+        j = request.get_json(force=True); dados = base64.b64decode(j["imagem_b64"])
+    else: dados = request.get_data()
+    out, info = manual.marca_dagua(dados, pos, prop, ass)
     resp = send_file(io.BytesIO(out), mimetype="image/jpeg"); resp.headers["X-Marca-Info"] = json.dumps(info, ensure_ascii=False); return resp
 
 @app.post("/letreiro")
@@ -304,7 +333,7 @@ def story_ep():
     if m == "foto_faixa":
         if not foto: return jsonify(erro="foto obrigatória"), 400
         out, info = story.foto_faixa(foto, j.get("texto", ""), j.get("palavra_dourada"), j.get("etiqueta"), "base")  # padrão KM fixo: faixa SEMPRE no rodapé
-    elif m == "frase": out, info = story.frase(j.get("texto", ""), j.get("palavra_dourada"), j.get("etiqueta"), j.get("autoria", "@kauemunchen"))
+    elif m == "frase": out, info = story.frase(j.get("texto", ""), j.get("palavra_dourada"), j.get("etiqueta"), j.get("autoria"))
     elif m == "chamada_feed": out, info = story.chamada_feed(j.get("titulo", ""), capa, j.get("palavra_dourada"), j.get("chamada", "Novo no feed"), j.get("formato", "carrossel"))
     elif m == "passos": out, info = story.passos(j.get("titulo", ""), j.get("itens", []), j.get("palavra_dourada"), j.get("etiqueta"))
     elif m == "pergunta": out, info = story.pergunta(j.get("texto", ""), j.get("palavra_dourada"), j.get("rodape", "Me responde aqui no direct"))

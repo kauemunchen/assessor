@@ -37,7 +37,7 @@ jobs:
             git fetch --all --prune
             git reset --hard origin/main
             echo "==> docker compose up -d --build"
-            docker compose up -d --build assessor
+            docker compose up -d --build render assessor
             echo "==> status"
             docker compose ps assessor
             echo "==> últimas 30 linhas de log"

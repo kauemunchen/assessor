@@ -109,27 +109,53 @@ telas.marca = async () => {
   const val = (k) => { const v = id[k]; return v == null ? '' : (typeof v === 'object' ? JSON.stringify(v, null, 1).replace(/[{}"]/g, '').replace(/,\n/g, '\n').trim() : String(v)); };
   const campo = (k, rows = 2) => `<div class="campo"><label>${ROTULOS_ID[k]}</label><textarea name="${k}" rows="${rows}">${esc(val(k))}</textarea></div>`;
   const cores = ['#37414E', '#C8CFD7', '#FFFFFF', '#000000', '#B9964B'];
+  const k = d.kit || {}; const kc = k.cores || {}; const kl = k.logos || {};
+  const slotLogo = (v, rot, bg) => `<div class="logo-slot"><div class="logo-prev" style="background:${bg}">${kl[v] ? `<img src="${esc(kl[v])}" alt="">` : '<span>sem logo</span>'}</div><div class="d" style="font-size:12px;margin:4px 0">${rot}</div><label class="btn" style="font-size:12px;padding:5px 10px;cursor:pointer">${kl[v] ? 'Trocar' : 'Enviar'}<input type="file" accept="image/png,image/jpeg,image/webp" data-logo="${v}" hidden></label>${kl[v] ? ` <button class="btn perigo" style="font-size:12px;padding:5px 10px" data-rmlogo="${v}">remover</button>` : ''}</div>`;
+  const corInput = (key, rot, ajuda) => `<div class="campo"><label>${rot}</label><div style="display:flex;gap:8px;align-items:center"><input type="color" data-cor="${key}" value="${esc(kc[key] || '#ffffff')}" style="width:44px;height:36px;padding:0;border:1px solid var(--sec);border-radius:8px;${kc[key] ? '' : 'opacity:.45'}"><input name="cor_${key}" value="${esc(kc[key] || '')}" placeholder="${ajuda}" style="flex:1"></div></div>`;
+  const kitCard = `<div class="cartao" style="grid-column:1/-1"><h3>Kit visual da sua marca <span class="tag">usado em carrossel, frase e story</span></h3>
+      <p class="d">As artes da MIA saem com estas cores, este @ e esta logo. Também dá para mandar o manual da marca no chat: "MIA, este é o manual da minha marca".</p>
+      <form id="fKit"><div class="grade">
+        <div class="campo"><label>Nome da marca</label><input name="nome" value="${esc(k.nome || '')}" placeholder="Ex.: Valora Imóveis"></div>
+        <div class="campo"><label>@ do Instagram</label><input name="assinatura" value="${esc(k.assinatura || '')}" placeholder="@suamarca"></div>
+        ${corInput('fundo', 'Cor de fundo das artes', 'ex.: #2B2B2B')}${corInput('destaque', 'Cor de destaque', 'ex.: #D9542F')}${corInput('titulo', 'Cor do título (opcional)', 'automática')}${corInput('apoio', 'Cor do texto de apoio (opcional)', 'automática')}
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" name="marca_dagua_auto" ${k.marca_dagua_auto ? 'checked' : ''}> Aplicar minha logo automaticamente nas fotos que eu enviar <span class="d" style="font-size:12px">(desligado = só quando eu pedir)</span></label>
+      <div style="display:flex;align-items:center;gap:10px"><button class="btn prim">Salvar kit</button><span class="salvo"></span></div></form>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:16px;align-items:flex-start">
+        ${slotLogo('principal', 'Logo principal', '#F3F3F3')}${slotLogo('claro', 'Versão clara (fundo escuro)', '#2B2B2B')}${slotLogo('escuro', 'Versão escura (fundo claro)', '#FFFFFF')}
+        <div style="margin-left:auto"><p class="d">Prévia ao vivo (story "frase")</p><img id="previaMarca" src="" style="height:260px;border-radius:12px;background:var(--fundo);display:block"><div style="display:flex;gap:6px;margin-top:6px"><input id="previaTexto" value="Seu próximo imóvel começa *aqui*" style="flex:1"><button class="btn" id="gerarPrevia" type="button">Gerar</button></div></div>
+      </div></div>`;
   const corpo = `<div class="grade">
-    <div class="cartao" style="grid-column:1/-1"><h3>Padrão visual <span class="tag">regra dura</span></h3>
+    ${d.km ? '' : kitCard}${d.km ? `<div class="cartao" style="grid-column:1/-1"><h3>Padrão visual <span class="tag">regra dura</span></h3>
       <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
         <div><p class="d">Cores</p><div style="display:flex;gap:8px">${cores.map(c => `<div title="${c}" style="width:40px;height:40px;border-radius:10px;background:${c};border:1px solid var(--sec)"></div>`).join('')}</div><p class="d" style="margin-top:6px">#37414E fundo · #C8CFD7 apoio · branco títulos · dourado #B9964B só UMA palavra</p></div>
         <div><p class="d">Logos (marca d'água automática, cor pela luminosidade)</p><div style="display:flex;gap:10px">${d.logos.map((l, i) => `<div style="padding:10px;border-radius:10px;background:${['#FFFFFF', '#37414E', '#000000'][i]}"><img src="${l}" style="height:36px"></div>`).join('')}</div></div>
         <div><p class="d">Tipografia</p><div style="font-family:Poppins;font-weight:700;font-size:22px">Poppins Bold <span style="color:#B9964B">dourado</span></div><p class="d">Regular para texto · etiqueta Bold caixa alta</p></div>
         <div style="margin-left:auto"><p class="d">Prévia ao vivo (story "frase do dia")</p><img id="previaMarca" src="" style="height:260px;border-radius:12px;background:var(--fundo);display:block"><div style="display:flex;gap:6px;margin-top:6px"><input id="previaTexto" value="Processo não é burocracia, é *liberdade*" style="flex:1;font:inherit;padding:6px 8px;border:1px solid var(--sec);border-radius:8px;background:var(--fundo);color:var(--texto)"><button class="btn sec" id="gerarPrevia">Gerar</button></div></div>
-      </div></div>
+      </div></div>` : ''}
     <div class="cartao" style="grid-column:1/-1"><h3>Identidade (o que a MIA usa em toda peça) ${d.atualizado_em ? `<span class="tag">atualizado ${esc(d.atualizado_em.slice(0, 10).split('-').reverse().join('/'))}</span>` : ''}</h3>
       <form id="fId"><div class="grade">${['perfil', 'nicho', 'publico', 'tom', 'pilares', 'series'].map(k => campo(k, 3)).join('')}${['hashtags_fixas', 'hashtags_pilar', 'ctas', 'provas'].map(k => campo(k, 4)).join('')}${['agenda', 'fase', 'formatos', 'cores', 'tipografia', 'descricao'].map(k => campo(k, 2)).join('')}</div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:8px"><button class="btn prim">Salvar identidade</button><span class="salvo"></span><span class="d" style="font-size:12px;color:var(--mudo)">Hashtags por pilar e CTAs: uma linha por item, "chave: valor".</span></div></form></div>
-    <div class="cartao" style="grid-column:1/-1"><h3>Regras operacionais do manual <span class="tag">entra no prompt da MIA</span></h3>
+    ${d.admin ? '' : '<!--'}<div class="cartao" style="grid-column:1/-1"><h3>Regras operacionais do manual <span class="tag">entra no prompt da MIA</span></h3>
       <p class="d">É o trecho do Manual da Marca que a MIA carrega ao criar conteúdo. Edite com cuidado; o arquivo anterior fica salvo como .bak.</p>
       <form id="fRegras"><textarea name="regras" rows="16" style="width:100%;font:13px/1.5 ui-monospace,Menlo,monospace;padding:10px;border:1px solid var(--sec);border-radius:10px;background:var(--fundo);color:var(--texto)">${esc(d.regras_operacionais)}</textarea>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:8px"><button class="btn prim">Salvar regras</button><span class="salvo"></span></div></form></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px"><button class="btn prim">Salvar regras</button><span class="salvo"></span></div></form></div>${d.admin ? '' : '-->'}
   </div>`;
   return { titulo: '✨ Identidade & Marca', sub: 'Tudo que define como a MIA escreve e desenha. Mudou aqui, vale no próximo post.', corpo, depois() {
     const gerar = async () => { const t = $('#previaTexto').value; const m = t.match(/\*([^*]+)\*/); const r = await fetch('/api/marca/previa', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + tokenLocal() }, body: JSON.stringify({ modelo: 'frase', texto: t.replace(/\*/g, ''), palavra_dourada: m ? m[1] : null }) }); if (r.ok) $('#previaMarca').src = URL.createObjectURL(await r.blob()); else toast('render indisponível'); };
     $('#gerarPrevia').onclick = gerar; gerar();
     $('#fId').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); for (const k of ['hashtags_pilar', 'ctas']) { const linhas = (f[k] || '').split('\n').map(x => x.trim()).filter(x => x.includes(':')); if (linhas.length) f[k] = Object.fromEntries(linhas.map(l => { const i = l.indexOf(':'); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })); } await post('/api/marca/identidade', f); e.target.querySelector('.salvo').textContent = 'salvo ✓'; };
-    $('#fRegras').onsubmit = async (e) => { e.preventDefault(); await post('/api/marca/regras', { regras: e.target.regras.value }); e.target.querySelector('.salvo').textContent = 'salvo ✓'; };
+    if ($('#fKit')) {
+      document.querySelectorAll('[data-cor]').forEach(i => i.oninput = () => { const t = document.querySelector(`[name=cor_${i.dataset.cor}]`); t.value = i.value.toUpperCase(); i.style.opacity = 1; });
+      $('#fKit').onsubmit = async (e) => { e.preventDefault(); const f = new FormData(e.target);
+        const r = await post('/api/marca/kit', { nome: f.get('nome'), assinatura: f.get('assinatura'), marca_dagua_auto: !!f.get('marca_dagua_auto'), cores: { fundo: f.get('cor_fundo'), destaque: f.get('cor_destaque'), titulo: f.get('cor_titulo'), apoio: f.get('cor_apoio') } });
+        e.target.querySelector('.salvo').textContent = r?.erro ? r.erro : 'salvo ✓'; gerar(); };
+      document.querySelectorAll('[data-logo]').forEach(inp => inp.onchange = async () => { const f = inp.files[0]; if (!f) return; if (f.size > 8e6) return toast('Imagem acima de 8 MB');
+        const b64 = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(f); });
+        toast('Enviando logo…'); const r = await post('/api/marca/kit/logo', { imagem_b64: b64, variante: inp.dataset.logo }); if (r?.erro) return toast(r.erro); mostrarTela('marca'); });
+      document.querySelectorAll('[data-rmlogo]').forEach(b => b.onclick = async () => { if (!confirm('Remover esta logo?')) return; await del('/api/marca/kit/logo/' + b.dataset.rmlogo); mostrarTela('marca'); });
+    }
+    $('#fRegras') && ($('#fRegras').onsubmit = async (e) => { e.preventDefault(); await post('/api/marca/regras', { regras: e.target.regras.value }); e.target.querySelector('.salvo').textContent = 'salvo ✓'; });
   } };
 };
 

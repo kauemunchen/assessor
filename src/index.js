@@ -15,7 +15,7 @@ import { db } from './db/index.js';
 
 migrar();
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '12mb' }));
 const servidor = http.createServer(app);
 // Contador público da landing: interações reais (fuso de São Paulo). Só totais, sem dado de conta.
 let _cont = { em: 0, hoje: 0, semana: 0, total: 0 };

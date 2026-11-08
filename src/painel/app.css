@@ -346,3 +346,10 @@ details.menu-mais[open] summary .seta{transform:rotate(90deg);color:var(--coral)
 .guia-dialogo code{background:var(--papel-2);padding:2px 6px;border-radius:6px;font-size:14px}
 .guia-dialogo::backdrop{background:rgba(0,0,0,.35)}
 @media (max-width:520px){.guia{margin:8px 10px 0}.guia-cont{display:none}.guia-txt small{display:none}}
+
+/* Kit visual da marca */
+.logo-slot{display:flex;flex-direction:column;align-items:flex-start}
+.logo-prev{width:150px;height:90px;border-radius:12px;border:1px solid var(--linha);display:grid;place-items:center;overflow:hidden}
+.logo-prev img{max-width:85%;max-height:70%;object-fit:contain}
+.logo-prev span{font-size:12px;color:#999}
+#tela-config:not(.oculto) ~ .guia{display:none!important}
