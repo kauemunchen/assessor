@@ -1,0 +1,17 @@
+name: inspecao
+on:
+  push:
+    branches: [inspecao-vps]
+jobs:
+  ler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /root/bot/telegram-instagram-bot && echo "== arquivos" && find . -type f -not -path '*/venv/*' -not -path '*/.venv/*' -not -path '*/__pycache__/*' -not -path '*/.git/*' -not -path '*/node_modules/*' -printf '%s\t%p\n' | sort -k2 | head -200
+            echo "== processo"; ps aux | grep -i "telegram-instagram\|bot.py\|main.py" | grep -v grep | head -5
